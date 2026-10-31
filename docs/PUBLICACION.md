@@ -1,7 +1,7 @@
 # Publicar el juego bajo un dominio Polkadot
 
-> Todavía no se ha desplegado el Tamagotchi ni se ha reservado un dominio. Este documento describe
-> el recorrido; antes de publicar elegiremos explícitamente la red y el nombre.
+> El contrato EVM de prueba ya está desplegado. La web actual y el Product
+> `tamagotchiaxolotl.paseo` todavía no se han publicado como una versión nueva.
 
 ## Estado de PolkaPets v1
 
@@ -11,11 +11,11 @@ La web ya compila con el contrato EVM de Polkadot Hub TestNet
 
 El modo NFT actual usa `viem`, un RPC EVM y una wallet de navegador. El flujo Product
 `.paseo` carga el bundle dentro de un Host y su SDK de contratos documenta llamadas a
-contratos PolkaVM (`pallet-revive`) en Asset Hub. Antes de publicar un Product funcional
-hay que implementar y comprobar un adaptador de firma/lectura compatible con el Host,
-o portar el contrato y el frontend a la ruta PolkaVM. También hacen falta el nombre
-dotNS, una cuenta de publicación y autorización de Bulletin. El build web `dist/`
-por sí solo no resuelve esa integración.
+contratos PolkaVM (`pallet-revive`) en Asset Hub. `product-contract/` y `product-app/`
+preparan esa ruta, pero el manifiesto de `product-app/` todavía tiene la dirección
+provisional `0x000…000`. Hay que desplegar el contrato PolkaVM, instalar su dirección,
+probar el Product dentro del Host y contar con autorización de Bulletin. El build web
+`dist/` por sí solo no resuelve esa integración.
 
 ## Qué se publica
 
@@ -57,5 +57,8 @@ sin verificar primero qué red y CLI utilizará el hackatón. [Guía oficial de 
 - Confirmar el destino del contrato y su dirección/ABI/manifest, si el juego ya lo utiliza.
 - Revisar el bundle y los permisos antes de firmar.
 
-Por ahora solo tenemos el servidor de desarrollo local. La publicación en Bulletin o el registro del
-dominio aún no se ha ejecutado.
+La vista local usa un servidor de desarrollo y su dirección `127.0.0.1` solo abre en la
+misma computadora. El CID compartido anteriormente para `polka-pets.dot` identifica
+una versión anterior; no incluye los ajustes visuales y de ranking recientes. Para
+publicar esta versión hará falta generar un bundle nuevo y vincular su nuevo CID al
+dominio de la red elegida. No se ha ejecutado aquí esa publicación en Bulletin.
