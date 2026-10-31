@@ -21,7 +21,7 @@ export interface SpriteSheet {
   loop?: boolean;
 }
 
-/** Assets disponibles. Las especies nuevas tienen un retrato animado con tweens. */
+/** Cada especie tiene arte de las tres edades; los estados usan cuadros o movimiento Phaser. */
 export const SPRITES: SpriteSheet[] = [
   { petId: 0, stage: 'baby', anim: 'idle', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 4, firstFrame: 0, lastFrame: 3 },
   { petId: 0, stage: 'baby', anim: 'play', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 7, firstFrame: 4, lastFrame: 7 },
@@ -29,10 +29,12 @@ export const SPRITES: SpriteSheet[] = [
   { petId: 0, stage: 'baby', anim: 'sleep', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 3, firstFrame: 12, lastFrame: 15 },
   { petId: 0, stage: 'teen', anim: 'idle', file: 'pets/axolotl/teen.png', frameWidth: 1254, frameHeight: 1254, fps: 1 },
   { petId: 0, stage: 'adult', anim: 'idle', file: 'pets/axolotl/adult.png', frameWidth: 1254, frameHeight: 1254, fps: 1 },
-  ...(['wolf', 'bear', 'opossum', 'manatee'] as const).map((slug, index) => ({
-    petId: index + 1, stage: 'baby' as const, anim: 'idle' as const,
-    file: `pets/${slug}/idle.png`, frameWidth: 1254, frameHeight: 1254, fps: 1,
-  })),
+  ...(['wolf', 'bear', 'opossum', 'manatee'] as const).flatMap((slug, index) =>
+    (['baby', 'teen', 'adult'] as const).map((stage) => ({
+      petId: index + 1, stage, anim: 'idle' as const,
+      file: `pets/${slug}/${stage === 'baby' ? 'idle' : stage}.png`,
+      frameWidth: 1254, frameHeight: 1254, fps: 1,
+    }))),
 ];
 
 /** La selección usa las mismas imágenes que la escena. */

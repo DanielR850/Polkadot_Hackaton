@@ -15,7 +15,7 @@ La mascota cambia de ilustración en las etapas `teen` y `adult` usando `public/
 
 ## Lobo, oso, tlacuache y manatí
 
-`public/assets/pets/{wolf,bear,opossum,manatee}/idle.png` contiene cuatro personajes transparentes de 1254×1254 px generados con ImageGen para esta versión. La pantalla de selección muestra esos retratos. Phaser los mueve de manera distinta según el estado: respiración, salto al jugar, inclinación al comer, sueño, baño, tristeza y muerte. También se escala el personaje al pasar de bebé a adolescente y adulto; todavía no hay una ilustración nueva para cada etapa de estas cuatro especies.
+Cada carpeta `public/assets/pets/{wolf,bear,opossum,manatee}/` contiene `idle.png` (bebé), `teen.png` y `adult.png`. Son ilustraciones transparentes de 1254×1254 px generadas con ImageGen para esta versión. La pantalla de selección muestra el bebé. Phaser usa el retrato de la edad actual y anima todos los estados: reposo, comer, jugar, dormir, baño, tristeza y muerte. El juego aplica movimiento, escala, inclinación y color mediante código; las especies nuevas todavía no tienen hojas de fotogramas dibujados para cada acción.
 
 ## Recursos recibidos en `TomoDachi/`
 

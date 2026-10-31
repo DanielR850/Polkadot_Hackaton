@@ -166,14 +166,15 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (spriteAnim) {
         this.sprite.play(spriteAnim.key);
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
-        this.animateSprite(view.anim, (BODY.ry * 3) / spriteAnim.frameHeight);
+        this.animateSprite(view, (BODY.ry * 3) / spriteAnim.frameHeight);
         return;
       }
       this.paintPlaceholder(view);
     }
 
     /** Da movimiento propio a los retratos de un fotograma en cada estado del juego. */
-    private animateSprite(anim: PetAnim, scale: number) {
+    private animateSprite(view: SceneView, scale: number) {
+      const { anim, petId } = view;
       this.tweens.killTweensOf(this.sprite);
       this.sprite.clearTint().setAlpha(1).setAngle(0).setPosition(0, 0).setScale(scale);
       if (anim === 'dead') {
@@ -191,7 +192,11 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         return;
       }
       if (anim === 'play') {
-        this.tweens.add({ targets: this.sprite, y: -16, angle: 7, duration: 230, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        // Cada especie conserva una forma reconocible de jugar.
+        if (petId === 4) this.tweens.add({ targets: this.sprite, x: 12, y: -5, angle: 5, duration: 470, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        else if (petId === 2) this.tweens.add({ targets: this.sprite, y: 7, scaleY: scale * 0.92, duration: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        else if (petId === 3) this.tweens.add({ targets: this.sprite, x: 11, angle: -5, duration: 190, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        else this.tweens.add({ targets: this.sprite, y: -16, angle: 7, duration: 230, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
         return;
       }
       if (anim === 'eat') {
@@ -202,12 +207,15 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         this.tweens.add({ targets: this.sprite, angle: 4, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
         return;
       }
-      this.tweens.add({ targets: this.sprite, scaleY: scale * 1.025, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      if (petId === 4) this.tweens.add({ targets: this.sprite, y: -5, angle: 2, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      else this.tweens.add({ targets: this.sprite, scaleY: scale * 1.025, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     }
 
     private findSprite(view: SceneView): { key: string; frameHeight: number } | null {
-      for (const anim of [view.anim, 'idle'] as const) {
-        for (const stage of [view.stage, 'baby'] as const) {
+      // Conserva la etapa visible: si una acción no tiene cuadros propios,
+      // anima el retrato de esa misma edad antes de buscar arte de otra edad.
+      for (const stage of [view.stage, 'baby'] as const) {
+        for (const anim of [view.anim, 'idle'] as const) {
           const key = spriteKey(view.petId, stage, anim);
           const sheet = SPRITES.find((s) => s.petId === view.petId && s.stage === stage && s.anim === anim);
           if (sheet && this.anims.exists(key)) return { key, frameHeight: sheet.frameHeight };

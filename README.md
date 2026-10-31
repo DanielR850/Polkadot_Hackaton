@@ -1,6 +1,6 @@
 # Tamagotchi Polkadot
 
-Juego web con ajolote, lobo, oso grizzly, tlacuache y manatí. Cada especie tiene etapas de bebé, adolescente y adulto.
+Juego web con ajolote, lobo, oso grizzly, tlacuache y manatí. Cada especie tiene ilustraciones de bebé, adolescente y adulto, con movimiento para los estados del juego.
 
 ## Ejecutar
 
@@ -29,6 +29,7 @@ La selección de cinco especies funciona en el modo local. La dirección TestNet
 - [Arquitectura](docs/ARQUITECTURA.md)
 - [PolkaPets y contrato](docs/POLKAPETS.md)
 - [Registro de assets](docs/ASSETS.md)
+- [Mascotas y animaciones](docs/ANIMACIONES.md)
 - [Publicación](docs/PUBLICACION.md)
 
 Los commits de las ramas integradas se conservan en `codex/integracion-total`.
