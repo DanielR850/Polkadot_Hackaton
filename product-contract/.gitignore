@@ -12,4 +12,5 @@ typechain-types/
 
 .env
 .hardhat-home/
+.npm-cache/
 .DS_Store

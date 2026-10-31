@@ -6,12 +6,12 @@ previsto es `@tamagotchiaxolotl/polkapets`.
 
 ## Estado
 
-El contrato está copiado para comprobar su compilación PolkaVM. Aún no está
-compilado, desplegado ni registrado. La dirección EVM `0x758425A3b756079B34FF97cB9C7A764fD44C008a`
+El contrato compiló con Hardhat Polkadot y se empaquetó con `cdm build`.
+Aún no está desplegado ni registrado. La dirección EVM `0x758425A3b756079B34FF97cB9C7A764fD44C008a`
 pertenece a otra ejecución y no es una dirección de este contrato PolkaVM.
 
-Antes de desplegar, compilar con `cdm build` y resolver cualquier incompatibilidad
-que señale `resolc`. Un despliegue requiere una cuenta propia de Paseo con PAS,
+Antes de desplegar, volver a compilar con `cdm build`. Un despliegue requiere
+una cuenta propia de Paseo con PAS,
 autorización Bulletin y mapeo de cuenta. No se deben registrar nombres con la cuenta
 compartida de desarrollo `//Alice`.
 
