@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { PetAnim } from './animations.ts';
-import { BACKGROUNDS, backgroundUrl, characterUrl, spriteKey, SPRITES } from './assets.ts';
+import { assetUrl, BACKGROUNDS, backgroundUrl, spriteKey, SPRITES } from './assets.ts';
 import { findPet } from './catalog.ts';
 import { scrubProgress, spongeTouchesPet } from './sponge.ts';
 import type { PetId, Stage } from './types.ts';
@@ -58,7 +58,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     preload() {
       this.load.on('loaderror', () => { /* sin el archivo se usa el marcador */ });
       for (const s of SPRITES) {
-        this.load.spritesheet(spriteKey(s.petId, s.stage, s.anim), characterUrl(s.file), { frameWidth: s.frameWidth, frameHeight: s.frameHeight });
+        this.load.spritesheet(spriteKey(s.petId, s.stage, s.anim), assetUrl(s.file), { frameWidth: s.frameWidth, frameHeight: s.frameHeight });
       }
       if (BACKGROUNDS.room) this.load.image('bg-room', backgroundUrl(BACKGROUNDS.room));
       if (BACKGROUNDS.bath) this.load.image('bg-bath', backgroundUrl(BACKGROUNDS.bath));

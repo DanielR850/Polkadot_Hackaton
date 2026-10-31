@@ -8,7 +8,7 @@ export interface SpriteSheet {
   petId: PetId;
   stage: Stage;
   anim: PetAnim;
-  /** Archivo dentro de `public/assets/characters/`, por ejemplo `axolotl-baby-idle.png`. */
+  /** Ruta relativa a `public/assets/`, por ejemplo `characters/axolotl-baby-idle.png`. */
   file: string;
   frameWidth: number;
   frameHeight: number;
@@ -23,10 +23,12 @@ export interface SpriteSheet {
 
 /** Assets disponibles. Las especies que aún no tienen arte usan el marcador vectorial. */
 export const SPRITES: SpriteSheet[] = [
-  { petId: 0, stage: 'baby', anim: 'idle', file: '../pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 4, firstFrame: 0, lastFrame: 3 },
-  { petId: 0, stage: 'baby', anim: 'play', file: '../pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 7, firstFrame: 4, lastFrame: 7 },
-  { petId: 0, stage: 'baby', anim: 'eat', file: '../pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 6, firstFrame: 8, lastFrame: 11 },
-  { petId: 0, stage: 'baby', anim: 'sleep', file: '../pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 3, firstFrame: 12, lastFrame: 15 },
+  { petId: 0, stage: 'baby', anim: 'idle', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 4, firstFrame: 0, lastFrame: 3 },
+  { petId: 0, stage: 'baby', anim: 'play', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 7, firstFrame: 4, lastFrame: 7 },
+  { petId: 0, stage: 'baby', anim: 'eat', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 6, firstFrame: 8, lastFrame: 11 },
+  { petId: 0, stage: 'baby', anim: 'sleep', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 3, firstFrame: 12, lastFrame: 15 },
+  { petId: 0, stage: 'teen', anim: 'idle', file: 'pets/axolotl/teen.png', frameWidth: 1254, frameHeight: 1254, fps: 1 },
+  { petId: 0, stage: 'adult', anim: 'idle', file: 'pets/axolotl/adult.png', frameWidth: 1254, frameHeight: 1254, fps: 1 },
 ];
 
 /** Retrato de la pantalla "Elige tu mascota": `public/assets/characters/<slug>-portrait.png`. */
@@ -44,4 +46,5 @@ export function spriteKey(petId: PetId, stage: Stage, anim: PetAnim): string {
 
 // Rutas relativas: el bundle se sirve desde un CID (vite `base: './'`).
 export const characterUrl = (file: string) => `assets/characters/${file}`;
+export const assetUrl = (file: string) => `assets/${file}`;
 export const backgroundUrl = (file: string) => `assets/backgrounds/${file}`;

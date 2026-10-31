@@ -9,7 +9,9 @@
 
 ## Animación del ajolote
 
-`public/assets/pets/axolotl/animations.png` contiene 16 cuadros transparentes en una hoja de 4 columnas por 4 filas. Cada cuadro mide 356×276 px. `src/game/assets.ts` conecta los cuadros con las animaciones idle (0–3), juego (4–7), comer (8–11) y dormir (12–15). La escena las reproduce desde la selección de mascota y durante las acciones correspondientes.
+`public/assets/pets/axolotl/animations.png` contiene 16 cuadros transparentes en una hoja de 4 columnas por 4 filas. Cada cuadro mide 356×276 px. `src/game/assets.ts` conecta los cuadros con las animaciones idle (0–3), juego (4–7), comer (8–11) y dormir (12–15).
+
+La mascota cambia de ilustración en las etapas `teen` y `adult` usando `public/assets/pets/axolotl/teen.png` y `adult.png`. Son sprites estáticos transparentes de 1254×1254 px; mientras aún no hay ciclos animados específicos para estas etapas, sus acciones reutilizan la pose idle. Ambas ilustraciones se generaron con ImageGen usando la hoja del bebé como referencia de identidad y estilo.
 
 ## Recursos recibidos en `TomoDachi/`
 
