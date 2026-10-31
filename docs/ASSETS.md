@@ -16,7 +16,7 @@ Las rutas anteriores son relativas a `TomoDachi/`. Todos los archivos son JPEG; 
 
 ## Estado de integración
 
-- Los 12 JPEG originales se conservan como material de referencia, pero el juego no los carga. El personaje actual se dibuja con código en Phaser.
+- Los 12 JPEG originales se conservan como material de referencia, pero el juego no los carga.
 - Son imágenes completas, no spritesheets ni animaciones por cuadros. Las muestras del ajolote tienen un fondo blanco incrustado; mostrarlas sobre la escena actual puede dejar un rectángulo blanco.
 - Para usarlas en Phaser hay que decidir una presentación compatible con ese fondo, adaptar tamaños para que el paquete web no cargue imágenes innecesariamente grandes y definir qué ilustración corresponde a cada estado del juego.
 - La rama de interfaz `Guillermo-Interfaz` no aporta commits distintos del código inicial. No hay una segunda implementación de interfaz que conectar todavía.
@@ -30,12 +30,15 @@ Las rutas anteriores son relativas a `TomoDachi/`. Todos los archivos son JPEG; 
 
 No incluir imágenes, música, modelos o fuentes en una publicación hasta confirmar que su licencia permite ese uso y distribución.
 
-## Personaje generado por código
+## Animación del ajolote
 
-La escena de Phaser construye al ajolote en una cuadrícula de píxeles mediante `Graphics` y una paleta
-de colores definida en TypeScript. Al alimentar, jugar, limpiar o dormir, el programa vuelve a dibujar
-la cara y los detalles para reflejar la acción. Así el personaje no depende de una imagen distinta por
-estado; se pueden agregar expresiones, colores y animaciones ajustando las reglas del dibujo.
+`public/assets/pets/axolotl/animations.png` contiene 16 cuadros transparentes organizados en una hoja
+de 4 columnas por 4 filas. Phaser los reproduce como cuatro animaciones: espera, feliz/juego, comida y
+sueño. Los botones de cuidado cambian a la animación correspondiente y luego regresan al ciclo de
+espera. Cada cuadro mide 356×276 px; el archivo completo mide 1424×1104 px y pesa unos 1.86 MB.
 
-La hoja de sprites que se generó como prueba ya no forma parte del juego. Los JPEG recibidos en
-`TomoDachi/` permanecen como referencias visuales, no como recursos cargados por la aplicación.
+El personaje tiene un diseño de pixel art creado para el juego. La ilustración está en la hoja de
+sprites; el código define cómo se reproducen sus cuadros y cómo responden a las acciones. Los JPEG
+recibidos en `TomoDachi/` permanecen como referencias y no se cargan en la escena.
+
+Confirmar los términos aplicables al arte generado antes de distribuir el juego.
