@@ -16,7 +16,11 @@ export interface PetSceneHandle {
   react(icon: string): void;
   /** Reinicia el progreso del baño a 0. */
   resetBath(): void;
+  /** Colores de pared de la habitación, para que combinen con el tema de la mascota. */
+  setRoomColors(colors: RoomColors): void;
 }
+
+export interface RoomColors { wall: number; stripe: number }
 
 const W = 520;
 const H = 360;
@@ -28,6 +32,11 @@ const STAGE_SCALE: Record<Stage, number> = { baby: 0.6, teen: 0.8, adult: 1 };
 const BODY = { rx: 61, ry: 56, offsetY: 8 };
 const SPONGE_R = 22;
 const DEAD_COLORS = { color: 0xb8b2bd, outline: 0x8a8490, belly: 0xd6d2da };
+/** Paleta mexicana de la decoración (papel picado, talavera, sarape, piñata). */
+const MX = {
+  pink: 0xe4007c, orange: 0xff8c1a, yellow: 0xffd23f, green: 0x2e9e4f,
+  turquoise: 0x00a6a6, blue: 0x1f4fa3, purple: 0x7b2d8e, red: 0xd7263d,
+};
 const INK = 0x302b43;
 
 export function createPetScene(parent: HTMLElement, onScrub: (progress: number) => void): PetSceneHandle {
@@ -52,6 +61,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private zzz!: Phaser.GameObjects.Text;
     private sponge!: Phaser.GameObjects.Container;
     private scrub = { progress: 0, lastX: 0, lastY: 0, lastT: 0, lastBubble: 0 };
+    private roomColors: RoomColors = { wall: 0xc9d3de, stripe: 0xbcc7d4 };
+    private roomGfx: Phaser.GameObjects.Graphics | null = null;
 
     constructor() { super('room'); }
 
@@ -73,7 +84,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: s.fps, repeat: s.loop === false ? 0 : -1 });
       }
 
-      this.roomLayer = this.add.container(0, 0, [this.textures.exists('bg-room') ? this.add.image(W / 2, H / 2, 'bg-room').setDisplaySize(W, H) : this.drawRoom()]);
+      this.roomLayer = this.add.container(0, 0, [this.textures.exists('bg-room') ? this.add.image(W / 2, H / 2, 'bg-room').setDisplaySize(W, H) : this.drawRoom(), this.drawPinata()]);
       this.bathLayer = this.add.container(0, 0, [this.textures.exists('bg-bath') ? this.add.image(W / 2, H / 2, 'bg-bath').setDisplaySize(W, H) : this.drawBath()]).setVisible(false);
 
       this.body = this.add.ellipse(0, BODY.offsetY, BODY.rx * 2, BODY.ry * 2, 0xffffff);
@@ -111,6 +122,11 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.tweens.add({ targets: this.petRoot, scaleX: s * 1.12, scaleY: s * 1.12, duration: 140, yoyo: true, ease: 'Back.Out' });
       const text = this.add.text(this.petRoot.x + 50, this.petRoot.y - 70, icon, { fontSize: '34px' }).setOrigin(0.5);
       this.tweens.add({ targets: text, y: text.y - 50, alpha: 0, duration: 1100, ease: 'Sine.out', onComplete: () => text.destroy() });
+    }
+
+    setRoomColors(colors: RoomColors) {
+      this.roomColors = colors;
+      if (this.roomGfx) this.paintRoom(this.roomGfx.clear());
     }
 
     resetBath() {
@@ -217,35 +233,119 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     }
 
     private drawRoom() {
-      const g = this.add.graphics();
-      // Pared con franjas y piso de tablas, en la paleta gris azulada del arte del equipo.
-      g.fillStyle(0xc9d3de, 1); g.fillRect(0, 0, W, H);
-      g.fillStyle(0xbcc7d4, 1);
-      for (let x = 0; x < W; x += 40) g.fillRect(x, 0, 20, H * 0.74);
-      g.fillStyle(0x1b1d33, 1); g.fillRect(0, H * 0.74, W, 5);
-      g.fillStyle(0x8e7258, 1); g.fillRect(0, H * 0.74 + 5, W, H);
-      g.fillStyle(0x765d47, 1);
-      for (let y = H * 0.74 + 25; y < H; y += 22) g.fillRect(0, y, W, 3);
-      // Ventana.
-      g.fillStyle(0x1b1d33, 1); g.fillRect(W * 0.08, H * 0.12, 112, 92);
-      g.fillStyle(0x9fd3f0, 1); g.fillRect(W * 0.08 + 6, H * 0.12 + 6, 100, 80);
-      g.fillStyle(0xfff3b0, 1); g.fillRect(W * 0.08 + 66, H * 0.12 + 16, 22, 22);
-      g.fillStyle(0x1b1d33, 1); g.fillRect(W * 0.08 + 53, H * 0.12, 6, 92); g.fillRect(W * 0.08, H * 0.12 + 43, 112, 6);
-      // Maceta.
-      g.fillStyle(0x1b1d33, 1); g.fillRect(W * 0.8 - 4, H * 0.62 - 4, 52, 50);
-      g.fillStyle(0xb8644a, 1); g.fillRect(W * 0.8, H * 0.62, 44, 42);
-      g.fillStyle(0x4f8a55, 1); g.fillRect(W * 0.8 + 4, H * 0.5, 14, 26); g.fillRect(W * 0.8 + 22, H * 0.46, 14, 30); g.fillRect(W * 0.8 - 6, H * 0.54, 12, 16);
+      this.roomGfx = this.paintRoom(this.add.graphics());
+      return this.roomGfx;
+    }
+
+    private paintRoom(g: Phaser.GameObjects.Graphics) {
+      const floorY = Math.round(H * 0.74);
+      // Pared con franjas (color del tema).
+      g.fillStyle(this.roomColors.wall, 1); g.fillRect(0, 0, W, H);
+      g.fillStyle(this.roomColors.stripe, 1);
+      for (let x = 0; x < W; x += 40) g.fillRect(x, 0, 20, floorY);
+      // Ventana con atardecer.
+      const wx = Math.round(W * 0.08), wy = 46;
+      g.fillStyle(INK, 1); g.fillRect(wx, wy, 112, 92);
+      g.fillStyle(0xff9e5e, 1); g.fillRect(wx + 6, wy + 6, 100, 40);
+      g.fillStyle(0xffc46b, 1); g.fillRect(wx + 6, wy + 46, 100, 40);
+      g.fillStyle(0xfff3b0, 1); g.fillRect(wx + 68, wy + 30, 22, 22);
+      g.fillStyle(0x3d7a3a, 1); g.fillRect(wx + 14, wy + 62, 10, 24); g.fillRect(wx + 8, wy + 70, 8, 6); g.fillRect(wx + 22, wy + 66, 8, 6);
+      g.fillStyle(INK, 1); g.fillRect(wx + 53, wy, 6, 92); g.fillRect(wx, wy + 43, 112, 6);
+      // Lambrín de azulejos de talavera.
+      const tileY = floorY - 36;
+      for (let x = 0; x < W; x += 36) this.talaveraTile(g, x, tileY, 36);
+      g.fillStyle(INK, 1); g.fillRect(0, tileY - 4, W, 4); g.fillRect(0, floorY, W, 5);
+      // Piso de tablas.
+      g.fillStyle(0x8e5a3a, 1); g.fillRect(0, floorY + 5, W, H);
+      g.fillStyle(0x6f4329, 1);
+      for (let y = floorY + 25; y < H; y += 22) g.fillRect(0, y, W, 3);
+      // Tapete de sarape debajo de la mascota.
+      const rx = 150, ry = floorY + 16, rw = 220, rh = 52;
+      const stripes = [MX.red, MX.orange, MX.yellow, MX.green, MX.turquoise, MX.blue, MX.purple, MX.pink];
+      g.fillStyle(INK, 1); g.fillRect(rx - 4, ry - 4, rw + 8, rh + 8);
+      stripes.forEach((color, i) => { g.fillStyle(color, 1); g.fillRect(rx, ry + (i * rh) / stripes.length, rw, rh / stripes.length + 1); });
+      g.fillStyle(0xfff3d6, 1);
+      for (let y = ry; y < ry + rh; y += 8) { g.fillRect(rx - 12, y, 8, 3); g.fillRect(rx + rw + 4, y, 8, 3); }
+      // Nopal en maceta de talavera.
+      const px = Math.round(W * 0.8), pyTop = floorY + 2;
+      g.fillStyle(INK, 1);
+      g.fillEllipse(px + 22, pyTop - 44, 36, 48); g.fillEllipse(px + 6, pyTop - 82, 28, 38); g.fillEllipse(px + 40, pyTop - 76, 26, 34);
+      g.fillStyle(MX.green, 1);
+      g.fillEllipse(px + 22, pyTop - 44, 30, 42); g.fillEllipse(px + 6, pyTop - 82, 22, 32); g.fillEllipse(px + 40, pyTop - 76, 20, 28);
+      g.fillStyle(0xfff3b0, 1);
+      for (const [dx, dy] of [[16, -54], [28, -38], [18, -30], [4, -88], [8, -74], [38, -84], [44, -70]] as const) g.fillRect(px + dx, pyTop + dy, 3, 3);
+      g.fillStyle(MX.pink, 1); g.fillRect(px + 2, pyTop - 104, 8, 8); g.fillRect(px + 38, pyTop - 96, 8, 8);
+      g.fillStyle(INK, 1); g.fillRect(px - 4, pyTop - 24, 52, 46);
+      g.fillStyle(0xf4f1e8, 1); g.fillRect(px, pyTop - 20, 44, 38);
+      g.fillStyle(MX.blue, 1); g.fillRect(px, pyTop - 12, 44, 6); g.fillRect(px + 8, pyTop + 2, 6, 6); g.fillRect(px + 30, pyTop + 2, 6, 6);
+      g.fillStyle(MX.yellow, 1); g.fillRect(px + 19, pyTop + 2, 6, 6);
+      // Papel picado colgado de una cuerda.
+      this.papelPicado(g, this.roomColors.wall);
       return g;
+    }
+
+    /** Azulejo de talavera: fondo blanco, rombo azul, flor amarilla al centro y esquinas. */
+    private talaveraTile(g: Phaser.GameObjects.Graphics, x: number, y: number, size: number) {
+      const c = size / 2;
+      g.fillStyle(0xf7f3ea, 1); g.fillRect(x, y, size, size);
+      g.fillStyle(MX.blue, 1);
+      g.fillTriangle(x + c, y + 4, x + size - 4, y + c, x + c, y + size - 4);
+      g.fillTriangle(x + c, y + 4, x + 4, y + c, x + c, y + size - 4);
+      g.fillRect(x, y, 6, 6); g.fillRect(x + size - 6, y, 6, 6); g.fillRect(x, y + size - 6, 6, 6); g.fillRect(x + size - 6, y + size - 6, 6, 6);
+      g.fillStyle(0xf7f3ea, 1); g.fillRect(x + c - 6, y + c - 6, 12, 12);
+      g.fillStyle(MX.yellow, 1); g.fillRect(x + c - 3, y + c - 3, 6, 6);
+      g.lineStyle(1.5, 0x9db4d8, 1); g.strokeRect(x, y, size, size);
+    }
+
+    private papelPicado(g: Phaser.GameObjects.Graphics, hole: number) {
+      const colors = [MX.pink, MX.orange, MX.yellow, MX.turquoise, MX.green, MX.purple, MX.red];
+      g.fillStyle(INK, 1); g.fillRect(0, 8, W, 3);
+      for (let i = 0, x = 6; x < W; i += 1, x += 52) {
+        const fw = 42, fh = 30, top = 11;
+        g.fillStyle(colors[i % colors.length], 1);
+        g.fillRect(x, top, fw, fh);
+        for (let t = 0; t < 4; t += 1) g.fillTriangle(x + (t * fw) / 4, top + fh, x + ((t + 1) * fw) / 4, top + fh, x + ((t + 0.5) * fw) / 4, top + fh + 7);
+        // Calados del papel.
+        g.fillStyle(hole, 1);
+        for (const [dx, dy] of [[8, 7], [19, 7], [30, 7], [13, 16], [25, 16], [19, 24]] as const) g.fillRect(x + dx, top + dy, 4, 4);
+      }
+    }
+
+    /** Piñata de estrella colgando; se balancea con un tween. */
+    private drawPinata() {
+      const g = this.add.graphics();
+      const cones = [MX.orange, MX.turquoise, MX.yellow, MX.green, MX.purple];
+      g.lineStyle(2, INK, 1); g.lineBetween(0, 0, 0, 48);
+      for (let i = 0; i < 5; i += 1) {
+        const a = Phaser.Math.DegToRad(-90 + i * 72);
+        const tip = { x: Math.cos(a) * 46, y: 70 + Math.sin(a) * 46 };
+        const l = { x: Math.cos(a - 0.5) * 16, y: 70 + Math.sin(a - 0.5) * 16 };
+        const r = { x: Math.cos(a + 0.5) * 16, y: 70 + Math.sin(a + 0.5) * 16 };
+        g.fillStyle(INK, 1); g.fillTriangle(l.x * 1.15, l.y + (l.y - 70) * 0.15, r.x * 1.15, r.y + (r.y - 70) * 0.15, tip.x * 1.08, 70 + (tip.y - 70) * 1.08);
+        g.fillStyle(cones[i], 1); g.fillTriangle(l.x, l.y, r.x, r.y, tip.x, tip.y);
+        g.fillStyle(MX.pink, 1); g.fillRect(tip.x - 3, tip.y - 3, 6, 6);
+      }
+      g.fillStyle(INK, 1); g.fillCircle(0, 70, 21);
+      g.fillStyle(MX.pink, 1); g.fillCircle(0, 70, 18);
+      g.fillStyle(MX.yellow, 1); g.fillRect(-14, 66, 28, 4);
+      g.fillStyle(MX.turquoise, 1); g.fillRect(-14, 74, 28, 4);
+      g.fillStyle(MX.red, 1); g.fillRect(-4, 90, 3, 26); g.fillStyle(MX.blue, 1); g.fillRect(2, 90, 3, 20);
+      const pinata = this.add.container(W * 0.875, 8, [g]);
+      this.tweens.add({ targets: pinata, angle: { from: -6, to: 6 }, duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      return pinata;
     }
 
     private drawBath() {
       const g = this.add.graphics();
-      g.fillStyle(0xdff1f3, 1); g.fillRect(0, 0, W, H);
-      g.lineStyle(1, 0xc3e1e5, 1);
-      for (let x = 0; x <= W; x += 40) g.lineBetween(x, 0, x, H * 0.72);
-      for (let y = 0; y <= H * 0.72; y += 40) g.lineBetween(0, y, W, y);
-      g.fillStyle(0xbfa58b, 1); g.fillRect(0, H * 0.72, W, H * 0.28);
-      g.fillStyle(0xb7e3ea, 1); g.fillRoundedRect(W * 0.2, H * 0.52, W * 0.6, 30, 12);
+      const floorY = Math.round(H * 0.72);
+      // Baño con pared de talavera y piso de barro.
+      for (let y = 0; y < floorY; y += 40) for (let x = 0; x < W; x += 40) this.talaveraTile(g, x, y, 40);
+      g.fillStyle(INK, 1); g.fillRect(0, floorY, W, 4);
+      g.fillStyle(0xc0643c, 1); g.fillRect(0, floorY + 4, W, H);
+      g.fillStyle(0x9c4a29, 1);
+      for (let x = 0; x < W; x += 48) g.fillRect(x, floorY + 4, 3, H);
+      for (let y = floorY + 34; y < H; y += 30) g.fillRect(0, y, W, 3);
+      g.fillStyle(0x7fd3e0, 1); g.fillRect(W * 0.2, H * 0.52, W * 0.6, 30);
       return g;
     }
 
@@ -279,5 +379,6 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     show: (view) => scene.show(view),
     react: (icon) => scene.react(icon),
     resetBath: () => scene.resetBath(),
+    setRoomColors: (colors) => scene.setRoomColors(colors),
   };
 }

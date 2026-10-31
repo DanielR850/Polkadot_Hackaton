@@ -2,7 +2,7 @@
 // la escena y las pantallas. Todo es local; ninguna acción pide firma (ver README).
 import './style.css';
 import { pickAnimation, type PetAnim } from './game/animations.ts';
-import { findItem } from './game/catalog.ts';
+import { findItem, findPet } from './game/catalog.ts';
 import { DEFAULT_CONFIG, withSpeed } from './game/config.ts';
 import { createPetScene, type PetSceneHandle } from './game/petScene.ts';
 import {
@@ -11,7 +11,7 @@ import {
 } from './game/petState.ts';
 import { createMockRanking } from './game/ranking.ts';
 import { loadPet, savePet } from './game/storage.ts';
-import type { NeedKey, PetState, Stage } from './game/types.ts';
+import type { NeedKey, PetId, PetState, Stage } from './game/types.ts';
 import { h } from './ui/dom.ts';
 import { createFeedMenu } from './ui/feedMenu.ts';
 import { formatDuration, STAGE_LABEL } from './ui/format.ts';
@@ -20,6 +20,7 @@ import { createRankingDialog } from './ui/rankingDialog.ts';
 import { createRenameDialog } from './ui/renameDialog.ts';
 import { createSelectScreen } from './ui/selectScreen.ts';
 import { createStartScreen } from './ui/startScreen.ts';
+import { applyTheme, buildTheme, DEFAULT_THEME_COLOR } from './ui/theme.ts';
 
 const params = new URLSearchParams(location.search);
 // `?speed=10` acelera el tiempo para probar etapas y muerte en la demo.
@@ -46,7 +47,15 @@ const selectScreen = createSelectScreen((petId) => {
   lastStage = 'baby';
   showScreen('game');
   gameScreen.say(`¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
-}, () => showScreen('start'));
+}, () => showScreen('start'), (petId) => useTheme(petId));
+
+/** Tema de color de la mascota (o el gris azulado por defecto) en la página y en la habitación. */
+function useTheme(petId: PetId | null) {
+  const species = petId === null ? undefined : findPet(petId);
+  const theme = buildTheme(species?.theme ?? DEFAULT_THEME_COLOR);
+  applyTheme(theme);
+  scene?.setRoomColors(theme.room);
+}
 
 const gameScreen = createGameScreen({
   feed: () => feedMenu.open(),
@@ -163,24 +172,29 @@ function showScreen(next: Screen) {
   startScreen.root.hidden = next !== 'start';
   selectScreen.root.hidden = next !== 'select';
   gameScreen.root.hidden = next !== 'game';
-  if (next === 'start') startScreen.focus();
+  if (next === 'start') { useTheme(null); startScreen.focus(); }
   if (next === 'select') selectScreen.reset(draftName);
   if (next === 'game') {
     // Phaser se crea cuando su contenedor ya es visible, para que mida bien el tamaño.
     scene ??= createPetScene(gameScreen.gameHost, (progress) => { bathProgress = progress; render(); });
+    useTheme(pet?.petId ?? null);
     if (pet) lastStage = computeStage(pet, Date.now(), config);
     render();
   }
 }
 
+// Papel picado decorativo arriba de todas las pantallas (los colores salen del CSS).
+const papelPicado = h('div', { class: 'papel-picado', 'aria-hidden': 'true' }, ...Array.from({ length: 14 }, () => h('span')));
+
 if (params.get('outside') === '1') {
   // Vista previa del aviso para cuando la app se abra fuera de un Host. La detección real
   // (`isInsideContainer()` del Product SDK) se conectará después desde src/polkadot/.
-  app.replaceChildren(h('section', { class: 'screen start-screen' },
+  useTheme(null);
+  app.replaceChildren(papelPicado, h('section', { class: 'screen start-screen' },
     h('span', { class: 'eyebrow' }, 'POLKADOT'), h('h1', { class: 'title' }, 'Abre esta app dentro de Polkadot Desktop o de la Polkadot App'),
     h('p', { class: 'hint' }, 'El juego necesita el Host de Polkadot para guardar tus logros.')));
 } else {
-  app.append(startScreen.root, selectScreen.root, gameScreen.root);
+  app.append(papelPicado, startScreen.root, selectScreen.root, gameScreen.root);
   startScreen.reset();
   showScreen(pet ? 'game' : 'start');
   window.setInterval(tick, 1000);

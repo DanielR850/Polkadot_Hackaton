@@ -1,20 +1,37 @@
-/* ===== Tema pixel con relieve =====
-   Bordes gruesos, sombras duras sin difuminar y botones con bisel, en la paleta gris azulada
-   del arte de las mascotas. Las fuentes van en el bundle (sin CDN): ver docs/ASSETS.md. */
+/* ===== Tema pixel maximalista retro con vibra mexicana =====
+   Bordes gruesos, sombras dobles de color sin difuminar, botones con bisel, fondo de azulejo de
+   talavera, papel picado y franjas de sarape. El color principal sale de la mascota
+   (src/ui/theme.ts); la decoración usa una paleta mexicana fija (--mx-*).
+   Las fuentes van en el bundle (sin CDN): ver docs/ASSETS.md. */
 @font-face { font-family: 'Press Start 2P'; src: url('/assets/ui/fonts/PressStart2P-Regular.ttf') format('truetype'); font-display: swap; }
 @font-face { font-family: 'VT323'; src: url('/assets/ui/fonts/VT323-Regular.ttf') format('truetype'); font-display: swap; }
 
 :root {
-  --ink: #1b1d33;
-  --bg: #a7b4c4;
-  --bg-dot: #9aa8b9;
-  --panel: #e3e8ee;
-  --panel-2: #cfd7e1;
+  /* Paleta mexicana fija para la decoración. */
+  --mx-pink: #e4007c;
+  --mx-orange: #ff8c1a;
+  --mx-yellow: #ffd23f;
+  --mx-green: #2e9e4f;
+  --mx-turquoise: #00a6a6;
+  --mx-blue: #1f4fa3;
+  --mx-purple: #7b2d8e;
+  --mx-red: #d7263d;
+  /* Valores por defecto (cempasúchil); src/ui/theme.ts los reemplaza al arrancar y al elegir mascota. */
+  --ink: #2b210f;
+  --bg: #f0cb75;
+  --bg-dot: #e8b441;
+  --tile: #8a6205;
+  --panel: #fff7e6;
+  --panel-2: #f5dc9f;
   --light: #ffffff;
-  --muted: #4d556b;
-  --accent: #e45b7f;
-  --accent-light: #f59ab3;
-  --accent-dark: #a5304f;
+  --muted: #5c4a2c;
+  --accent: #d79909;
+  --accent-light: #f5c451;
+  --accent-dark: #8a6205;
+  --accent-soft: #fbe6b1;
+  --on-accent: #2b210f;
+  --complement: #1a6bf2;
+  --frame: #f2d58e;
   --good: #5bb36a;
   --warn: #e8b23a;
   --bad: #d9534f;
@@ -30,14 +47,47 @@
   font-smooth: never;
 }
 * { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+button, label, input { touch-action: manipulation; }
+/* El cambio de tema se ve en saltos, como en una consola. */
+body, .pet-card, .care-card, .primary, .pet-frame, .screen { transition: background-color .32s steps(4), color .32s steps(4); }
 [hidden] { display: none !important; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
 body {
-  margin: 0; min-width: 320px; min-height: 100vh;
+  margin: 0; min-width: 300px; min-height: 100vh; min-height: 100dvh;
+  /* Azulejo de talavera: flor central, cuartos de flor en las esquinas, cruz y juntas blancas. */
   background-color: var(--bg);
-  background-image: radial-gradient(var(--bg-dot) 1.5px, transparent 1.6px);
-  background-size: 16px 16px;
+  background-image:
+    linear-gradient(90deg, #ffffff99 0 3px, transparent 3px),
+    linear-gradient(#ffffff99 0 3px, transparent 3px),
+    radial-gradient(circle at 50% 50%, var(--light) 0 3px, var(--tile) 3.5px 8px, transparent 8.5px),
+    radial-gradient(circle at 0 0, var(--tile) 0 10px, transparent 10.5px),
+    radial-gradient(circle at 100% 0, var(--tile) 0 10px, transparent 10.5px),
+    radial-gradient(circle at 0 100%, var(--tile) 0 10px, transparent 10.5px),
+    radial-gradient(circle at 100% 100%, var(--tile) 0 10px, transparent 10.5px),
+    conic-gradient(from 45deg at 50% 50%, var(--bg-dot) 0 25%, transparent 0 50%, var(--bg-dot) 0 75%, transparent 0);
+  background-size: 56px 56px;
 }
+
+/* Papel picado colgado en la parte de arriba (decorativo). */
+.papel-picado { position: relative; display: flex; gap: 6px; height: 52px; max-width: 1020px; margin: -26px auto 18px; padding: 0 4px; pointer-events: none; }
+.papel-picado::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 4px; background: var(--ink); }
+.papel-picado span {
+  flex: 1; margin-top: 4px; background: var(--c, var(--mx-pink)); transform-origin: top center;
+  clip-path: polygon(0 0, 100% 0, 100% 80%, 87.5% 100%, 75% 80%, 62.5% 100%, 50% 80%, 37.5% 100%, 25% 80%, 12.5% 100%, 0 80%);
+  -webkit-mask: radial-gradient(circle, #0000 0 2.5px, #000 3px) 3px 6px / 11px 11px;
+  mask: radial-gradient(circle, #0000 0 2.5px, #000 3px) 3px 6px / 11px 11px;
+  animation: sway 2.4s steps(3) infinite alternate;
+}
+.papel-picado span:nth-child(7n + 1) { --c: var(--mx-pink); }
+.papel-picado span:nth-child(7n + 2) { --c: var(--mx-orange); animation-delay: -.6s; }
+.papel-picado span:nth-child(7n + 3) { --c: var(--mx-yellow); animation-delay: -1.2s; }
+.papel-picado span:nth-child(7n + 4) { --c: var(--accent); animation-delay: -.3s; }
+.papel-picado span:nth-child(7n + 5) { --c: var(--mx-turquoise); animation-delay: -.9s; }
+.papel-picado span:nth-child(7n + 6) { --c: var(--mx-green); animation-delay: -1.5s; }
+.papel-picado span:nth-child(7n + 7) { --c: var(--mx-purple); animation-delay: -1.8s; }
+@keyframes sway { from { transform: rotate(-3deg); } to { transform: rotate(3deg); } }
+@media (prefers-reduced-motion: reduce) { .papel-picado span, .live-dot, .meter-fill[data-level="bad"] { animation: none !important; } }
 #app {
   width: min(1080px, 100%); margin: 0 auto;
   padding: 26px max(30px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(30px, env(safe-area-inset-left));
@@ -46,11 +96,18 @@ h1, h2, .eyebrow, button, .title { font-family: var(--title); font-weight: 400; 
 button { color: var(--ink); }
 button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
 
-/* Bloque en relieve: borde, bisel interior y sombra dura. */
+/* Bloque en relieve: borde, bisel interior y sombra doble (color de la mascota + tinta). */
+.pet-card, .care-card, .screen.start-screen, .screen.select-screen { position: relative; }
 .pet-card, .care-card, .screen.start-screen, .screen.select-screen, .dialog {
   border: var(--px) solid var(--ink);
   background: var(--panel);
-  box-shadow: inset -6px -6px 0 var(--panel-2), inset 6px 6px 0 var(--light), 8px 8px 0 var(--ink);
+  box-shadow: inset -6px -6px 0 var(--panel-2), inset 6px 6px 0 var(--light), 7px 7px 0 var(--accent), 12px 12px 0 var(--ink);
+}
+/* Franja de sarape arriba de cada panel. */
+.pet-card::before, .care-card::before, .screen.start-screen::before, .screen.select-screen::before, .dialog::before {
+  content: ''; position: absolute; z-index: 1; left: 0; right: 0; top: 0; height: 14px; pointer-events: none;
+  background: linear-gradient(var(--mx-pink) 0 3px, var(--mx-yellow) 3px 5px, var(--mx-turquoise) 5px 8px, var(--mx-orange) 8px 10px, var(--mx-green) 10px 12px, var(--mx-purple) 12px 14px);
+  border-bottom: 3px solid var(--ink);
 }
 
 /* Botones con bisel que se hunden al presionarlos. */
@@ -60,14 +117,15 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   transition: transform .06s steps(1), box-shadow .06s steps(1);
 }
 .primary {
-  background: var(--accent); color: var(--light); padding: 14px 20px; font-size: 13px; text-shadow: 2px 2px 0 var(--accent-dark);
-  box-shadow: inset -5px -5px 0 var(--accent-dark), inset 5px 5px 0 var(--accent-light), 5px 5px 0 var(--ink);
+  background: var(--accent); color: var(--on-accent); padding: 14px 20px; font-size: 13px; text-shadow: 2px 2px 0 var(--accent-dark);
+  box-shadow: inset -5px -5px 0 var(--accent-dark), inset 5px 5px 0 var(--accent-light), 4px 4px 0 var(--complement), 8px 8px 0 var(--ink);
 }
 .primary.big { font-size: 22px; letter-spacing: .1em; padding: 20px 46px; }
 .ghost, .actions button, .dialog-close {
   background: var(--panel); padding: 12px 14px; font-size: 10px;
   box-shadow: inset -4px -4px 0 var(--panel-2), inset 4px 4px 0 var(--light), 4px 4px 0 var(--ink);
 }
+.ghost:hover, .actions button:hover:not(:disabled), .dialog-close:hover { background: var(--accent-soft); }
 .primary:active:not(:disabled), .ghost:active, .actions button:active:not(:disabled), .dialog-close:active {
   transform: translate(4px, 4px); box-shadow: inset 4px 4px 0 #0003, 0 0 0 var(--ink);
 }
@@ -81,8 +139,12 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .eyebrow { font-size: 9px; letter-spacing: .14em; color: var(--muted); }
 
 /* ===== Inicio y elegir mascota ===== */
-.screen.start-screen, .screen.select-screen { max-width: 760px; margin: 4vh auto 0; text-align: center; padding: 34px 26px 30px; }
-.title { font-size: clamp(18px, 4.6vw, 30px); line-height: 1.4; margin: 14px 0 22px; text-shadow: 3px 3px 0 var(--light), 6px 6px 0 #0002; }
+.screen.start-screen, .screen.select-screen { max-width: 760px; margin: 4vh auto 0; text-align: center; padding: 46px 26px 30px; }
+/* Título con sombras de colores apiladas, como letrero de feria. */
+.title {
+  font-size: clamp(18px, 4.6vw, 30px); line-height: 1.5; margin: 14px 0 26px; color: var(--light);
+  text-shadow: 3px 3px 0 var(--mx-pink), 6px 6px 0 var(--mx-yellow), 9px 9px 0 var(--mx-turquoise), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink), 12px 12px 0 var(--ink);
+}
 .start-form { display: flex; flex-direction: column; align-items: center; gap: 10px; }
 .name-input {
   width: 100%; max-width: 520px; font: 400 clamp(36px, 9vw, 54px) var(--body); text-align: center; text-transform: uppercase;
@@ -90,18 +152,17 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   box-shadow: inset 5px 5px 0 var(--panel-2), 6px 6px 0 var(--ink);
 }
 .name-input.small { font-size: 34px; padding: 6px 10px; }
-.name-input::placeholder { color: #aab3c1; text-transform: none; }
+.name-input::placeholder { color: var(--muted); opacity: .55; text-transform: none; }
 .start-form .primary.big { margin-top: 16px; }
 
 .pet-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
 .pet-option { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; text-align: center; }
 .pet-frame {
-  display: grid; place-items: center; width: 100%; aspect-ratio: 1; background: #b5c1cf;
-  border: var(--px) solid var(--ink); box-shadow: inset -4px -4px 0 #9eabbb, inset 4px 4px 0 #cdd6e0, 5px 5px 0 var(--ink);
-  transition: transform .06s steps(1);
+  display: grid; place-items: center; width: 100%; aspect-ratio: 1; background: var(--frame);
+  border: var(--px) solid var(--ink); box-shadow: inset -4px -4px 0 #00000022, inset 4px 4px 0 #ffffff66, 5px 5px 0 var(--ink);
 }
-.pet-option:hover .pet-frame { transform: translate(-2px, -2px); box-shadow: inset -4px -4px 0 #9eabbb, inset 4px 4px 0 #cdd6e0, 7px 7px 0 var(--ink); }
-.pet-option:has(input:checked) .pet-frame { background: #f7d2dd; outline: var(--px) solid var(--accent); outline-offset: 3px; }
+.pet-option:hover .pet-frame { transform: translate(-2px, -2px); box-shadow: inset -4px -4px 0 #00000022, inset 4px 4px 0 #ffffff66, 7px 7px 0 var(--ink); }
+.pet-option:has(input:checked) .pet-frame { background: var(--accent-soft); outline: var(--px) solid var(--accent); outline-offset: 3px; }
 .pet-option:has(input:focus-visible) .pet-frame { outline: var(--px) dashed var(--accent); outline-offset: 3px; }
 .pet-portrait { width: 86%; height: 86%; object-fit: contain; image-rendering: pixelated; }
 .pet-swatch {
@@ -113,27 +174,33 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 
 /* ===== Juego ===== */
 .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin: 0 auto 22px; max-width: 960px; }
-.topbar h1 { font-size: 20px; margin: 8px 0 0; text-transform: uppercase; text-shadow: 3px 3px 0 var(--light); }
-.day-pill {
-  display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 20px;
-  background: var(--panel); border: var(--px) solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+/* Nombre y etapa en letreros, para que se lean sobre el fondo de talavera. */
+.topbar > div:first-child, .day-pill {
+  background: var(--panel); border: var(--px) solid var(--ink); box-shadow: 4px 4px 0 var(--accent), 7px 7px 0 var(--ink);
 }
+.topbar > div:first-child { padding: 8px 14px 10px; }
+.topbar h1 { font-size: 20px; margin: 8px 0 0; text-transform: uppercase; color: var(--accent-dark); text-shadow: 2px 2px 0 var(--accent-soft); }
+.day-pill { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 20px; }
 .day-pill > span:nth-child(2) { font-family: var(--title); font-size: 9px; }
 .day-pill .age { color: var(--muted); }
 .live-dot { width: 10px; height: 10px; background: var(--good); box-shadow: 0 0 0 3px var(--ink); animation: blink 1s steps(2) infinite; }
 @keyframes blink { 50% { background: #9be0a6; } }
 .layout { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(300px, .85fr); gap: 22px; max-width: 960px; margin: auto; }
-.pet-card { position: relative; overflow: hidden; padding: 16px 18px 14px; }
-.room-label { position: absolute; z-index: 2; top: 16px; left: 18px; font-family: var(--title); font-size: 8px; letter-spacing: .1em; background: var(--ink); color: var(--light); padding: 6px 8px; }
+.pet-card { position: relative; overflow: hidden; padding: 28px 18px 14px; }
+.room-label { position: absolute; z-index: 2; top: 28px; left: 18px; font-family: var(--title); font-size: 8px; letter-spacing: .1em; background: var(--ink); color: var(--light); padding: 6px 8px; }
 .room-label span { margin-right: 4px; }
-.pet-card #game { height: 360px; margin-top: 30px; border: var(--px) solid var(--ink); background: #c9d3de; box-shadow: inset 0 0 0 4px #ffffff55; }
+/* El área de la mascota mantiene la proporción de la escena (13:9) a cualquier ancho y no pasa del alto visible. */
+.pet-card #game {
+  width: 100%; aspect-ratio: 13 / 9; max-height: min(62vh, 440px); margin-top: 30px;
+  border: var(--px) solid var(--ink); background: var(--frame); box-shadow: inset 0 0 0 4px #ffffff55;
+}
 .pet-card canvas { display: block; margin: auto; max-width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
 .pet-caption { display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 24px; margin-top: 10px; }
 .pet-caption span:first-child { font-size: 26px; }
-.care-card { padding: 22px 22px 18px; }
+.care-card { padding: 34px 22px 18px; }
 .card-heading { display: flex; justify-content: space-between; align-items: center; }
 .card-heading h2 { font-size: 13px; margin: 8px 0 0; }
-.sparkle { font-size: 26px; color: var(--accent); }
+.sparkle { font-size: 26px; color: var(--complement); text-shadow: 2px 2px 0 var(--ink); }
 
 .meters { display: grid; gap: 10px; margin: 18px 0; }
 .meter-label { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: 20px; line-height: 1; }
@@ -141,7 +208,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .meter-label b { font-weight: 400; }
 .meter-label strong { margin-left: auto; font-weight: 400; color: var(--muted); }
 /* Barra segmentada: el relleno se corta en bloques como en las consolas portátiles. */
-.meter-track { height: 18px; background: #3a3f5c; border: 3px solid var(--ink); box-shadow: 3px 3px 0 #0003; padding: 2px; }
+.meter-track { height: 18px; background: var(--accent-dark); border: 3px solid var(--ink); box-shadow: 3px 3px 0 #0003; padding: 2px; }
 .meter-fill {
   height: 100%; background-color: var(--good); transition: width .25s steps(5);
   background-image: repeating-linear-gradient(90deg, transparent 0 9px, #0000004d 9px 11px), linear-gradient(#ffffff59 0 35%, transparent 35%);
@@ -160,16 +227,16 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .feedback { font-size: 20px; color: var(--muted); min-height: 22px; margin: 16px 0 10px; }
 .mode-panel { display: grid; gap: 14px; padding: 14px; background: #d4ebf3; border: 3px solid var(--ink); font-size: 20px; }
 .mode-panel p { margin: 0; }
-.death-panel { text-align: center; background: #e2dbe6; margin: 18px 0; }
+.death-panel { text-align: center; background: var(--panel-2); margin: 18px 0; }
 .death-panel h2 { margin: 0; font-size: 14px; line-height: 1.5; }
 .death-icon { font-size: 44px; }
-.local-note { display: flex; gap: 10px; align-items: flex-start; padding: 10px; background: var(--panel-2); border: 3px dashed #8d98ab; color: var(--muted); }
+.local-note { display: flex; gap: 10px; align-items: flex-start; padding: 10px; background: var(--panel-2); border: 3px dashed var(--muted); color: var(--muted); }
 .local-note span { font-size: 22px; }
 .local-note p { font-size: 17px; line-height: 1.1; margin: 0; }
 .local-note small { font-size: 16px; }
 .toast {
   position: absolute; z-index: 3; left: 50%; top: 56px; transform: translateX(-50%); white-space: nowrap;
-  font-family: var(--title); font-size: 10px; line-height: 1.6; color: var(--light); background: var(--accent); padding: 10px 14px;
+  font-family: var(--title); font-size: 10px; line-height: 1.6; color: var(--on-accent); background: var(--accent); padding: 10px 14px;
   border: var(--px) solid var(--ink); box-shadow: 4px 4px 0 var(--ink); animation: pop .3s steps(3);
 }
 @keyframes pop { from { transform: translate(-50%, -12px); } }
@@ -177,19 +244,19 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 /* ===== Diálogos ===== */
 .dialog { padding: 0; color: var(--ink); width: min(500px, calc(100vw - 28px)); border-radius: 0; }
 .dialog::backdrop { background: #1b1d3399; }
-.dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 18px 20px 6px; }
+.dialog-header { display: flex; justify-content: space-between; align-items: center; gap: 10px; padding: 30px 20px 6px; }
 .dialog-header h2 { margin: 0; font-size: 13px; line-height: 1.5; }
 .dialog-close { padding: 6px 10px; font-size: 12px; }
 .dialog-body { padding: 8px 20px 22px; }
 .tabs { display: flex; gap: 10px; margin-bottom: 14px; }
 .tabs [role="tab"] { flex: 1; padding: 10px; font-size: 10px; background: var(--panel-2); box-shadow: 3px 3px 0 var(--ink); }
-.tabs [role="tab"][aria-selected="true"] { background: var(--accent); color: var(--light); transform: translate(3px, 3px); box-shadow: inset 3px 3px 0 var(--accent-dark); }
+.tabs [role="tab"][aria-selected="true"] { background: var(--accent); color: var(--on-accent); transform: translate(3px, 3px); box-shadow: inset 3px 3px 0 var(--accent-dark); }
 .item-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .item-option {
   display: grid; grid-template-columns: auto 1fr; column-gap: 10px; align-items: center; padding: 8px 10px; cursor: pointer;
   background: var(--light); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
 }
-.item-option:has(input:checked) { background: #f7d2dd; transform: translate(3px, 3px); box-shadow: inset 3px 3px 0 #0002; }
+.item-option:has(input:checked) { background: var(--accent-soft); transform: translate(3px, 3px); box-shadow: inset 3px 3px 0 #0002; }
 .item-option:has(input:focus-visible) { outline: 3px dashed var(--accent); outline-offset: 3px; }
 .item-icon { grid-row: span 2; font-size: 30px; }
 .item-option b { font-weight: 400; font-size: 22px; line-height: 1; }
@@ -199,20 +266,85 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   display: grid; grid-template-columns: 36px 1fr auto; grid-template-areas: "rank name time" "rank species time"; align-items: center; column-gap: 10px;
   padding: 6px 10px; background: var(--light); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink);
 }
-.ranking-list li.mine { background: #f7d2dd; }
+.ranking-list li.mine { background: var(--accent-soft); }
 .ranking-list .rank { grid-area: rank; font-family: var(--title); font-size: 11px; }
 .ranking-list b { grid-area: name; font-weight: 400; font-size: 22px; line-height: 1; }
 .ranking-list .species { grid-area: species; font-size: 16px; color: var(--muted); line-height: 1; }
 .ranking-list .time { grid-area: time; font-size: 20px; color: var(--accent-dark); }
 
-@media (max-width: 720px) {
-  #app { padding: 18px max(14px, env(safe-area-inset-right)) max(14px, env(safe-area-inset-bottom)) max(14px, env(safe-area-inset-left)); }
+/* ===== Responsivo =====
+   Las reglas dependen del tamaño de la ventana, no del dispositivo: una ventana de escritorio
+   acomodada a media pantalla se ve igual que un teléfono o una tableta del mismo ancho. */
+
+/* Tableta, ventana a media pantalla o teléfono grande: una sola columna. */
+@media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; gap: 18px; }
-  .pet-card #game { height: 260px; }
-  .care-card { padding: 18px; }
-  .meters { grid-template-columns: 1fr 1fr; column-gap: 14px; }
-  .pet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; }
-  .screen.start-screen, .screen.select-screen { padding: 26px 16px; }
+  .pet-card #game { max-height: 52vh; }
+  .meters { grid-template-columns: 1fr 1fr; column-gap: 16px; }
   .topbar { flex-wrap: wrap; }
   .toast { white-space: normal; width: calc(100% - 32px); text-align: center; }
+}
+
+/* Teléfono vertical. */
+@media (max-width: 560px) {
+  :root { font-size: 18px; --px: 3px; }
+  #app { padding: 14px max(10px, env(safe-area-inset-right)) max(12px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); }
+  .pet-card, .care-card, .screen.start-screen, .screen.select-screen { box-shadow: inset -4px -4px 0 var(--panel-2), inset 4px 4px 0 var(--light), 4px 4px 0 var(--accent), 7px 7px 0 var(--ink); }
+  .pet-card { padding: 24px 12px 12px; }
+  .pet-card #game { margin-top: 28px; max-height: 46vh; }
+  .room-label { top: 24px; left: 12px; }
+  .care-card { padding: 26px 14px 14px; }
+  .papel-picado { height: 40px; gap: 4px; margin: -14px auto 14px; }
+  .papel-picado span:nth-child(n + 9) { display: none; }
+  .title { text-shadow: 2px 2px 0 var(--mx-pink), 4px 4px 0 var(--mx-yellow), 6px 6px 0 var(--mx-turquoise), -2px -2px 0 var(--ink), 2px -2px 0 var(--ink), -2px 2px 0 var(--ink), 8px 8px 0 var(--ink); }
+  .card-heading { display: none; }
+  .meters { margin-top: 4px; gap: 8px; column-gap: 12px; }
+  .meter-label { font-size: 18px; }
+  .meter-track { height: 15px; }
+  .actions { gap: 8px; }
+  .actions button { padding: 8px 4px; font-size: 8px; min-height: 64px; }
+  .actions button span { font-size: 22px; }
+  .screen.start-screen, .screen.select-screen { margin-top: 2vh; padding: 34px 14px 24px; }
+  .pet-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .pet-option small { display: none; }
+  .primary.big { font-size: 18px; padding: 16px 30px; }
+  .topbar h1 { font-size: 15px; }
+  .day-pill { font-size: 17px; padding: 6px 8px; }
+  .local-note { display: none; }
+}
+
+/* Teléfono muy angosto (320–380 px). */
+@media (max-width: 380px) {
+  .meters { grid-template-columns: 1fr; }
+  .item-grid { grid-template-columns: 1fr; }
+  .pet-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .actions button b { font-size: 7px; }
+}
+
+/* Teléfono horizontal o ventana baja: mascota y controles lado a lado, sin pasar del alto visible. */
+@media (orientation: landscape) and (max-height: 560px) {
+  :root { font-size: 17px; }
+  #app { padding-top: 8px; padding-bottom: max(8px, env(safe-area-inset-bottom)); }
+  .topbar { margin-bottom: 8px; }
+  .topbar .eyebrow { display: none; }
+  .topbar h1 { margin: 0; font-size: 14px; }
+  .layout { grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 12px; }
+  .pet-card { padding: 22px 8px 8px; }
+  .papel-picado { display: none; }
+  .room-label, .pet-caption { display: none; }
+  .pet-card #game { margin-top: 0; max-height: calc(100dvh - 94px); }
+  .care-card { padding: 22px 12px 10px; max-height: calc(100dvh - 70px); overflow-y: auto; }
+  .card-heading, .local-note { display: none; }
+  .meters { grid-template-columns: 1fr 1fr; margin: 0 0 8px; gap: 4px; column-gap: 12px; }
+  .meter-track { height: 13px; }
+  .actions { gap: 6px; }
+  .actions button { flex-direction: row; min-height: 0; padding: 6px; font-size: 8px; }
+  .actions button span { font-size: 18px; }
+  .feedback { margin: 8px 0 0; }
+  .screen.start-screen, .screen.select-screen { margin-top: 0; padding: 26px 18px 14px; }
+  .title { margin: 6px 0 10px; }
+  .pet-grid { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 10px; margin-top: 8px; }
+  .pet-frame { max-height: 34vh; }
+  .pet-option small { display: none; }
+  .dialog { max-height: 92dvh; }
 }
