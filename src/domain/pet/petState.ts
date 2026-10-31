@@ -1,31 +1,137 @@
-export type Need = 'hunger' | 'energy' | 'cleanliness' | 'happiness';
-export type CareAction = 'feed' | 'play' | 'clean' | 'sleep';
-export interface PetState { hunger: number; energy: number; cleanliness: number; happiness: number; day: number; lastDay: number; }
+// Reglas puras de la mascota. Cada función recibe `now` y devuelve un estado nuevo; no muta nada.
+// El valor actual de cada necesidad se calcula desde su base y el tiempo transcurrido, así que el
+// juego funciona igual si la app estuvo cerrada.
+import { DEFAULT_CONFIG } from './config.ts';
+import { findItem } from './catalog.ts';
+import type { GameConfig, NeedKey, Needs, PetId, PetState, Stage, Stats } from './types.ts';
 
-const clamp = (n: number) => Math.max(0, Math.min(100, n));
+export const NEED_KEYS: readonly NeedKey[] = ['hunger', 'thirst', 'energy', 'happiness', 'cleanliness'];
+export const NAME_MAX_LENGTH = 16;
+const MINUTE = 60_000;
+const START_VALUE = 80;
+const STAGE_ORDER: readonly Stage[] = ['baby', 'teen', 'adult'];
 
-export function createPetState(saved?: Partial<PetState>): PetState {
-  const now = Date.now();
-  return {
-    hunger: clamp(saved?.hunger ?? 82), energy: clamp(saved?.energy ?? 78),
-    cleanliness: clamp(saved?.cleanliness ?? 88), happiness: clamp(saved?.happiness ?? 84),
-    day: Math.max(1, saved?.day ?? 1), lastDay: saved?.lastDay ?? now,
-  };
+export const clamp = (n: number) => Math.max(0, Math.min(100, n));
+
+export type NameResult = { ok: true; value: string } | { ok: false; error: string };
+
+export function validateName(raw: string): NameResult {
+  const value = raw.trim().replace(/\s+/g, ' ');
+  if (value.length === 0) return { ok: false, error: 'Escribe un nombre.' };
+  if ([...value].length > NAME_MAX_LENGTH) return { ok: false, error: `Máximo ${NAME_MAX_LENGTH} caracteres.` };
+  return { ok: true, value };
 }
 
-export function care(state: PetState, action: CareAction): string {
-  if (action === 'feed') { state.hunger = clamp(state.hunger + 22); state.happiness = clamp(state.happiness + 5); return '¡Qué rico! Tu criatura quedó feliz.'; }
-  if (action === 'play') { state.happiness = clamp(state.happiness + 20); state.energy = clamp(state.energy - 12); state.cleanliness = clamp(state.cleanliness - 5); return '¡Se divirtió muchísimo jugando contigo!'; }
-  if (action === 'clean') { state.cleanliness = clamp(state.cleanliness + 28); state.happiness = clamp(state.happiness + 4); return '¡Listo! Ahora está fresca y limpia.'; }
-  state.energy = clamp(state.energy + 30); state.hunger = clamp(state.hunger - 4); return 'Shhh… está tomando una siesta reparadora.';
+export function createPet(petId: PetId, name: string, now: number): PetState {
+  const needs = Object.fromEntries(NEED_KEYS.map((key) => [key, START_VALUE])) as Needs;
+  return { version: 2, petId, name, bornAt: now, updatedAt: now, needs, sleeping: false, diedAt: null };
 }
 
-export function tick(state: PetState, now = Date.now()): void {
-  const elapsed = Math.max(0, now - state.lastDay);
-  const periods = Math.floor(elapsed / 86_400_000);
-  if (periods > 0) { state.day += periods; state.lastDay += periods * 86_400_000; }
-  state.hunger = clamp(state.hunger - 0.6);
-  state.energy = clamp(state.energy - 0.25);
-  state.cleanliness = clamp(state.cleanliness - 0.2);
-  state.happiness = clamp(state.happiness - 0.25);
+export function computeNeeds(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): Needs {
+  const until = state.diedAt ?? now;
+  const minutes = Math.max(0, until - state.updatedAt) / MINUTE;
+  const factor = state.sleeping ? config.sleepDecayFactor : 1;
+  const needs = {} as Needs;
+  for (const key of NEED_KEYS) {
+    const delta = state.sleeping && key === 'energy'
+      ? config.sleepEnergyPerMinute * minutes
+      : -config.decayPerMinute[key] * factor * minutes;
+    needs[key] = clamp(state.needs[key] + delta);
+  }
+  return needs;
+}
+
+export function computeStats(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): Stats {
+  const needs = computeNeeds(state, now, config);
+  const health = NEED_KEYS.reduce((sum, key) => sum + needs[key], 0) / NEED_KEYS.length;
+  return { ...needs, health };
+}
+
+export function ageMs(state: PetState, now: number): number {
+  return Math.max(0, (state.diedAt ?? now) - state.bornAt);
+}
+
+export function computeStage(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): Stage {
+  const age = ageMs(state, now);
+  if (age >= config.adultAtMs) return 'adult';
+  if (age >= config.teenAtMs) return 'teen';
+  return 'baby';
+}
+
+/**
+ * Muere cuando la vida llega a 0 o cuando el hambre y la sed llegan a 0 a la vez. La segunda regla
+ * evita que dormir la vuelva inmortal: dormida, la energía sube y la vida (promedio) nunca llegaría a 0.
+ */
+export function isDead(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): boolean {
+  if (state.diedAt !== null) return true;
+  const stats = computeStats(state, now, config);
+  return stats.health <= 0 || (stats.hunger <= 0 && stats.thirst <= 0);
+}
+
+/** Guarda la muerte en el estado la primera vez que se detecta. */
+export function markDeadIfNeeded(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  if (state.diedAt !== null || !isDead(state, now, config)) return state;
+  return { ...state, needs: computeNeeds(state, now, config), updatedAt: now, diedAt: now };
+}
+
+export function lowNeeds(stats: Stats, config: GameConfig = DEFAULT_CONFIG): NeedKey[] {
+  return NEED_KEYS.filter((key) => stats[key] < config.lowThreshold);
+}
+
+/** Lleva las necesidades al valor actual. Toda acción lo hace antes de aplicar su efecto. */
+function settle(state: PetState, now: number, config: GameConfig): PetState {
+  return { ...state, needs: computeNeeds(state, now, config), updatedAt: now };
+}
+
+function applyEffects(state: PetState, effects: Partial<Needs>): PetState {
+  const needs = { ...state.needs };
+  for (const key of NEED_KEYS) needs[key] = clamp(needs[key] + (effects[key] ?? 0));
+  return { ...state, needs };
+}
+
+/** Acción con efecto en las necesidades. Muerta o dormida no hace nada. */
+function careAction(state: PetState, now: number, config: GameConfig, effects: Partial<Needs>): PetState {
+  if (isDead(state, now, config) || state.sleeping) return state;
+  return applyEffects(settle(state, now, config), effects);
+}
+
+export function feed(state: PetState, itemId: string, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  const item = findItem(itemId);
+  if (!item) return state;
+  return careAction(state, now, config, item.effects);
+}
+
+export function play(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  return careAction(state, now, config, { happiness: 20, energy: -12, cleanliness: -5, thirst: -5 });
+}
+
+/** `scrubPercent` (0–100) es cuánto se frotó en la escena del baño. Se aplica una sola vez al salir. */
+export function bathe(state: PetState, scrubPercent: number, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  const percent = clamp(scrubPercent);
+  if (percent === 0) return state;
+  return careAction(state, now, config, {
+    cleanliness: (config.bathMaxGain * percent) / 100,
+    happiness: percent >= 50 ? 5 : 0,
+  });
+}
+
+export function sleep(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  if (isDead(state, now, config) || state.sleeping) return state;
+  return { ...settle(state, now, config), sleeping: true };
+}
+
+export function wake(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  if (isDead(state, now, config) || !state.sleeping) return state;
+  return { ...settle(state, now, config), sleeping: false };
+}
+
+export function rename(state: PetState, rawName: string, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  const result = validateName(rawName);
+  if (!result.ok || isDead(state, now, config)) return state;
+  return { ...state, name: result.value };
+}
+
+/** Devuelve la etapa nueva si avanzó entre dos lecturas; null si no cambió. */
+export function detectStageChange(previous: Stage, next: Stage): Stage | null {
+  return STAGE_ORDER.indexOf(next) > STAGE_ORDER.indexOf(previous) ? next : null;
 }
