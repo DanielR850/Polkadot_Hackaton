@@ -22,7 +22,7 @@ Ambos modos usan la misma escena Phaser y los sprites del ajolote. La raíz es e
 
 ## Especie única y contrato
 
-La interfaz solo ofrece el ajolote (id 0) y el Solidity actual rechaza otros IDs en nuevos despliegues. La dirección TestNet configurada es `0x08Ff3f07Bca56D0ebdD4346c815B320CDCBC3aec`. Confirmamos por lectura pública que responde como PolkaPets (PPET) y acepta cuatro IDs (`NUM_ESPECIES = 4`). Para imponer la restricción también en cadena hay que desplegar el Solidity actualizado y configurar la nueva dirección en `game/src/contract/config.ts`. No se desplegó un contrato como parte de esta versión.
+La interfaz solo ofrece el ajolote (id 0). La dirección TestNet configurada es `0x758425A3b756079B34FF97cB9C7A764fD44C008a`. Confirmamos por lectura pública que responde como PolkaPets (PPET) y permite una especie (`NUM_ESPECIES = 1`). Aún falta comparar el Solidity exacto del despliegue con el fuente del repositorio.
 
 ## Documentación
 

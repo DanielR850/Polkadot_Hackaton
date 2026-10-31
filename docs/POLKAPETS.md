@@ -96,19 +96,17 @@ npm run dev                # http://127.0.0.1:5173
 
 ## Despliegue actual
 
-- Contrato PolkaPets: `0x08Ff3f07Bca56D0ebdD4346c815B320CDCBC3aec`
-  ([explorador](https://blockscout-testnet.polkadot.io/address/0x08Ff3f07Bca56D0ebdD4346c815B320CDCBC3aec))
+- Contrato PolkaPets: `0x758425A3b756079B34FF97cB9C7A764fD44C008a`
+  ([explorador](https://blockscout-testnet.polkadot.io/address/0x758425A3b756079B34FF97cB9C7A764fD44C008a))
 - Prueba de humo: `npm run probar` dentro de `contrato/` (adopta, cuida con cada acción,
   cambia el nombre y lee el ranking).
 
 ### Alcance de la primera versión
 
-La interfaz solo permite adoptar el ajolote (id 0), y el Solidity del repositorio limita a ese
-ID los contratos que se desplieguen desde este código. La dirección TestNet de arriba es de un
-despliegue anterior, cuyo bytecode acepta las cuatro especies originales; por eso el límite de
-una sola especie todavía no está aplicado en cadena para esa dirección. Para aplicarlo hay que
-desplegar esta versión del contrato y actualizar `game/src/contract/config.ts`. La integración
-actual usa wallets EVM con `viem`; el Product SDK de Polkadot Desktop no está conectado.
+La interfaz solo permite adoptar el ajolote (id 0). La dirección TestNet de arriba responde
+como PolkaPets (PPET) y devuelve `NUM_ESPECIES = 1`; aún falta comparar el Solidity exacto
+del despliegue con el fuente y ABI del repositorio. La integración usa wallets EVM con `viem`;
+el Product SDK de Polkadot Desktop no está conectado.
 
 ## Notas de red
 

@@ -3,6 +3,20 @@
 > Todavía no se ha desplegado el Tamagotchi ni se ha reservado un dominio. Este documento describe
 > el recorrido; antes de publicar elegiremos explícitamente la red y el nombre.
 
+## Estado de PolkaPets v1
+
+La web ya compila con el contrato EVM de Polkadot Hub TestNet
+`0x758425A3b756079B34FF97cB9C7A764fD44C008a`. La lectura pública confirmó
+`name = PolkaPets`, `symbol = PPET` y `NUM_ESPECIES = 1`.
+
+El modo NFT actual usa `viem`, un RPC EVM y una wallet de navegador. El flujo Product
+`.paseo` carga el bundle dentro de un Host y su SDK de contratos documenta llamadas a
+contratos PolkaVM (`pallet-revive`) en Asset Hub. Antes de publicar un Product funcional
+hay que implementar y comprobar un adaptador de firma/lectura compatible con el Host,
+o portar el contrato y el frontend a la ruta PolkaVM. También hacen falta el nombre
+dotNS, una cuenta de publicación y autorización de Bulletin. El build web `dist/`
+por sí solo no resuelve esa integración.
+
 ## Qué se publica
 
 Se compila la aplicación web a una carpeta estática (`dist/`) con HTML, JavaScript, CSS e imágenes.
