@@ -39,6 +39,56 @@ const MX = {
 };
 const INK = 0x302b43;
 
+/** La hoja del ajolote bebé trae un fondo granate en cada cuadro. Se elimina
+ * al cargarla para que el personaje comparta la habitación con las demás edades. */
+function transparentAxolotlSheet(source: HTMLImageElement | HTMLCanvasElement, frameWidth: number, frameHeight: number): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const context = canvas.getContext('2d', { willReadFrequently: true })!;
+  context.drawImage(source, 0, 0);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  const data = pixels.data;
+  const columns = Math.floor(canvas.width / frameWidth);
+  const rows = Math.floor(canvas.height / frameHeight);
+  const frameSize = frameWidth * frameHeight;
+  const visited = new Uint8Array(frameSize);
+  const queue = new Int32Array(frameSize);
+  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+    visited.fill(0);
+    let head = 0, tail = 0;
+    const background = (local: number) => {
+      const x = column * frameWidth + local % frameWidth;
+      const y = row * frameHeight + Math.floor(local / frameWidth);
+      const i = (y * canvas.width + x) * 4;
+      const red = data[i], green = data[i + 1], blue = data[i + 2];
+      // El fondo es rojo oscuro con un gradiente; la piel, branquias y contorno
+      // tienen otra paleta. Solo se borran píxeles conectados al borde del cuadro.
+      return red < 180 && green >= 12 && green < 105 && blue < 125 && red > green * 1.2;
+    };
+    const enqueue = (local: number) => {
+      if (visited[local] || !background(local)) return;
+      visited[local] = 1;
+      queue[tail++] = local;
+    };
+    for (let x = 0; x < frameWidth; x++) { enqueue(x); enqueue((frameHeight - 1) * frameWidth + x); }
+    for (let y = 0; y < frameHeight; y++) { enqueue(y * frameWidth); enqueue(y * frameWidth + frameWidth - 1); }
+    while (head < tail) {
+      const local = queue[head++];
+      const x = local % frameWidth;
+      const y = Math.floor(local / frameWidth);
+      const i = ((row * frameHeight + y) * canvas.width + column * frameWidth + x) * 4;
+      data[i + 3] = 0;
+      if (x > 0) enqueue(local - 1);
+      if (x + 1 < frameWidth) enqueue(local + 1);
+      if (y > 0) enqueue(local - frameWidth);
+      if (y + 1 < frameHeight) enqueue(local + frameWidth);
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  return canvas;
+}
+
 export function createPetScene(parent: HTMLElement, onScrub: (progress: number) => void): PetSceneHandle {
   class RoomScene extends Phaser.Scene {
     private ready = false;
@@ -78,6 +128,20 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     create() {
       // El mundo sigue midiendo W×H; la cámara lo reduce al lienzo pequeño.
       this.cameras.main.setZoom(PIXEL).centerOn(W / 2, H / 2);
+      const babySheet = SPRITES.find((s) => s.petId === 0 && s.stage === 'baby');
+      if (babySheet) {
+        const firstKey = spriteKey(0, 'baby', babySheet.anim);
+        if (this.textures.exists(firstKey)) {
+          const source = this.textures.get(firstKey).getSourceImage() as HTMLImageElement;
+          const clean = transparentAxolotlSheet(source, babySheet.frameWidth, babySheet.frameHeight);
+          for (const sheet of SPRITES.filter((s) => s.petId === 0 && s.stage === 'baby')) {
+            const key = spriteKey(0, 'baby', sheet.anim);
+            this.textures.remove(key);
+            // Phaser admite canvas en tiempo de ejecución, aunque su tipo solo declara imágenes.
+            this.textures.addSpriteSheet(key, clean as unknown as HTMLImageElement, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
+          }
+        }
+      }
       for (const s of SPRITES) {
         const key = spriteKey(s.petId, s.stage, s.anim);
         if (!this.textures.exists(key)) continue;
