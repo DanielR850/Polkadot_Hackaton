@@ -5,7 +5,7 @@ El árbol contiene dos arquitecturas de ejecución, no una sola app ya conectada
 1. **Juego de la raíz:** `src/app/application.ts` coordina selección, cuidado, progreso y almacenamiento local; `src/domain/pet/` conserva reglas puras; `src/game/petScene.ts` dibuja la habitación con Phaser; `src/ui/` implementa pantallas y controles. Los assets del ajolote se registran en `src/game/assets.ts`.
 2. **PolkaPets (rama Ana):** `game/` es frontend Vite independiente que usa `viem` y wallets EVM de navegador. `contrato/` contiene Solidity/Hardhat para Polkadot Hub TestNet. Se ejecuta y compila aparte de la raíz.
 
-El frontend EVM no es una integración del Product SDK. Tampoco se debe asumir que las reglas del juego local son equivalentes a las reglas del contrato. La dirección que figura en `docs/POLKAPETS.md` es una afirmación de esos documentos y requiere verificación independiente antes de usar fondos o anunciar un despliegue. No se desplegó ni firmó ninguna transacción durante esta integración.
+El inicio local incluye una entrada al frontend EVM existente de `game/`. Ese frontend comparte la escena Phaser y los sprites del juego local. El contrato Solidity limita las nuevas adopciones a especie id 0, aunque la dirección TestNet actualmente configurada apunta a un despliegue anterior que admite cuatro IDs; para aplicar el límite en cadena se necesita desplegar el contrato actualizado y cambiar `game/src/contract/config.ts`. Esta integración no desplegó ni firmó transacciones. La conexión se hace con wallets EVM del navegador mediante `viem`; el Product SDK de Polkadot Desktop sigue pendiente.
 # Arquitectura: de la interfaz al smart contract
 
 > **Estado:** guía del diseño propuesto. El prototipo actual todavía no usa Product SDK, Host,
@@ -162,4 +162,6 @@ Podemos organizar **el frontend** con MVC sin convertir el contrato en un “mod
 
 El contrato se organiza y se despliega como componente independiente. El proyecto completo puede
 vivir en un monorepo, pero la web y el contrato tienen compilación, pruebas y despliegues distintos.
+
+
 

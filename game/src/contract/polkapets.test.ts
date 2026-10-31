@@ -68,8 +68,8 @@ describe("nombreValido", () => {
 
 describe("especie y etapas", () => {
   it("devuelve la especie y cae en la primera si el id no existe", () => {
-    expect(especie(3).nombre).to.equal("Pingüino");
-    expect(especie(99).nombre).to.equal("Gato");
+    expect(especie(0).nombre).to.equal("Ajolote");
+    expect(especie(99).nombre).to.equal("Ajolote");
   });
   it("etapa por nivel y etiquetas", () => {
     expect(etapaPorNivel(1)).to.equal(Etapa.Bebe);

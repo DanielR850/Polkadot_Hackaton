@@ -4,6 +4,7 @@ import { pickAnimation, type PetAnim } from '../game/animations.ts';
 import { findItem } from '../game/catalog.ts';
 import { DEFAULT_CONFIG, withSpeed } from '../game/config.ts';
 import { createPetScene, type PetSceneHandle } from '../game/petScene.ts';
+import { findPet } from '../game/catalog.ts';
 import {
   ageMs, bathe, computeStage, computeStats, createPet, detectStageChange, feed, isDead, lowNeeds,
   markDeadIfNeeded, play, rename, sleep, wake,
@@ -17,8 +18,8 @@ import { formatDuration, STAGE_LABEL } from '../ui/format.ts';
 import { createGameScreen, type GameMode } from '../ui/gameScreen.ts';
 import { createRankingDialog } from '../ui/rankingDialog.ts';
 import { createRenameDialog } from '../ui/renameDialog.ts';
-import { createSelectScreen } from '../ui/selectScreen.ts';
 import { createStartScreen } from '../ui/startScreen.ts';
+import { applyTheme, buildTheme, DEFAULT_THEME_COLOR } from '../ui/theme.ts';
 
 const params = new URLSearchParams(location.search);
 // `?speed=10` acelera el tiempo para probar etapas y muerte en la demo.
@@ -26,10 +27,9 @@ const config = withSpeed(DEFAULT_CONFIG, Number(params.get('speed') ?? 1));
 const app = document.querySelector<HTMLElement>('#app')!;
 const ACTION_MS = 1200;
 
-type Screen = 'start' | 'select' | 'game';
+type Screen = 'start' | 'game';
 
 let pet: PetState | null = loadPet();
-let draftName = '';
 let bathing = false;
 let bathProgress = 0;
 let action: { anim: 'eat' | 'play'; until: number } | null = null;
@@ -37,15 +37,35 @@ let lastStage: Stage | null = null;
 let scene: PetSceneHandle | null = null;
 let screen: Screen = 'start';
 
-const startScreen = createStartScreen((name) => { draftName = name; showScreen('select'); });
-
-const selectScreen = createSelectScreen((petId) => {
-  pet = createPet(petId, draftName, Date.now());
+const startScreen = createStartScreen((name) => {
+  pet = createPet(0, name, Date.now());
   savePet(pet);
+  useTheme(0);
   lastStage = 'baby';
   showScreen('game');
   gameScreen.say(`¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
-}, () => showScreen('start'));
+}, () => { void openContractGame(); });
+
+async function openContractGame() {
+  try {
+    document.documentElement.removeAttribute('style');
+    const [, { startApp }] = await Promise.all([
+      import('../../game/src/styles.css'),
+      import('../../game/src/app.ts'),
+    ]);
+    startApp(app, () => window.location.reload());
+  } catch (error) {
+    console.error('No se pudo abrir el juego con contrato:', error);
+    startScreen.say('No se pudo cargar el modo Polkadot. Revisa la conexión e inténtalo de nuevo.');
+  }
+}
+
+/** Aplica el tema del ajolote y sincroniza el color de la habitación Phaser. */
+function useTheme(petId: number | null) {
+  const theme = buildTheme(petId === null ? DEFAULT_THEME_COLOR : findPet(petId)?.theme ?? DEFAULT_THEME_COLOR);
+  applyTheme(theme);
+  scene?.setRoomColors(theme.room);
+}
 
 const gameScreen = createGameScreen({
   feed: () => feedMenu.open(),
@@ -72,6 +92,7 @@ const gameScreen = createGameScreen({
   restart: () => {
     pet = null;
     savePet(null);
+    useTheme(null);
     bathing = false;
     action = null;
     startScreen.reset();
@@ -160,10 +181,8 @@ function tick() {
 function showScreen(next: Screen) {
   screen = next;
   startScreen.root.hidden = next !== 'start';
-  selectScreen.root.hidden = next !== 'select';
   gameScreen.root.hidden = next !== 'game';
   if (next === 'start') startScreen.focus();
-  if (next === 'select') selectScreen.reset(draftName);
   if (next === 'game') {
     // Phaser se crea cuando su contenedor ya es visible, para que mida bien el tamaño.
     scene ??= createPetScene(gameScreen.gameHost, (progress) => { bathProgress = progress; render(); });
@@ -179,8 +198,9 @@ if (params.get('outside') === '1') {
     h('span', { class: 'eyebrow' }, 'POLKADOT'), h('h1', { class: 'title' }, 'Esta vista de Polkadot Desktop aún no está conectada'),
     h('p', { class: 'hint' }, 'El juego local funciona en el navegador. La integración con el Host todavía está pendiente.')));
 } else {
-  app.append(startScreen.root, selectScreen.root, gameScreen.root);
+  app.append(startScreen.root, gameScreen.root);
   startScreen.reset();
+  useTheme(pet?.petId ?? null);
   showScreen(pet ? 'game' : 'start');
   window.setInterval(tick, 1000);
 }

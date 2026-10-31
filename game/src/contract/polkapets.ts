@@ -28,10 +28,7 @@ export interface Especie {
 
 /** Mismo orden que los ids del contrato (0..NUM_ESPECIES-1). */
 export const ESPECIES: readonly Especie[] = [
-  { id: 0, nombre: "Gato", emoji: "🐱", descripcion: "Curioso e independiente." },
-  { id: 1, nombre: "Perro", emoji: "🐶", descripcion: "Leal y juguetón." },
-  { id: 2, nombre: "Dragón", emoji: "🐲", descripcion: "Pequeño, pero con carácter." },
-  { id: 3, nombre: "Pingüino", emoji: "🐧", descripcion: "Le encanta el agua." },
+  { id: 0, nombre: "Ajolote", emoji: "🦎", descripcion: "Tu compañero acuático." },
 ];
 
 export function especie(id: number): Especie {
@@ -128,7 +125,7 @@ export function etiquetaEtapa(etapa: Etapa): string {
     case Etapa.Bebe:
       return "Bebé";
     case Etapa.Joven:
-      return "Joven";
+      return "Adolescente";
     case Etapa.Adulta:
       return "Adulta";
     case Etapa.Enferma:

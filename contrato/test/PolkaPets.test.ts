@@ -4,8 +4,7 @@ import { time } from "@nomicfoundation/hardhat-network-helpers";
 
 const { ethers } = hre;
 
-const GATO = 0;
-const DRAGON = 2;
+const AJOLOTE = 0;
 
 // Con todo al máximo, sin cuidados:
 //  - la sed llega a 0 a los 100*45 = 4500 s y el hambre a los 100*60 = 6000 s;
@@ -21,7 +20,7 @@ describe("PolkaPets", () => {
     return { pets, owner, otro };
   }
 
-  async function adoptar(nombre = "Michi", especie = GATO) {
+  async function adoptar(nombre = "Michi", especie = AJOLOTE) {
     const ctx = await desplegar();
     await ctx.pets.mint(nombre, especie);
     const nacimiento = (await ctx.pets.verMascota(1)).nacimiento;
@@ -30,13 +29,13 @@ describe("PolkaPets", () => {
 
   it("adopta una mascota con nombre, especie y todo al máximo", async () => {
     const { pets, owner } = await desplegar();
-    await expect(pets.mint("Michi", DRAGON))
+    await expect(pets.mint("Michi", AJOLOTE))
       .to.emit(pets, "MascotaNacida")
-      .withArgs(1n, owner.address, "Michi", DRAGON);
+      .withArgs(1n, owner.address, "Michi", AJOLOTE);
 
     const m = await pets.verMascota(1);
     expect(m.nombre).to.equal("Michi");
-    expect(m.especie).to.equal(DRAGON);
+    expect(m.especie).to.equal(AJOLOTE);
     for (const v of [m.vida, m.hambre, m.sed, m.energia, m.felicidad, m.limpieza]) expect(v).to.equal(100);
     expect(m.viva).to.equal(true);
     expect(m.etapa).to.equal(0); // Bebé
@@ -45,9 +44,9 @@ describe("PolkaPets", () => {
 
   it("rechaza nombres y especies inválidos", async () => {
     const { pets } = await desplegar();
-    await expect(pets.mint("", GATO)).to.be.revertedWithCustomError(pets, "NombreInvalido");
-    await expect(pets.mint("x".repeat(25), GATO)).to.be.revertedWithCustomError(pets, "NombreInvalido");
-    await expect(pets.mint("Rex", 4)).to.be.revertedWithCustomError(pets, "EspecieInvalida");
+    await expect(pets.mint("", AJOLOTE)).to.be.revertedWithCustomError(pets, "NombreInvalido");
+    await expect(pets.mint("x".repeat(25), AJOLOTE)).to.be.revertedWithCustomError(pets, "NombreInvalido");
+    await expect(pets.mint("Rex", 1)).to.be.revertedWithCustomError(pets, "EspecieInvalida");
   });
 
   it("cada necesidad baja a su ritmo", async () => {
@@ -155,10 +154,10 @@ describe("PolkaPets", () => {
 
   it("el ranking devuelve la duración de cada mascota", async () => {
     const { pets, owner, otro } = await desplegar();
-    await pets.mint("Vieja", GATO);
+    await pets.mint("Vieja", AJOLOTE);
     const nacimiento = (await pets.verMascota(1)).nacimiento;
     await time.setNextBlockTimestamp(nacimiento + 100n);
-    await pets.connect(otro).mint("Nueva", DRAGON);
+    await pets.connect(otro).mint("Nueva", AJOLOTE);
     await time.increaseTo(nacimiento + 10_000n); // la primera ya murió (a los 6750 s)
 
     expect(await pets.totalMascotas()).to.equal(2);
@@ -179,8 +178,8 @@ describe("PolkaPets", () => {
 
   it("lista las mascotas de un dueño", async () => {
     const { pets, owner } = await desplegar();
-    await pets.mint("A", GATO);
-    await pets.mint("B", DRAGON);
+    await pets.mint("A", AJOLOTE);
+    await pets.mint("B", AJOLOTE);
     const ids = await pets.mascotasDe(owner.address);
     expect(ids.map((x) => Number(x))).to.deep.equal([1, 2]);
   });

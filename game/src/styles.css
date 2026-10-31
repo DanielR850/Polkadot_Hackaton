@@ -374,6 +374,8 @@ h3 {
   align-items: center;
   gap: 20px;
 }
+.onchain-pet-scene { flex: 1 1 360px; min-width: 0; overflow: hidden; aspect-ratio: 13 / 9; border-radius: 12px; }
+.onchain-pet-scene canvas { display: block; width: 100% !important; height: 100% !important; image-rendering: pixelated; }
 .avatar {
   flex: none;
   width: 120px;

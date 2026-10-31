@@ -45,7 +45,7 @@ export interface Hub {
   conectar(wallet: WalletInfo): Promise<void>;
   elegirNombre(nombre: string): boolean;
   adoptar(especie: number): Promise<void>;
-  cuidar(accion: Accion): Promise<void>;
+  cuidar(accion: Accion): Promise<boolean>;
   renombrar(nombre: string): Promise<boolean>;
   nuevaPartida(): void;
   volver(): void;
@@ -208,8 +208,8 @@ export function createHub(): Hub {
 
     async cuidar(accion) {
       const { wallet, cuenta, mascota } = state;
-      if (!wallet || !cuenta || !mascota) return;
-      await operar(TEXTO_ACCION[accion], async () => {
+      if (!wallet || !cuenta || !mascota) return false;
+      return operar(TEXTO_ACCION[accion], async () => {
         await red.cuidar(wallet.provider, cuenta, accion, mascota.tokenId);
         await releer();
         void actualizarSaldo();

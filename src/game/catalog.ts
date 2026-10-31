@@ -1,15 +1,8 @@
 import type { CareItem, ItemKind, PetId, PetSpecies } from './types.ts';
 
-// Las 5 mascotas del equipo. `slug` es el prefijo de sus archivos en `public/assets/characters/`
-// (por ejemplo `axolotl-portrait.png`). `id` (0–4) no debe cambiar porque es el que se guarda.
-// `theme` es el color de la interfaz con cada mascota, tomado de la paleta mexicana para que las 5
-// se distingan. `color`, `outline` y `belly` son del marcador temporal mientras no hay sprites.
+// Primera versión: solo se puede adoptar el ajolote. Conservamos el id 0 en las partidas guardadas.
 export const PETS: readonly PetSpecies[] = [
   { id: 0, slug: 'axolotl', label: 'Ajolote', description: 'Sonriente y acuático.', theme: 0xe4007c, color: 0xf5a3bf, outline: 0xc4506f, belly: 0xfbd2df },
-  { id: 1, slug: 'wolf', label: 'Lobo', description: 'Leal y aventurero.', theme: 0x1f4fa3, color: 0x9aa1aa, outline: 0x4f555e, belly: 0xe1e4e8 },
-  { id: 2, slug: 'grizzly', label: 'Oso grizzly', description: 'Grande y comelón.', theme: 0xff8c1a, color: 0xa65c2e, outline: 0x5e3216, belly: 0xcf9461 },
-  { id: 3, slug: 'opossum', label: 'Tlacuache', description: 'Astuto y nocturno.', theme: 0x7b2d8e, color: 0x6a5b52, outline: 0x342b26, belly: 0xf0dcc4 },
-  { id: 4, slug: 'manatee', label: 'Manatí', description: 'Tranquilo y dormilón.', theme: 0x00a6a6, color: 0x7f96a5, outline: 0x4a5d69, belly: 0xa9bdc9 },
 ];
 
 export const ITEMS: readonly CareItem[] = [

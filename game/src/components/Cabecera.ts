@@ -10,14 +10,15 @@ export interface Cabecera {
   sync(s: HubState): void;
 }
 
-export function createCabecera(onSalir: () => void): Cabecera {
+export function createCabecera(onSalir: () => void, salirLabel = "Salir"): Cabecera {
+  const keepExitVisible = salirLabel !== "Salir";
   const cuenta = el("span", { class: "cuenta" });
   const faucet = el("a", {
     class: "faucet",
     text: "Conseguir PAS",
     attrs: { href: FAUCET_URL, target: "_blank", rel: "noopener noreferrer", hidden: "" },
   });
-  const salir = boton("Salir", onSalir, "btn ghost chico");
+  const salir = boton(salirLabel, onSalir, "btn ghost chico");
   const derecha = el("div", { class: "cabecera-der" }, faucet, cuenta, salir);
 
   const element = el(
@@ -30,7 +31,7 @@ export function createCabecera(onSalir: () => void): Cabecera {
   return {
     element,
     sync(s) {
-      derecha.hidden = s.cuenta === null;
+      derecha.hidden = s.cuenta === null && !keepExitVisible;
       if (!s.cuenta) return;
       const saldo = s.saldo === null ? "" : ` · ${Number(formatEther(s.saldo)).toFixed(2)} ${NATIVE_SYMBOL}`;
       cuenta.textContent = `${s.wallet?.nombre ?? "Wallet"} · ${acortarDireccion(s.cuenta)}${saldo}`;

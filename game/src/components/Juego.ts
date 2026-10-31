@@ -1,14 +1,19 @@
 // Pantalla principal: la mascota, sus seis atributos y los botones de cuidado.
-import { especie, etiquetaEtapa, type Accion, type Mascota } from "../contract/polkapets";
+import { especie, Etapa, etiquetaEtapa, type Accion, type Mascota, etapaPorNivel } from "../contract/polkapets";
 import { diagnosticar, progresoXp } from "../engine/salud";
 import { duracionHumana } from "../lib/format";
 import { boton, el } from "./dom";
 import { createStatBar } from "./StatBar";
+import { createPetScene, type PetSceneHandle, type SceneView } from "../../../src/game/petScene.ts";
+import type { PetAnim } from "../../../src/game/animations.ts";
+import type { Stage } from "../../../src/game/types.ts";
+import { buildTheme } from "../../../src/ui/theme.ts";
 
 export interface Juego {
   element: HTMLElement;
   /** `m` ya viene con el tiempo simulado al instante actual. */
   sync(m: Mascota, ocupado: boolean): void;
+  react(action: Accion): void;
 }
 
 export interface JuegoAcciones {
@@ -19,7 +24,7 @@ export interface JuegoAcciones {
 }
 
 export function createJuego(acc: JuegoAcciones): Juego {
-  const avatar = el("div", { class: "avatar", attrs: { "aria-hidden": "true" } });
+  const gameHost = el("div", { class: "onchain-pet-scene", attrs: { "aria-label": "Ajolote NFT animado" } });
   const nombre = el("h2", { class: "mascota-nombre" });
   const meta = el("p", { class: "mascota-meta" });
   const xp = el("span");
@@ -60,6 +65,11 @@ export function createJuego(acc: JuegoAcciones): Juego {
     ),
   );
   const finTexto = fin.querySelector(".fin-texto") as HTMLElement;
+  let scene: PetSceneHandle | null = null;
+  let currentStage: Stage = "baby";
+  let idleView: SceneView = { petId: 0, stage: "baby", anim: "idle" };
+  let reactionTimer = 0;
+  let roomThemeApplied = false;
 
   const element = el(
     "section",
@@ -67,7 +77,7 @@ export function createJuego(acc: JuegoAcciones): Juego {
     el(
       "div",
       { class: "escenario" },
-      avatar,
+      gameHost,
       el("div", { class: "mascota-info" }, nombre, meta, xpBar, tiempo),
     ),
     consejo,
@@ -82,8 +92,16 @@ export function createJuego(acc: JuegoAcciones): Juego {
       const esp = especie(m.especie);
       const d = diagnosticar(m);
 
-      avatar.textContent = m.viva ? esp.emoji : "🪦";
-      avatar.className = `avatar ${d.urgencia}${m.viva && m.energia < 25 ? " cansada" : ""}`;
+      const growth = m.etapa === Etapa.Enferma || m.etapa === Etapa.Muerta ? etapaPorNivel(m.nivel) : m.etapa;
+      currentStage = growth === Etapa.Adulta ? "adult" : growth === Etapa.Joven ? "teen" : "baby";
+      const anim: PetAnim = !m.viva ? "dead" : m.etapa === Etapa.Enferma ? "sad" : "idle";
+      idleView = { petId: 0, stage: currentStage, anim };
+      scene ??= createPetScene(gameHost, () => {});
+      if (!roomThemeApplied) {
+        scene.setRoomColors(buildTheme(0xe4007c).room);
+        roomThemeApplied = true;
+      }
+      scene.show(idleView);
       nombre.textContent = m.nombre;
       meta.textContent = `${esp.nombre} · ${etiquetaEtapa(m.etapa)} · Nivel ${m.nivel} · NFT #${m.tokenId}`;
       xp.style.width = `${progresoXp(m)}%`;
@@ -106,6 +124,15 @@ export function createJuego(acc: JuegoAcciones): Juego {
 
       fin.hidden = m.viva;
       if (!m.viva) finTexto.textContent = `${m.nombre} vivió ${duracionHumana(m.duracion)}. Su récord queda en el ranking.`;
+    },
+    react(action) {
+      if (!scene) return;
+      const anim: Record<Accion, PetAnim> = { alimentar: "eat", jugar: "play", dormir: "sleep", banar: "bath" };
+      const icon: Record<Accion, string> = { alimentar: "🍓", jugar: "🎾", dormir: "🌙", banar: "🫧" };
+      scene.show({ petId: 0, stage: currentStage, anim: anim[action] });
+      scene.react(icon[action]);
+      window.clearTimeout(reactionTimer);
+      reactionTimer = window.setTimeout(() => scene?.show(idleView), 1400);
     },
   };
 }

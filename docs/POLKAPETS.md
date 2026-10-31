@@ -17,7 +17,7 @@ que encapsula todo lo que va a la cadena.
    de Polkadot compatibles con EVM (Talisman, SubWallet, Nova). La app agrega o cambia la red
    a Polkadot Hub TestNet.
 3. **Nombre** de la mascota (1 a 24 bytes).
-4. **Elige la mascota**: 🐱 Gato, 🐶 Perro, 🐲 Dragón o 🐧 Pingüino. *Adoptar* mintea el NFT.
+4. **Adopta el ajolote** (especie id 0). *Adoptar* mintea el NFT.
 5. **Juego principal**: seis atributos y los botones *Alimentación*, *Jugar*, *Dormir*,
    *Bañar*, *Nombre* y *Ranking*.
 
@@ -100,6 +100,15 @@ npm run dev                # http://127.0.0.1:5173
   ([explorador](https://blockscout-testnet.polkadot.io/address/0x022e6adE3D707EA9E7D96D50FD388922A58cEF8E))
 - Prueba de humo: `npm run probar` dentro de `contrato/` (adopta, cuida con cada acción,
   cambia el nombre y lee el ranking).
+
+### Alcance de la primera versión
+
+La interfaz solo permite adoptar el ajolote (id 0), y el Solidity del repositorio limita a ese
+ID los contratos que se desplieguen desde este código. La dirección TestNet de arriba es de un
+despliegue anterior, cuyo bytecode acepta las cuatro especies originales; por eso el límite de
+una sola especie todavía no está aplicado en cadena para esa dirección. Para aplicarlo hay que
+desplegar esta versión del contrato y actualizar `game/src/contract/config.ts`. La integración
+actual usa wallets EVM con `viem`; el Product SDK de Polkadot Desktop no está conectado.
 
 ## Notas de red
 

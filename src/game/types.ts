@@ -10,7 +10,8 @@ export type Stats = Needs & { health: number };
 
 export type Stage = 'baby' | 'teen' | 'adult';
 
-export type PetId = 0 | 1 | 2 | 3 | 4;
+/** El catálogo actual solo permite id 0; number mantiene compatibilidad con datos externos/históricos. */
+export type PetId = number;
 
 /**
  * Estado guardado. Las necesidades se guardan como valor base en `updatedAt`; el valor actual se

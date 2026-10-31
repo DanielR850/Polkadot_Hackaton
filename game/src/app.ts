@@ -14,11 +14,15 @@ import { createNombre } from "./components/Nombre";
 import { EXPLORER_URL, PETS_ADDRESS } from "./contract/config";
 import { mascotaAhora } from "./engine/tiempo";
 import { createHub, leerRanking, type HubState, type Pantalla } from "./hub/hub";
+import type { Accion } from "./contract/polkapets";
 
-export function startApp(root: HTMLElement): void {
+export function startApp(root: HTMLElement, onReturnToLocal?: () => void): void {
   const hub = createHub();
 
-  const cabecera = createCabecera(() => hub.salir());
+  const cabecera = createCabecera(() => {
+    hub.salir();
+    if (onReturnToLocal) onReturnToLocal();
+  }, onReturnToLocal ? "Volver al juego local" : "Salir");
   const mensajes = createMensajes(() => hub.limpiarMensajes());
   const ranking = createModalRanking(leerRanking);
   const abrirRanking = () => ranking.abrir(hub.getState().cuenta);
@@ -38,12 +42,14 @@ export function startApp(root: HTMLElement): void {
     (e) => void hub.adoptar(e),
     () => hub.volver(),
   );
+  let reaccionar = (_a: Accion) => {};
   const juego = createJuego({
-    onCuidar: (a) => void hub.cuidar(a),
+    onCuidar: (a) => { void hub.cuidar(a).then((ok) => { if (ok) reaccionar(a); }); },
     onNombre: () => modalNombre.abrir(hub.getState().mascota?.nombre ?? ""),
     onRanking: abrirRanking,
     onNuevaPartida: () => hub.nuevaPartida(),
   });
+  reaccionar = (a) => juego.react(a);
 
   const pantallas: Record<Pantalla, HTMLElement> = {
     inicio: inicio,

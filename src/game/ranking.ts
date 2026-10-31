@@ -24,15 +24,15 @@ export function sortRanking(entries: readonly RankingEntry[]): RankingEntry[] {
 const MINUTE = 60_000;
 const FAKE: ReadonlyArray<Omit<RankingEntry, 'isMine'>> = [
   { id: 'f1', petName: 'Mochi', petId: 0, aliveMs: 42 * MINUTE },
-  { id: 'f2', petName: 'Kiwi', petId: 1, aliveMs: 31 * MINUTE },
-  { id: 'f3', petName: 'Tofu', petId: 2, aliveMs: 27 * MINUTE },
-  { id: 'f4', petName: 'Luna', petId: 3, aliveMs: 19 * MINUTE },
-  { id: 'f5', petName: 'Pixel', petId: 4, aliveMs: 15 * MINUTE },
+  { id: 'f2', petName: 'Kiwi', petId: 0, aliveMs: 31 * MINUTE },
+  { id: 'f3', petName: 'Tofu', petId: 0, aliveMs: 27 * MINUTE },
+  { id: 'f4', petName: 'Luna', petId: 0, aliveMs: 19 * MINUTE },
+  { id: 'f5', petName: 'Pixel', petId: 0, aliveMs: 15 * MINUTE },
   { id: 'f6', petName: 'Nube', petId: 0, aliveMs: 11 * MINUTE },
-  { id: 'f7', petName: 'Churro', petId: 1, aliveMs: 8 * MINUTE },
-  { id: 'f8', petName: 'Bolita', petId: 2, aliveMs: 6 * MINUTE },
-  { id: 'f9', petName: 'Dot', petId: 3, aliveMs: 4 * MINUTE },
-  { id: 'f10', petName: 'Paseo', petId: 4, aliveMs: 2 * MINUTE },
+  { id: 'f7', petName: 'Churro', petId: 0, aliveMs: 8 * MINUTE },
+  { id: 'f8', petName: 'Bolita', petId: 0, aliveMs: 6 * MINUTE },
+  { id: 'f9', petName: 'Dot', petId: 0, aliveMs: 4 * MINUTE },
+  { id: 'f10', petName: 'Paseo', petId: 0, aliveMs: 2 * MINUTE },
 ];
 
 /** Datos falsos con un retraso para ver el estado de carga. `getMine` agrega la mascota del usuario. */
