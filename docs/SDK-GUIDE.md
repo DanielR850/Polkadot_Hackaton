@@ -44,6 +44,22 @@ configuración propias. Hay que seguir un solo conjunto compatible y no mezclar 
 nuevos. [SDK y capacidades](https://docs.polkadot.com/apps/product-sdk/) · [Contratos desde un
 Product](https://docs.polkadot.com/apps/product-sdk/contracts/)
 
+## Lo que confirma la documentación vigente
+
+- El Product es una aplicación web de una sola página que se carga dentro de un Host. No guarda las
+  llaves, no elige un RPC ni habla directamente con la cadena: el Host media esas capacidades.
+- Podemos usar el paquete agrupador `@parity/product-sdk` o instalar solo paquetes por capacidad. La
+  guía de Polkadot favorece los paquetes individuales en sus ejemplos de construcción; elegiremos
+  según las capacidades reales para evitar dependencias innecesarias.
+- `createFakeApp` sirve para probar wallet y almacenamiento local. No trae un cliente de cadena falso
+  por defecto; la lectura de cadena requiere una interfaz nuestra y pruebas específicas de integración.
+- La página actual de Contracts cubre contratos `pallet-revive` en Asset Hub. El cliente toma la
+  dirección y ABI desde `cdm.json`; las lecturas `query` entregan `success`, las escrituras `tx`
+  requieren firma, y una cuenta nueva debe mapearse a H160 antes de enviar.
+- Por eso aún no agrego dependencias ni código de contrato: primero hay que confirmar si el proyecto
+  seguirá el devnet del taller o el flujo actual del Product SDK. Los dos ejemplos pueden usar
+  herramientas, manifiestos y redes diferentes.
+
 ## Cómo entra en el Tamagotchi
 
 ```text
