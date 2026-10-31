@@ -119,7 +119,7 @@ const renameDialog = createRenameDialog((name) => withPet((p, now) => commit(ren
 
 const rankingDialog = createRankingDialog(createMockRanking(() => pet
   ? { id: 'me', petName: pet.name, petId: pet.petId, aliveMs: ageMs(pet, Date.now()), isMine: true }
-  : null));
+  : null), () => { void openContractGame(); });
 
 function withPet(fn: (p: PetState, now: number) => void) {
   if (pet) fn(pet, Date.now());

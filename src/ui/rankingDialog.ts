@@ -4,11 +4,17 @@ import { createDialog, h } from './dom.ts';
 import { formatDuration } from './format.ts';
 
 /** Ranking por tiempo vivido. Muestra carga, vacío y error; la fila propia va resaltada. */
-export function createRankingDialog(source: RankingSource) {
+export function createRankingDialog(source: RankingSource, onConnect: () => void) {
   const { dialog, body } = createDialog('Ranking', 'ranking-dialog');
   const status = h('p', { class: 'hint', 'aria-live': 'polite' });
   const list = h('ol', { class: 'ranking-list' });
-  body.append(h('p', { class: 'hint' }, 'Mascotas que más tiempo han vivido. Datos de ejemplo.'), status, list);
+  const connect = h('button', { class: 'primary', type: 'button' }, 'Vincular cuenta para registrar mi récord');
+  connect.addEventListener('click', () => { dialog.close(); onConnect(); });
+  body.append(
+    h('p', { class: 'hint' }, 'Estos son récords de ejemplo del juego local.'),
+    h('p', { class: 'hint', 'aria-live': 'polite' }, 'Vincula tu cuenta para registrar tu récord NFT en la cadena.'),
+    connect, status, list,
+  );
   let request = 0;
 
   async function load() {

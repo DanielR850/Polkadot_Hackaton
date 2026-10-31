@@ -204,7 +204,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 /* El área de la mascota mantiene la proporción de la escena (13:9) a cualquier ancho y no pasa del alto visible. */
 .pet-card #game {
   width: 100%; aspect-ratio: 13 / 9; max-height: min(62vh, 440px); margin-top: 30px;
-  border: var(--px) solid var(--ink); background: var(--frame); box-shadow: inset 0 0 0 4px #ffffff55;
+  overflow: hidden; outline: var(--px) solid var(--ink); background: var(--frame); box-shadow: inset 0 0 0 4px #ffffff55;
 }
 .pet-card canvas { display: block; margin: auto; max-width: 100%; image-rendering: pixelated; image-rendering: crisp-edges; }
 .pet-caption { display: flex; justify-content: center; align-items: center; gap: 10px; font-size: 24px; margin-top: 10px; }
