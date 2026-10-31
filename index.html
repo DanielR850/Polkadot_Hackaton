@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4ead6" />
+    <title>Mi criatura — Tamagotchi Polkadot</title>
+  </head>
+  <body>
+    <div id="app">
+      <header class="topbar">
+        <div><span class="eyebrow">MI PEQUEÑO MUNDO</span><h1>Mi criatura</h1></div>
+        <div class="day-pill"><span class="live-dot"></span><span id="day-label">Día 1</span></div>
+      </header>
+      <main class="layout">
+        <section class="pet-card" aria-label="Habitación de la mascota">
+          <div class="room-label"><span>⌂</span> HABITACIÓN</div>
+          <div id="game" aria-label="Mascota animada"></div>
+          <div class="pet-caption"><span id="mood-emoji">☺</span><span id="mood-text">¡Qué bonito día!</span></div>
+        </section>
+        <aside class="care-card">
+          <div class="card-heading"><div><span class="eyebrow">CUIDADOS</span><h2>¿Qué hacemos?</h2></div><span class="sparkle">✦</span></div>
+          <div class="meters" id="meters"></div>
+          <div class="actions">
+            <button data-action="feed"><span>🍓</span><b>Alimentar</b></button>
+            <button data-action="play"><span>🎾</span><b>Jugar</b></button>
+            <button data-action="clean"><span>🫧</span><b>Limpiar</b></button>
+            <button data-action="sleep"><span>🌙</span><b>Descansar</b></button>
+          </div>
+          <p id="feedback" class="feedback" aria-live="polite">Tu criatura te está esperando.</p>
+          <div class="local-note"><span>☁</span><p>Tu partida se guarda en este dispositivo.<br><small>La conexión con Polkadot la añadiremos después.</small></p></div>
+        </aside>
+      </main>
+      <footer>Una mascota virtual, hecha para cuidar con calma <span>✦</span></footer>
+    </div>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
