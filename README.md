@@ -6,14 +6,14 @@ Juego web de mascota virtual. La primera versión será 2D y funcionará en nave
 
 Los recursos del juego viven en `public/assets/` y se organizan por tipo:
 
-- `characters/`: spritesheets, retratos y animaciones de la mascota.
+- `pets/`: spritesheets, retratos y animaciones de la mascota.
 - `backgrounds/`: habitación y fondos.
 - `ui/`: iconos y elementos gráficos de la interfaz.
 - `sfx/`: efectos de sonido.
 - `music/`: música del juego.
 - `models-3d/`: modelos `.glb` si añadimos una versión 3D.
 
-Usa nombres descriptivos y minúsculas, por ejemplo `axolotl-idle.png` o `room-day.webp`. Guarda aquí solo recursos que podamos usar legalmente y registra su fuente/licencia en `docs/ASSETS.md`.
+Usa nombres descriptivos y minúsculas, por ejemplo `pets/axolotl/states.png` o `backgrounds/room-day.webp`. Guarda aquí solo recursos que podamos usar legalmente y registra su fuente/licencia en `docs/ASSETS.md`.
 
 ## Arquitectura del proyecto
 

@@ -29,3 +29,15 @@ Las rutas anteriores son relativas a `TomoDachi/`. Todos los archivos son JPEG; 
 | 12 ilustraciones JPEG en `TomoDachi/` | Nombre de archivo `Gemini_Generated_Image_*`; falta confirmación del proceso exacto | Pendiente de confirmar antes de publicar | Ninguno |
 
 No incluir imágenes, música, modelos o fuentes en una publicación hasta confirmar que su licencia permite ese uso y distribución.
+
+## Sprite nuevo para el juego
+
+`public/assets/pets/axolotl/states.png` es una hoja de cuatro poses originales del ajolote (quieto,
+feliz, comiendo y dormido), generada para este proyecto con ImageGen y fondo transparente. Mide
+2172×724 px; cada cuadro mide 543×724 px. Phaser la carga como spritesheet y muestra una pose distinta
+cuando la persona alimenta, juega, limpia o manda a dormir a la mascota. Es un archivo PNG de unos
+906 KB.
+
+La hoja genera arte para estados visuales, no una animación continua: cada pose ocupa un cuadro. Si
+queremos caminar o mover la boca de forma fluida, necesitaremos varios cuadros por acción. Confirmar
+los términos de uso aplicables antes de distribuir el juego.
