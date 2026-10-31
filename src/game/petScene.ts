@@ -28,7 +28,7 @@ const H = 360;
 const PIXEL = 0.4;
 const ROOM_POS = { x: W / 2, y: 190 };
 const BATH_POS = { x: W / 2, y: 205 };
-const STAGE_SCALE: Record<Stage, number> = { baby: 0.6, teen: 0.8, adult: 1 };
+const STAGE_SCALE: Record<Stage, number> = { baby: 0.8, teen: 0.95, adult: 1.1 };
 const BODY = { rx: 61, ry: 56, offsetY: 8 };
 const SPONGE_R = 22;
 const DEAD_COLORS = { color: 0xb8b2bd, outline: 0x8a8490, belly: 0xd6d2da };
@@ -166,17 +166,52 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (spriteAnim) {
         this.sprite.play(spriteAnim.key);
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
-        this.sprite.setScale((BODY.ry * 2.4) / spriteAnim.frameHeight);
+        this.animateSprite(view.anim, (BODY.ry * 3) / spriteAnim.frameHeight);
         return;
       }
       this.paintPlaceholder(view);
     }
 
+    /** Da movimiento propio a los retratos de un fotograma en cada estado del juego. */
+    private animateSprite(anim: PetAnim, scale: number) {
+      this.tweens.killTweensOf(this.sprite);
+      this.sprite.clearTint().setAlpha(1).setAngle(0).setPosition(0, 0).setScale(scale);
+      if (anim === 'dead') {
+        this.sprite.setTint(0x888888).setAngle(75).setY(25);
+        return;
+      }
+      if (anim === 'sad') {
+        this.sprite.setTint(0xb8c5dd).setY(8);
+        this.tweens.add({ targets: this.sprite, y: 12, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'sleep') {
+        this.sprite.setAngle(-9).setY(8);
+        this.tweens.add({ targets: this.sprite, scaleY: scale * 1.04, duration: 1550, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'play') {
+        this.tweens.add({ targets: this.sprite, y: -16, angle: 7, duration: 230, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'eat') {
+        this.tweens.add({ targets: this.sprite, angle: -7, scaleY: scale * 0.94, duration: 180, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'bath') {
+        this.tweens.add({ targets: this.sprite, angle: 4, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      this.tweens.add({ targets: this.sprite, scaleY: scale * 1.025, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
+
     private findSprite(view: SceneView): { key: string; frameHeight: number } | null {
       for (const anim of [view.anim, 'idle'] as const) {
-        const key = spriteKey(view.petId, view.stage, anim);
-        const sheet = SPRITES.find((s) => s.petId === view.petId && s.stage === view.stage && s.anim === anim);
-        if (sheet && this.anims.exists(key)) return { key, frameHeight: sheet.frameHeight };
+        for (const stage of [view.stage, 'baby'] as const) {
+          const key = spriteKey(view.petId, stage, anim);
+          const sheet = SPRITES.find((s) => s.petId === view.petId && s.stage === stage && s.anim === anim);
+          if (sheet && this.anims.exists(key)) return { key, frameHeight: sheet.frameHeight };
+        }
       }
       return null;
     }

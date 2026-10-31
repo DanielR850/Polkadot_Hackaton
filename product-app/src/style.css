@@ -12,3 +12,9 @@
 .product-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; margin: 1rem 0; }
 .product-stat { background: var(--panel-2); padding: .5rem; }
 .product-stat meter { display: block; width: 100%; }
+.product-species { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: .65rem; margin: 1rem 0; padding: .8rem; border: 3px solid var(--ink); }
+.product-species legend { padding: 0 .4rem; }
+.product-species-option { display: grid; justify-items: center; gap: .2rem; padding: .45rem; border: 3px solid var(--ink); background: var(--frame); cursor: pointer; text-align: center; }
+.product-species-option:has(input:checked) { outline: 3px solid var(--accent); outline-offset: 2px; }
+.product-species-option img { width: 90px; height: 90px; object-fit: contain; image-rendering: pixelated; }
+.product-species-option span { font: 9px var(--title); }

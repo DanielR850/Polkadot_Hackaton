@@ -38,6 +38,20 @@ export function createGameScreen(intents: GameIntents) {
   const moodText = h('span', {});
   const feedback = h('p', { class: 'feedback', 'aria-live': 'polite' }, 'Tu mascota te está esperando.');
   const toast = h('div', { class: 'toast', role: 'status', hidden: true });
+  const menuButton = h('button', { type: 'button', class: 'menu-button', 'aria-expanded': 'false', 'aria-controls': 'game-menu' }, '☰ Menú');
+  const menuClose = h('button', { type: 'button', class: 'ghost' }, 'Continuar partida');
+  const chooseAnother = h('button', { type: 'button', class: 'ghost' }, 'Elegir otra mascota');
+  const menu = h('div', { id: 'game-menu', class: 'game-menu', hidden: true },
+    h('strong', {}, 'MENÚ DE PARTIDA'),
+    h('p', {}, 'Elegir otra mascota reemplaza esta partida guardada en tu dispositivo.'),
+    menuClose, chooseAnother);
+  const toggleMenu = (open: boolean) => {
+    menu.hidden = !open;
+    menuButton.setAttribute('aria-expanded', String(open));
+  };
+  menuButton.addEventListener('click', () => toggleMenu(menu.hidden));
+  menuClose.addEventListener('click', () => toggleMenu(false));
+  chooseAnother.addEventListener('click', () => { toggleMenu(false); intents.restart(); });
 
   const bars = BAR_INFO.map((info) => {
     const value = h('strong', {});
@@ -81,7 +95,9 @@ export function createGameScreen(intents: GameIntents) {
   const root = h('section', { class: 'screen game-screen', 'aria-label': 'Juego' },
     h('header', { class: 'topbar' },
       h('div', {}, h('span', { class: 'eyebrow' }, 'MI PEQUEÑO MUNDO'), nameEl),
-      h('div', { class: 'day-pill' }, h('span', { class: 'live-dot' }), stageEl, ageEl)),
+      h('div', { class: 'topbar-tools' }, menuButton,
+        h('div', { class: 'day-pill' }, h('span', { class: 'live-dot' }), stageEl, ageEl))),
+    menu,
     h('main', { class: 'layout' },
       h('section', { class: 'pet-card', 'aria-label': 'Habitación de la mascota' },
         h('div', { class: 'room-label' }, h('span', {}, '⌂'), ' HABITACIÓN'), gameHost,
@@ -90,7 +106,7 @@ export function createGameScreen(intents: GameIntents) {
         h('div', { class: 'card-heading' }, h('div', {}, h('span', { class: 'eyebrow' }, 'CUIDADOS'), h('h2', {}, '¿Qué hacemos?')), h('span', { class: 'sparkle' }, '✦')),
         careControls, deathPanel,
         h('div', { class: 'local-note' }, h('span', {}, '☁'),
-          h('p', {}, 'Tu partida se guarda en este dispositivo.', h('br'), h('small', {}, 'La conexión con Polkadot la añadiremos después.'))))));
+          h('p', {}, 'Tu partida local se guarda en este dispositivo.', h('br'), h('small', {}, 'El modo NFT se abre desde la pantalla inicial.'))))));
 
   let currentMode: GameMode = 'normal';
   let toastTimer = 0;

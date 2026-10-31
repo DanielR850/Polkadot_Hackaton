@@ -160,6 +160,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .chain-entry:hover { filter: brightness(1.08); transform: translate(-1px, -1px); }
 
 .pet-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
+.topbar-tools { display: flex; align-items: center; gap: 10px; }
+.menu-button, .game-menu button { cursor: pointer; font-family: var(--title); }
+.menu-button { padding: 8px 12px; border: var(--px) solid var(--ink); background: var(--light); color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
+.game-menu { position: relative; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 14px; padding: 16px; border: var(--px) solid var(--ink); background: var(--panel); box-shadow: 5px 5px 0 var(--ink); }
+.game-menu[hidden] { display: none; }
+.game-menu strong { font: 10px var(--title); }
+.game-menu p { flex: 1 1 100%; margin: 0; }
+.game-menu button { padding: 8px 10px; }
 .pet-option { display: flex; flex-direction: column; align-items: center; gap: 8px; cursor: pointer; text-align: center; }
 .pet-frame {
   display: grid; place-items: center; width: 100%; aspect-ratio: 1; background: var(--frame);
