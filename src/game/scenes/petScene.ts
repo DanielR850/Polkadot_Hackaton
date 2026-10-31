@@ -40,5 +40,8 @@ export function createPetScene(parent: HTMLElement) {
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
     scene: [RoomScene], render: { antialias: true, roundPixels: true },
   });
-  return { react: (action: string) => (game.scene.getScene('room') as RoomScene).react(action) };
+  return {
+    react: (action: string) => (game.scene.getScene('room') as RoomScene).react(action),
+    destroy: () => game.destroy(true),
+  };
 }
