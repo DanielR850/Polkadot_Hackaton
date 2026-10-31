@@ -103,8 +103,10 @@ npm run dev                # http://127.0.0.1:5173
 
 ### Alcance de la primera versión
 
-La interfaz solo permite adoptar el ajolote (id 0). La dirección TestNet de arriba responde
-como PolkaPets (PPET) y devuelve `NUM_ESPECIES = 1`; aún falta comparar el Solidity exacto
+La dirección TestNet de arriba responde como PolkaPets (PPET) y devuelve `NUM_ESPECIES = 1`.
+La interfaz muestra cinco animales pero desactiva los cuatro no admitidos por ese contrato.
+El Solidity fuente de esta rama admite las cinco especies; para usarlo en EVM hay que
+desplegar una instancia nueva y actualizar su dirección. Aún falta comparar el Solidity exacto
 del despliegue con el fuente y ABI del repositorio. La integración usa wallets EVM con `viem`;
 el Product SDK de Polkadot Desktop no está conectado.
 

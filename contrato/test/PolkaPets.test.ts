@@ -46,7 +46,16 @@ describe("PolkaPets", () => {
     const { pets } = await desplegar();
     await expect(pets.mint("", AJOLOTE)).to.be.revertedWithCustomError(pets, "NombreInvalido");
     await expect(pets.mint("x".repeat(25), AJOLOTE)).to.be.revertedWithCustomError(pets, "NombreInvalido");
-    await expect(pets.mint("Rex", 1)).to.be.revertedWithCustomError(pets, "EspecieInvalida");
+    await expect(pets.mint("Rex", 5)).to.be.revertedWithCustomError(pets, "EspecieInvalida");
+  });
+
+  it("adopta las cinco especies y conserva su id en la lectura", async () => {
+    const { pets } = await desplegar();
+    expect(await pets.NUM_ESPECIES()).to.equal(5);
+    for (let id = 0; id < 5; id += 1) {
+      await pets.mint(`Mascota ${id}`, id);
+      expect((await pets.verMascota(id + 1)).especie).to.equal(id);
+    }
   });
 
   it("cada necesidad baja a su ritmo", async () => {

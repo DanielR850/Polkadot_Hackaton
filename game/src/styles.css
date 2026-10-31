@@ -366,6 +366,13 @@ h3 {
   font-size: 52px;
   line-height: 1.1;
 }
+  .especie-retrato {
+    width: 92px;
+    height: 92px;
+    object-fit: contain;
+    image-rendering: pixelated;
+  }
+  .especie:disabled { opacity: .45; cursor: not-allowed; }
 
 /* ───────────── juego */
 

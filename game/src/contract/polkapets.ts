@@ -21,6 +21,7 @@ export type Accion = "alimentar" | "jugar" | "dormir" | "banar";
 
 export interface Especie {
   id: number;
+  slug: string;
   nombre: string;
   emoji: string;
   descripcion: string;
@@ -28,7 +29,11 @@ export interface Especie {
 
 /** Mismo orden que los ids del contrato (0..NUM_ESPECIES-1). */
 export const ESPECIES: readonly Especie[] = [
-  { id: 0, nombre: "Ajolote", emoji: "🦎", descripcion: "Tu compañero acuático." },
+  { id: 0, slug: "axolotl", nombre: "Ajolote", emoji: "🦎", descripcion: "Tu compañero acuático." },
+  { id: 1, slug: "wolf", nombre: "Lobo", emoji: "🐺", descripcion: "Curioso y juguetón." },
+  { id: 2, slug: "bear", nombre: "Oso grizzly", emoji: "🐻", descripcion: "Dulce y aventurero." },
+  { id: 3, slug: "opossum", nombre: "Tlacuache", emoji: "🐾", descripcion: "Travieso y nocturno." },
+  { id: 4, slug: "manatee", nombre: "Manatí", emoji: "🦭", descripcion: "Tranquilo y amigable." },
 ];
 
 export function especie(id: number): Especie {

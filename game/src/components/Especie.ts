@@ -1,5 +1,6 @@
 // Pantalla para elegir la mascota (especie). Adoptar mintea el NFT.
 import { ESPECIES } from "../contract/polkapets";
+import { portraitUrl } from "../../../src/game/assets.ts";
 import type { HubState } from "../hub/hub";
 import { boton, el } from "./dom";
 
@@ -15,7 +16,7 @@ export function createEspecie(onAdoptar: (especie: number) => void, onVolver: ()
     const b = el(
       "button",
       { class: "especie", attrs: { type: "button", "aria-pressed": "false" } },
-      el("span", { class: "especie-emoji", text: e.emoji }),
+      el("img", { class: "especie-retrato", attrs: { src: portraitUrl(e.slug), alt: "", draggable: "false" } }),
       el("strong", { text: e.nombre }),
       el("span", { class: "ayuda", text: e.descripcion }),
     );
@@ -34,6 +35,7 @@ export function createEspecie(onAdoptar: (especie: number) => void, onVolver: ()
 
   const volver = boton("← Volver", onVolver, "btn ghost");
   const adoptar = boton("🥚 Adoptar (NFT)", () => onAdoptar(elegida), "btn primary");
+  const disponibilidad = el("p", { class: "ayuda", attrs: { "aria-live": "polite" } });
 
   const element = el(
     "section",
@@ -42,6 +44,7 @@ export function createEspecie(onAdoptar: (especie: number) => void, onVolver: ()
     titulo,
     el("p", { class: "ayuda", text: "Al adoptar firmas una transacción que crea tu mascota como NFT en tu cuenta." }),
     el("div", { class: "especies" }, ...tarjetas),
+    disponibilidad,
     el("div", { class: "botones-fila" }, volver, adoptar),
   );
 
@@ -50,9 +53,14 @@ export function createEspecie(onAdoptar: (especie: number) => void, onVolver: ()
     sync(s) {
       titulo.textContent = `Elige a ${s.nombreNuevo || "tu mascota"}`;
       const ocupado = s.ocupado !== null;
-      adoptar.disabled = ocupado;
+      if (elegida >= s.numEspecies) elegida = 0;
+      marcar();
+      adoptar.disabled = ocupado || elegida >= s.numEspecies;
       volver.disabled = ocupado;
-      for (const t of tarjetas) t.disabled = ocupado;
+      tarjetas.forEach((t, i) => { t.disabled = ocupado || i >= s.numEspecies; });
+      disponibilidad.textContent = s.numEspecies < ESPECIES.length
+        ? `El contrato NFT actual admite ${s.numEspecies === 1 ? "solo al ajolote" : `${s.numEspecies} especies`}. Los demás animales ya pueden jugarse en modo local y estarán disponibles como NFT tras desplegar el contrato nuevo.`
+        : "Las cinco especies están disponibles como NFT en este contrato.";
     },
   };
 }
