@@ -84,7 +84,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         this.anims.create({ key, frames: this.anims.generateFrameNumbers(key), frameRate: s.fps, repeat: s.loop === false ? 0 : -1 });
       }
 
-      this.roomLayer = this.add.container(0, 0, [this.textures.exists('bg-room') ? this.add.image(W / 2, H / 2, 'bg-room').setDisplaySize(W, H) : this.drawRoom(), this.drawPinata()]);
+      this.roomLayer = this.add.container(0, 0, [
+        this.textures.exists('bg-room') ? this.add.image(W / 2, H / 2, 'bg-room').setDisplaySize(W, H) : this.drawRoom(),
+        this.drawMaracas(), this.drawGuitar(), this.drawToys(), this.drawPinata(),
+      ]);
       this.bathLayer = this.add.container(0, 0, [this.textures.exists('bg-bath') ? this.add.image(W / 2, H / 2, 'bg-bath').setDisplaySize(W, H) : this.drawBath()]).setVisible(false);
 
       this.body = this.add.ellipse(0, BODY.offsetY, BODY.rx * 2, BODY.ry * 2, 0xffffff);
@@ -100,7 +103,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
 
       this.tubFront = this.drawTubFront().setVisible(false);
       this.night = this.add.rectangle(W / 2, H / 2, W, H, 0x1c1834, 0.5).setVisible(false);
-      this.zzz = this.add.text(W / 2 + 70, 95, 'Z z z', { fontFamily: 'system-ui, sans-serif', fontSize: '28px', fontStyle: 'bold', color: '#fff6d8' }).setVisible(false);
+      this.zzz = this.add.text(W / 2 - 10, 95, 'Z z z', { fontFamily: 'system-ui, sans-serif', fontSize: '28px', fontStyle: 'bold', color: '#fff6d8' }).setVisible(false);
       this.tweens.add({ targets: this.zzz, y: 80, alpha: 0.4, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       this.sponge = this.drawSponge().setVisible(false);
 
@@ -261,7 +264,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       for (let y = floorY + 25; y < H; y += 22) g.fillRect(0, y, W, 3);
       // Tapete de sarape debajo de la mascota.
       const rx = 150, ry = floorY + 16, rw = 220, rh = 52;
-      const stripes = [MX.red, MX.orange, MX.yellow, MX.green, MX.turquoise, MX.blue, MX.purple, MX.pink];
+      // Franjas negro, rojo, verde, rosa y verde, repetidas dos veces.
+      const black = 0x141414;
+      const stripes = [black, MX.red, MX.green, MX.pink, MX.green, black, MX.red, MX.green, MX.pink, MX.green];
       g.fillStyle(INK, 1); g.fillRect(rx - 4, ry - 4, rw + 8, rh + 8);
       stripes.forEach((color, i) => { g.fillStyle(color, 1); g.fillRect(rx, ry + (i * rh) / stripes.length, rw, rh / stripes.length + 1); });
       g.fillStyle(0xfff3d6, 1);
@@ -309,6 +314,137 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         g.fillStyle(hole, 1);
         for (const [dx, dy] of [[8, 7], [19, 7], [30, 7], [13, 16], [25, 16], [19, 24]] as const) g.fillRect(x + dx, top + dy, 4, 4);
       }
+    }
+
+    /** Elipse con contorno de tinta (estilo pixel). */
+    private blob(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, color: number, outline = 3) {
+      g.fillStyle(INK, 1); g.fillEllipse(x, y, w + outline * 2, h + outline * 2);
+      g.fillStyle(color, 1); g.fillEllipse(x, y, w, h);
+    }
+
+    /** Rectángulo con contorno de tinta. */
+    private box(g: Phaser.GameObjects.Graphics, x: number, y: number, w: number, h: number, color: number, outline = 3) {
+      g.fillStyle(INK, 1); g.fillRect(x - outline, y - outline, w + outline * 2, h + outline * 2);
+      g.fillStyle(color, 1); g.fillRect(x, y, w, h);
+    }
+
+    /** Guitarra colgada de un clavo en la pared, entre la mascota y la piñata. */
+    private drawGuitar() {
+      const g = this.add.graphics();
+      const wood = 0xd9873a, dark = 0x5a3a22, neck = 0x8b5a2b;
+      // Clavo y cordón.
+      g.lineStyle(2, INK, 1); g.lineBetween(-8, 10, 0, 0); g.lineBetween(8, 10, 0, 0);
+      g.fillStyle(INK, 1); g.fillRect(-3, -3, 6, 6);
+      // Clavijero con clavijas.
+      this.box(g, -8, 8, 16, 20, dark, 2);
+      g.fillStyle(0xf7f3ea, 1);
+      for (const y of [11, 17, 23]) { g.fillRect(-14, y, 5, 4); g.fillRect(9, y, 5, 4); }
+      // Mástil con trastes.
+      this.box(g, -5, 28, 10, 52, neck, 2);
+      g.fillStyle(MX.yellow, 1);
+      for (let y = 34; y < 80; y += 9) g.fillRect(-5, y, 10, 2);
+      // Caja: dos curvas con boca, roseta turquesa, flores pintadas y puente.
+      this.blob(g, 0, 94, 42, 36, wood);
+      this.blob(g, 0, 126, 56, 46, wood);
+      g.fillStyle(wood, 1); g.fillEllipse(0, 94, 42, 36);
+      g.fillStyle(MX.turquoise, 1); g.fillCircle(0, 106, 12);
+      g.fillStyle(INK, 1); g.fillCircle(0, 106, 8);
+      g.fillStyle(MX.pink, 1); g.fillRect(-20, 124, 6, 6); g.fillRect(14, 130, 6, 6);
+      g.fillStyle(MX.yellow, 1); g.fillRect(-14, 132, 5, 5); g.fillRect(9, 122, 5, 5);
+      g.fillStyle(MX.green, 1); g.fillRect(-22, 132, 5, 3); g.fillRect(19, 126, 5, 3);
+      g.fillStyle(dark, 1); g.fillRect(-12, 136, 24, 5);
+      g.lineStyle(1, 0xfff3d6, 0.9); g.lineBetween(-2, 28, -2, 136); g.lineBetween(2, 28, 2, 136);
+      const guitar = this.add.container(368, 56, [g]).setScale(0.9).setAngle(-6);
+      this.tweens.add({ targets: guitar, angle: { from: -7, to: -4 }, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      return guitar;
+    }
+
+    /** Par de maracas cruzadas colgadas junto a la ventana. */
+    private drawMaracas() {
+      const maraca = (angle: number, colors: readonly number[]) => {
+        const g = this.add.graphics();
+        this.box(g, -3, 0, 6, 32, 0x8b5a2b, 2);
+        this.blob(g, 0, -16, 22, 30, colors[0], 2);
+        g.fillStyle(colors[1], 1); g.fillRect(-10, -22, 20, 5);
+        g.fillStyle(colors[2], 1); g.fillRect(-10, -12, 20, 5);
+        g.fillStyle(0xffffff, 0.8); g.fillRect(-6, -26, 4, 4);
+        return this.add.container(0, 0, [g]).setAngle(angle);
+      };
+      const bow = this.add.graphics();
+      bow.fillStyle(INK, 1); bow.fillRect(-3, -3, 6, 6);
+      bow.fillStyle(MX.pink, 1); bow.fillTriangle(-12, -8, -12, 8, 0, 0); bow.fillTriangle(12, -8, 12, 8, 0, 0);
+      return this.add.container(178, 100, [
+        maraca(-24, [MX.red, MX.yellow, MX.green]),
+        maraca(24, [MX.turquoise, MX.pink, MX.yellow]),
+        bow,
+      ]);
+    }
+
+    /** Juguetes en el piso: mariachi de peluche, muñeca de trapo y balero. */
+    private drawToys() {
+      const g = this.add.graphics();
+      const floorY = Math.round(H * 0.74);
+      const shade = 0x6f4329;
+
+      // Mariachi de peluche (esquina izquierda).
+      const mx = 64, base = floorY + 30;
+      g.fillStyle(shade, 1); g.fillEllipse(mx, base + 2, 84, 12);
+      this.blob(g, mx - 16, base - 6, 22, 14, 0x1b1b1b);
+      this.blob(g, mx + 16, base - 6, 22, 14, 0x1b1b1b);
+      this.blob(g, mx, base - 30, 54, 50, 0x1b1b1b);
+      g.fillStyle(MX.yellow, 1);
+      for (const y of [-44, -34, -24]) { g.fillRect(mx - 12, base + y, 4, 4); g.fillRect(mx + 8, base + y, 4, 4); }
+      g.fillRect(mx - 26, base - 30, 4, 18); g.fillRect(mx + 22, base - 30, 4, 18);
+      this.blob(g, mx - 16, base - 74, 14, 14, 0xb07a4a, 2);
+      this.blob(g, mx + 16, base - 74, 14, 14, 0xb07a4a, 2);
+      this.blob(g, mx, base - 64, 40, 38, 0xb07a4a);
+      g.fillStyle(0xe8c39e, 1); g.fillEllipse(mx, base - 56, 20, 13);
+      g.fillStyle(INK, 1); g.fillRect(mx - 9, base - 70, 5, 5); g.fillRect(mx + 4, base - 70, 5, 5); g.fillRect(mx - 3, base - 60, 6, 4);
+      g.fillStyle(MX.red, 1); g.fillTriangle(mx, base - 44, mx - 12, base - 50, mx - 12, base - 38); g.fillTriangle(mx, base - 44, mx + 12, base - 50, mx + 12, base - 38);
+      // Sombrero de charro con galón dorado.
+      g.fillStyle(INK, 1); g.fillEllipse(mx, base - 84, 96, 24);
+      g.fillStyle(MX.yellow, 1); g.fillEllipse(mx, base - 84, 90, 19);
+      g.fillStyle(0x222222, 1); g.fillEllipse(mx, base - 84, 82, 13);
+      this.blob(g, mx, base - 98, 30, 28, 0x222222);
+      g.fillStyle(MX.yellow, 1); g.fillRect(mx - 15, base - 92, 30, 4);
+      g.fillRect(mx - 40, base - 86, 5, 4); g.fillRect(mx + 35, base - 86, 5, 4);
+
+      // Muñeca de trapo con listones de colores (esquina derecha).
+      const dx = 492, dBase = floorY + 30;
+      g.fillStyle(shade, 1); g.fillEllipse(dx, dBase + 2, 48, 10);
+      // Falda escalonada: primero los contornos y luego el relleno, para que no queden líneas entre niveles.
+      const skirtWidths = [24, 30, 36, 42];
+      skirtWidths.forEach((w, i) => this.box(g, dx - w / 2, dBase - 44 + i * 11, w, 11, MX.pink, 2));
+      g.fillStyle(MX.pink, 1);
+      skirtWidths.forEach((w, i) => g.fillRect(dx - w / 2, dBase - 44 + i * 11, w, 11));
+      g.fillStyle(MX.yellow, 1); g.fillRect(dx - 15, dBase - 31, 30, 3);
+      g.fillStyle(MX.turquoise, 1); g.fillRect(dx - 21, dBase - 9, 42, 4);
+      this.box(g, dx - 10, dBase - 58, 20, 14, MX.green, 2);
+      this.box(g, dx - 17, dBase - 56, 5, 18, 0xf0c9a0, 2);
+      this.box(g, dx + 12, dBase - 56, 5, 18, 0xf0c9a0, 2);
+      this.blob(g, dx, dBase - 72, 26, 26, 0xf0c9a0);
+      g.fillStyle(0x2b1a12, 1); g.fillEllipse(dx, dBase - 80, 28, 12);
+      g.fillRect(dx - 16, dBase - 78, 5, 26); g.fillRect(dx + 11, dBase - 78, 5, 26);
+      g.fillStyle(MX.pink, 1); g.fillRect(dx - 18, dBase - 54, 9, 5); g.fillStyle(MX.purple, 1); g.fillRect(dx + 9, dBase - 54, 9, 5);
+      for (const [x, color] of [[-14, MX.pink], [-6, MX.yellow], [2, MX.turquoise], [10, MX.green]] as const) {
+        g.fillStyle(INK, 1); g.fillRect(dx + x - 1, dBase - 93, 8, 11);
+        g.fillStyle(color, 1); g.fillRect(dx + x, dBase - 92, 6, 9);
+      }
+      g.fillStyle(INK, 1); g.fillRect(dx - 7, dBase - 74, 4, 4); g.fillRect(dx + 3, dBase - 74, 4, 4);
+      g.fillStyle(MX.red, 1); g.fillRect(dx - 3, dBase - 66, 6, 3);
+      g.fillStyle(0xe995a7, 1); g.fillRect(dx - 11, dBase - 69, 4, 3); g.fillRect(dx + 7, dBase - 69, 4, 3);
+
+      // Balero sobre el tapete, frente a la mascota.
+      const bx = 328, by = floorY + 46;
+      this.box(g, bx, by, 30, 6, 0x8b5a2b, 2);
+      g.fillStyle(MX.red, 1); g.fillRect(bx - 4, by - 1, 5, 8);
+      g.lineStyle(2, 0xfff3d6, 1);
+      g.lineBetween(bx + 30, by + 3, bx + 36, by - 6); g.lineBetween(bx + 36, by - 6, bx + 40, by - 10);
+      this.blob(g, bx + 46, by - 16, 24, 24, MX.red);
+      g.fillStyle(MX.yellow, 1); g.fillRect(bx + 34, by - 19, 24, 5);
+      g.fillStyle(MX.green, 1); g.fillRect(bx + 34, by - 12, 24, 3);
+      g.fillStyle(INK, 1); g.fillCircle(bx + 46, by - 22, 3);
+      return g;
     }
 
     /** Piñata de estrella colgando; se balancea con un tween. */
