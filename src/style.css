@@ -160,10 +160,10 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .chain-entry:hover { filter: brightness(1.08); transform: translate(-1px, -1px); }
 
 .pet-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 16px; margin-top: 18px; }
-.topbar-tools { display: flex; align-items: center; gap: 10px; }
+.topbar-tools { position: relative; z-index: 6; display: flex; align-items: center; gap: 10px; }
 .menu-button, .game-menu button { cursor: pointer; font-family: var(--title); }
 .menu-button { min-height: 44px; padding: 8px 12px; border: var(--px) solid var(--ink); background: var(--light); color: var(--ink); box-shadow: 4px 4px 0 var(--ink); }
-.game-menu { position: relative; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 0 0 14px; padding: 16px; border: var(--px) solid var(--ink); background: var(--panel); box-shadow: 5px 5px 0 var(--ink); }
+.game-menu { position: absolute; top: calc(100% + 8px); right: 0; z-index: 8; width: min(360px, calc(100vw - 20px)); display: flex; flex-wrap: wrap; align-items: center; gap: 12px; padding: 16px; border: var(--px) solid var(--ink); background: var(--panel); box-shadow: 5px 5px 0 var(--ink); }
 .game-menu[hidden] { display: none; }
 .game-menu strong { font: 10px var(--title); }
 .game-menu p { flex: 1 1 100%; margin: 0; }
@@ -192,7 +192,7 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 }
 .topbar > div:first-child { padding: 8px 14px 10px; }
 .topbar h1 { font-size: 20px; margin: 8px 0 0; text-transform: uppercase; color: var(--accent-dark); text-shadow: 2px 2px 0 var(--accent-soft); }
-.day-pill { display: flex; align-items: center; gap: 10px; padding: 8px 12px; font-size: 20px; }
+.day-pill { display: flex; align-items: center; justify-content: center; gap: 10px; min-width: 225px; padding: 8px 12px; font-size: 20px; }
 .day-pill > span:nth-child(2) { font-family: var(--title); font-size: 9px; }
 .day-pill .age { color: var(--muted); }
 .live-dot { width: 10px; height: 10px; background: var(--good); box-shadow: 0 0 0 3px var(--ink); animation: blink 1s steps(2) infinite; }
@@ -322,6 +322,9 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   .primary.big { font-size: 18px; padding: 16px 30px; }
   .topbar h1 { font-size: 15px; }
   .day-pill { font-size: 17px; padding: 6px 8px; }
+  .topbar-tools { width: 100%; justify-content: space-between; }
+  .day-pill { min-width: 175px; min-height: 52px; }
+  .game-menu { left: 0; right: auto; width: 100%; }
   .local-note { display: none; }
 }
 

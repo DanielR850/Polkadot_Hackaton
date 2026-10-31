@@ -10,7 +10,7 @@ import {
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
 import { createMockRanking } from '../game/ranking.ts';
-import { loadPet, savePet } from '../game/storage.ts';
+import { loadPet, parsePetState, PET_STORAGE_KEY, savePet } from '../game/storage.ts';
 import type { NeedKey, PetState, Stage } from '../game/types.ts';
 import { h } from '../ui/dom.ts';
 import { createFeedMenu } from '../ui/feedMenu.ts';
@@ -212,5 +212,16 @@ if (params.get('outside') === '1') {
   startScreen.reset();
   useTheme(pet?.petId ?? null);
   showScreen(pet ? 'game' : 'start');
+  window.addEventListener('storage', (event) => {
+    if (event.key !== PET_STORAGE_KEY || !app.contains(startScreen.root)) return;
+    pet = parsePetState(event.newValue);
+    bathing = false;
+    bathProgress = 0;
+    action = null;
+    lastStage = null;
+    useTheme(pet?.petId ?? null);
+    showScreen(pet ? 'game' : 'start');
+    if (pet) gameScreen.say('La partida se actualizó en otra pestaña.');
+  });
   window.setInterval(tick, 1000);
 }

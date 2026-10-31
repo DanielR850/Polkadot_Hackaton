@@ -192,4 +192,19 @@ describe("PolkaPets", () => {
     const ids = await pets.mascotasDe(owner.address);
     expect(ids.map((x) => Number(x))).to.deep.equal([1, 2]);
   });
+
+  it("aísla dos dueños y actualiza permisos al transferir el NFT", async () => {
+    const { pets, owner, otro } = await desplegar();
+    await pets.mint("Luna", AJOLOTE);
+    await pets.connect(otro).mint("Sol", 1);
+    expect((await pets.mascotasDe(owner.address)).map(Number)).to.deep.equal([1]);
+    expect((await pets.mascotasDe(otro.address)).map(Number)).to.deep.equal([2]);
+    await expect(pets.connect(otro).jugar(1)).to.be.revertedWithCustomError(pets, "NoEresDueno");
+
+    await pets.transferFrom(owner.address, otro.address, 1);
+    expect(await pets.mascotasDe(owner.address)).to.deep.equal([]);
+    expect((await pets.mascotasDe(otro.address)).map(Number).sort()).to.deep.equal([1, 2]);
+    await expect(pets.jugar(1)).to.be.revertedWithCustomError(pets, "NoEresDueno");
+    await expect(pets.connect(otro).jugar(1)).to.emit(pets, "Cuidada");
+  });
 });

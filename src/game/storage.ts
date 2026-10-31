@@ -4,7 +4,7 @@ import type { PetState } from './types.ts';
 
 // Guardado local. Dentro del Host `localStorage` no está verificado, así que todo va en try/catch
 // con respaldo en memoria. Clave nueva (v2) porque el formato cambió respecto al prototipo.
-const KEY = 'tamagotchi-polkadot-pet-v2';
+export const PET_STORAGE_KEY = 'tamagotchi-polkadot-pet-v2';
 let memory: string | null = null;
 
 export function parsePetState(raw: string | null): PetState | null {
@@ -31,14 +31,14 @@ export function parsePetState(raw: string | null): PetState | null {
 
 export function loadPet(): PetState | null {
   let raw = memory;
-  try { raw = localStorage.getItem(KEY) ?? memory; } catch { /* sin localStorage */ }
+  try { raw = localStorage.getItem(PET_STORAGE_KEY); } catch { /* sin localStorage */ }
   return parsePetState(raw);
 }
 
 export function savePet(state: PetState | null): void {
   memory = state ? JSON.stringify(state) : null;
   try {
-    if (memory) localStorage.setItem(KEY, memory);
-    else localStorage.removeItem(KEY);
+    if (memory) localStorage.setItem(PET_STORAGE_KEY, memory);
+    else localStorage.removeItem(PET_STORAGE_KEY);
   } catch { /* se queda en memoria */ }
 }
