@@ -44,6 +44,8 @@ export interface PetSpecies {
   slug: string;
   label: string;
   description: string;
+  /** Color base del tema de la interfaz; distinto para cada mascota. */
+  theme: number;
   /** Colores del marcador temporal mientras no haya sprites. */
   color: number;
   outline: number;

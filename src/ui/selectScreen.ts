@@ -6,7 +6,8 @@ import { h } from './dom.ts';
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 /** Elegir 1 de 5 mascotas. Radios nativos: funcionan con toque, mouse y flechas del teclado. */
-export function createSelectScreen(onConfirm: (petId: PetId) => void, onBack: () => void) {
+/** `onPreview` avisa qué mascota está marcada para mostrar su tema de color antes de confirmar. */
+export function createSelectScreen(onConfirm: (petId: PetId) => void, onBack: () => void, onPreview: (petId: PetId | null) => void) {
   const greeting = h('p', { class: 'hint' });
   const confirm = h('button', { type: 'submit', class: 'primary', disabled: true }, 'Confirmar');
   const back = h('button', { type: 'button', class: 'ghost' }, '← Cambiar nombre');
@@ -27,7 +28,11 @@ export function createSelectScreen(onConfirm: (petId: PetId) => void, onBack: ()
   const root = h('section', { class: 'screen select-screen', 'aria-label': 'Elegir mascota' },
     h('span', { class: 'eyebrow' }, 'PASO 2 DE 2'), h('h1', { class: 'title' }, 'Elige tu mascota'), greeting, form);
 
-  form.addEventListener('change', () => { confirm.disabled = !form.querySelector('input:checked'); });
+  form.addEventListener('change', () => {
+    const checked = form.querySelector<HTMLInputElement>('input:checked');
+    confirm.disabled = !checked;
+    onPreview(checked ? (Number(checked.value) as PetId) : null);
+  });
   form.addEventListener('submit', (event) => {
     event.preventDefault();
     const checked = form.querySelector<HTMLInputElement>('input:checked');
@@ -41,6 +46,7 @@ export function createSelectScreen(onConfirm: (petId: PetId) => void, onBack: ()
       greeting.textContent = `¿Quién será ${name}?`;
       form.reset();
       confirm.disabled = true;
+      onPreview(null);
     },
   };
 }
