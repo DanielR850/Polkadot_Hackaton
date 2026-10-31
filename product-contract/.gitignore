@@ -1,0 +1,15 @@
+.cdm/
+node_modules/
+target/
+dist/
+
+cache/
+artifacts/
+coverage/
+coverage.json
+typechain/
+typechain-types/
+
+.env
+.hardhat-home/
+.DS_Store
