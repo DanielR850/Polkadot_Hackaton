@@ -1,3 +1,15 @@
+## Estado del repositorio después de integrar las ramas
+
+El repositorio contiene tres piezas relacionadas pero independientes:
+
+- **Aplicación principal (raíz):** interfaz retro de Guillermo, reglas locales y Phaser. La mascota ajolote ya usa el spritesheet animado. Arranca con `npm run dev` desde la raíz.
+- **`game/`:** segundo frontend de PolkaPets, conectado con wallet EVM mediante viem. Tiene lógica y ranking propios y se instala por separado (`cd game; npm install; npm run dev`).
+- **`contrato/`:** contrato Solidity ERC-721 y herramientas Hardhat para Polkadot Hub TestNet. Se instala por separado. Requiere revisar `.env.example` y configurar una clave local para desplegar; nunca se debe subir `.env`.
+- **`TomoDachi/`:** imágenes originales y referencias; no se cargan en la app principal.
+
+La rama `Ana` aporta un flujo EVM con wallet de navegador; no utiliza el Product SDK ni se comunica con la aplicación Phaser de la raíz. Las dos experiencias siguen siendo prototipos distintos dentro del mismo repositorio. Las acciones del juego raíz se guardan localmente; el flujo EVM de `game/` hace transacciones en el contrato.
+
+Para entender las fronteras y los dos caminos de integración, consulta `docs/ARQUITECTURA.md` y `docs/POLKAPETS.md`. Las ilustraciones y sus usos están descritos en `docs/ASSETS.md`.
 # Tamagotchi Polkadot
 
 Juego web de mascota virtual. La primera versión será 2D y funcionará en navegador de escritorio y móvil. Más adelante podremos evaluar una habitación 3D o modo WebXR.
@@ -103,8 +115,5 @@ está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Para aprender el SDK ve
 [docs/ROADMAP.md](docs/ROADMAP.md). Las reglas para organizar cambios están en
 [CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Estado
+## Estado de integración`n`nLa raíz es un prototipo jugable local; no tiene wallet ni escritura en blockchain. `game/` y `contrato/` componen la implementación EVM separada documentada en `docs/POLKAPETS.md`. La Polkadot App/Product SDK sigue sin integrarse.
 
-Prototipo jugable local con estructura modular. La integración con el Host, la wallet y el contrato
-todavía no están creados. Los diagramas de blockchain son el diseño propuesto, no una función ya
-conectada.

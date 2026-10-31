@@ -176,8 +176,8 @@ if (params.get('outside') === '1') {
   // Vista previa del aviso para cuando la app se abra fuera de un Host. La detección real
   // (`isInsideContainer()` del Product SDK) se conectará después desde src/polkadot/.
   app.replaceChildren(h('section', { class: 'screen start-screen' },
-    h('span', { class: 'eyebrow' }, 'POLKADOT'), h('h1', { class: 'title' }, 'Abre esta app dentro de Polkadot Desktop o de la Polkadot App'),
-    h('p', { class: 'hint' }, 'El juego necesita el Host de Polkadot para guardar tus logros.')));
+    h('span', { class: 'eyebrow' }, 'POLKADOT'), h('h1', { class: 'title' }, 'Esta vista de Polkadot Desktop aún no está conectada'),
+    h('p', { class: 'hint' }, 'El juego local funciona en el navegador. La integración con el Host todavía está pendiente.')));
 } else {
   app.append(startScreen.root, selectScreen.root, gameScreen.root);
   startScreen.reset();
