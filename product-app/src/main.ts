@@ -33,6 +33,7 @@ shell.innerHTML = `
     <div class="product-stats" id="stats"></div>
     <div class="product-actions" id="care"></div>
     <div class="product-actions"><button id="rename" type="button">Cambiar nombre</button><button id="new-pet" type="button">Adoptar otro ajolote</button></div>
+    <form id="rename-form" hidden><label>Nuevo nombre <input name="name" maxlength="24" required /></label> <button type="submit">Guardar nombre</button></form>
   </section>
   <div class="product-actions"><button id="ranking" type="button">Ver ranking</button></div>
   <ol id="ranking-list" hidden></ol>`;
@@ -41,6 +42,7 @@ root.append(shell);
 const status = shell.querySelector<HTMLElement>('.product-status')!;
 const connectButton = shell.querySelector<HTMLButtonElement>('#connect')!;
 const adoptForm = shell.querySelector<HTMLFormElement>('#adopt')!;
+const renameForm = shell.querySelector<HTMLFormElement>('#rename-form')!;
 const petSection = shell.querySelector<HTMLElement>('#pet')!;
 const sceneHost = shell.querySelector<HTMLElement>('#scene')!;
 const statsHost = shell.querySelector<HTMLElement>('#stats')!;
@@ -169,12 +171,17 @@ adoptForm.addEventListener('submit', (event) => {
 });
 shell.querySelector<HTMLButtonElement>('#new-pet')!.addEventListener('click', () => showPet(null));
 shell.querySelector<HTMLButtonElement>('#rename')!.addEventListener('click', () => {
-  const name = window.prompt('Nuevo nombre del ajolote:')?.trim();
+  renameForm.hidden = !renameForm.hidden;
+});
+renameForm.addEventListener('submit', (event) => {
+  event.preventDefault();
+  const name = String(new FormData(renameForm).get('name') ?? '').trim();
   if (!name || !currentPet) return;
   if (new TextEncoder().encode(name).length > 24) { say('El nombre supera 24 bytes.'); return; }
   void operation('Cambiando nombre…', async () => {
     await transact('cambiarNombre', currentPet!.tokenId, name);
     await reloadPet();
+    renameForm.hidden = true;
     say('Nombre actualizado.');
   });
 });
