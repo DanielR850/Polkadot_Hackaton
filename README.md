@@ -22,6 +22,8 @@ Ambos modos usan la misma escena Phaser. El modo local incluye imágenes pixelad
 
 La interfaz NFT usa el mismo estilo retro que el juego local. El ranking se puede consultar sin conectar una cuenta y muestra una invitación a vincularla para registrar un récord NFT. Para revisar la interfaz en otra computadora, ejecuta `npm run dev -- --host 0.0.0.0` y abre la dirección de red que muestra Vite; `127.0.0.1` solo funciona en la computadora que ejecuta el servidor.
 
+Si la mascota queda sin cuidados, sus necesidades bajan hasta que muere. La partida local muestra la animación de muerte, el tiempo vivido y botones para ver el ranking o empezar de nuevo; `?speed=100` acelera el reloj para probar ese desenlace. El Product de Paseo conserva visible el NFT fallecido y ofrece adoptar otra mascota. Su muerte y duración las calcula el contrato; el Product todavía requiere su despliegue en Paseo para comprobarlo en la cadena.
+
 ## Especies y contrato
 
 La selección de cinco especies funciona en el modo local. La dirección TestNet configurada para NFT es `0x758425A3b756079B34FF97cB9C7A764fD44C008a`. Confirmamos por lectura pública que responde como PolkaPets (PPET) y permite una especie (`NUM_ESPECIES = 1`): solo el ajolote puede adoptarse como NFT en ese despliegue. Aún falta comparar el Solidity exacto del despliegue con el fuente del repositorio.

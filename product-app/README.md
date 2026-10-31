@@ -22,3 +22,8 @@ instale la dirección del contrato desplegado.
 El contrato PolkaVM preparado aquí admite cinco especies (ids 0–4). El contrato
 EVM ya desplegado en Polkadot Hub TestNet admite solo el ajolote y no comparte
 estado con esta instancia de Paseo. Los NFT EVM anteriores no aparecen aquí.
+
+Cuando el NFT más reciente muere, el Product mantiene su escena y muestra su
+tiempo vivido; desactiva cuidados y cambio de nombre. La persona puede abrir el
+ranking o elegir adoptar otra mascota. Esto requiere desplegar el contrato y
+probar el Product dentro del Host antes de la publicación.

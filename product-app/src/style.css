@@ -13,6 +13,9 @@
 .product-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: .6rem; margin: 1rem 0; }
 .product-stat { background: var(--panel-2); padding: .5rem; }
 .product-stat meter { display: block; width: 100%; }
+.product-death { margin: 1rem 0; padding: 1rem; border: 4px solid var(--ink); background: var(--panel-2); text-align: center; box-shadow: 5px 5px 0 var(--bad); }
+.product-death h3 { margin: 0 0 .5rem; font: 13px/1.5 var(--title); }
+.product-death p { margin: .4rem 0; }
 .product-species { display: grid; grid-template-columns: repeat(auto-fit, minmax(105px, 1fr)); gap: .65rem; margin: 1rem 0; padding: .8rem; border: 3px solid var(--ink); }
 .product-species legend { padding: 0 .4rem; }
 .product-species-option { display: grid; justify-items: center; gap: .2rem; padding: .45rem; border: 3px solid var(--ink); background: var(--frame); cursor: pointer; text-align: center; }
