@@ -2,10 +2,10 @@
 
 El árbol contiene dos arquitecturas de ejecución, no una sola app ya conectada de extremo a extremo:
 
-1. **Juego de la raíz:** `src/app/application.ts` coordina selección, cuidado, progreso y almacenamiento local; `src/domain/pet/` conserva reglas puras; `src/game/petScene.ts` dibuja la habitación con Phaser; `src/ui/` implementa pantallas y controles. Los assets del ajolote se registran en `src/game/assets.ts`.
+1. **Juego de la raíz:** `src/app/application.ts` coordina selección, cuidado, progreso y almacenamiento local; `src/domain/pet/` conserva reglas puras; `src/game/petScene.ts` dibuja la habitación con Phaser; `src/ui/` implementa pantallas y controles. Las cinco especies y sus tres edades se registran en `src/game/assets.ts`.
 2. **PolkaPets (rama Ana):** `game/` es frontend Vite independiente que usa `viem` y wallets EVM de navegador. `contrato/` contiene Solidity/Hardhat para Polkadot Hub TestNet. Se ejecuta y compila aparte de la raíz.
 
-El inicio local incluye una entrada al frontend EVM existente de `game/`. Ese frontend comparte la escena Phaser y los sprites del juego local. La dirección TestNet configurada (`0x758425A3b756079B34FF97cB9C7A764fD44C008a`) responde como PolkaPets y limita las especies a una según su función pública `NUM_ESPECIES`. Todavía falta comparar el Solidity exacto del despliegue con el fuente del repositorio. La conexión se hace con wallets EVM del navegador mediante `viem`; el Product SDK de Polkadot Desktop sigue pendiente.
+El inicio local incluye una entrada al frontend EVM de `game/`. Ese frontend comparte la escena Phaser y los sprites del juego local. La dirección TestNet configurada (`0x758425A3b756079B34FF97cB9C7A764fD44C008a`) responde como PolkaPets y limita las especies a una según su función pública `NUM_ESPECIES`. El frontend lee ese límite y desactiva las otras cuatro tarjetas NFT. El Solidity fuente de esta rama ya admite cinco especies, pero necesita un nuevo despliegue y dirección para que las cinco sean NFT en esa red. La conexión EVM se hace con wallets de navegador mediante `viem`; `product-app/` prepara por separado el Host SDK para Paseo.
 # Arquitectura: de la interfaz al smart contract
 
 > **Estado:** guía del diseño propuesto. El prototipo actual todavía no usa Product SDK, Host,

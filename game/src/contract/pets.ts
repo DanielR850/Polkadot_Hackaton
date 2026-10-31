@@ -79,6 +79,11 @@ export async function saldo(cuenta: Address): Promise<bigint> {
   return publicClient.getBalance({ address: cuenta });
 }
 
+/** Límite del contrato realmente desplegado; puede ser distinto al Solidity de esta rama. */
+export async function numEspecies(): Promise<number> {
+  return Number(await publicClient.readContract({ ...contrato, functionName: "NUM_ESPECIES" }));
+}
+
 // ───────────────────────────────────────────────────────────── lecturas
 
 export async function mascotasDe(dueno: Address): Promise<bigint[]> {

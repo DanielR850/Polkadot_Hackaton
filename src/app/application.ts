@@ -10,7 +10,7 @@ import {
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
 import { createMockRanking } from '../game/ranking.ts';
-import { loadPet, savePet } from '../game/storage.ts';
+import { loadPet, parsePetState, PET_STORAGE_KEY, savePet } from '../game/storage.ts';
 import type { NeedKey, PetState, Stage } from '../game/types.ts';
 import { h } from '../ui/dom.ts';
 import { createFeedMenu } from '../ui/feedMenu.ts';
@@ -18,6 +18,7 @@ import { formatDuration, STAGE_LABEL } from '../ui/format.ts';
 import { createGameScreen, type GameMode } from '../ui/gameScreen.ts';
 import { createRankingDialog } from '../ui/rankingDialog.ts';
 import { createRenameDialog } from '../ui/renameDialog.ts';
+import { createSelectScreen } from '../ui/selectScreen.ts';
 import { createStartScreen } from '../ui/startScreen.ts';
 import { applyTheme, buildTheme, DEFAULT_THEME_COLOR } from '../ui/theme.ts';
 
@@ -27,7 +28,7 @@ const config = withSpeed(DEFAULT_CONFIG, Number(params.get('speed') ?? 1));
 const app = document.querySelector<HTMLElement>('#app')!;
 const ACTION_MS = 1200;
 
-type Screen = 'start' | 'game';
+type Screen = 'start' | 'select' | 'game';
 
 let pet: PetState | null = loadPet();
 let bathing = false;
@@ -36,15 +37,22 @@ let action: { anim: 'eat' | 'play'; until: number } | null = null;
 let lastStage: Stage | null = null;
 let scene: PetSceneHandle | null = null;
 let screen: Screen = 'start';
+let draftName = '';
 
 const startScreen = createStartScreen((name) => {
-  pet = createPet(0, name, Date.now());
+  draftName = name;
+  selectScreen.reset(name);
+  showScreen('select');
+}, () => { void openContractGame(); });
+
+const selectScreen = createSelectScreen((petId) => {
+  pet = createPet(petId, draftName, Date.now());
   savePet(pet);
-  useTheme(0);
+  useTheme(petId);
   lastStage = 'baby';
   showScreen('game');
   gameScreen.say(`¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
-}, () => { void openContractGame(); });
+}, () => showScreen('start'), useTheme);
 
 async function openContractGame() {
   try {
@@ -57,7 +65,7 @@ async function openContractGame() {
   }
 }
 
-/** Aplica el tema del ajolote y sincroniza el color de la habitación Phaser. */
+/** Aplica el tema de la especie y sincroniza el color de la habitación Phaser. */
 function useTheme(petId: number | null) {
   const theme = buildTheme(petId === null ? DEFAULT_THEME_COLOR : findPet(petId)?.theme ?? DEFAULT_THEME_COLOR);
   applyTheme(theme);
@@ -92,6 +100,7 @@ const gameScreen = createGameScreen({
     useTheme(null);
     bathing = false;
     action = null;
+    draftName = '';
     startScreen.reset();
     showScreen('start');
   },
@@ -107,7 +116,7 @@ const renameDialog = createRenameDialog((name) => withPet((p, now) => commit(ren
 
 const rankingDialog = createRankingDialog(createMockRanking(() => pet
   ? { id: 'me', petName: pet.name, petId: pet.petId, aliveMs: ageMs(pet, Date.now()), isMine: true }
-  : null));
+  : null), () => { void openContractGame(); });
 
 function withPet(fn: (p: PetState, now: number) => void) {
   if (pet) fn(pet, Date.now());
@@ -178,6 +187,7 @@ function tick() {
 function showScreen(next: Screen) {
   screen = next;
   startScreen.root.hidden = next !== 'start';
+  selectScreen.root.hidden = next !== 'select';
   gameScreen.root.hidden = next !== 'game';
   if (next === 'start') startScreen.focus();
   if (next === 'game') {
@@ -195,9 +205,20 @@ if (params.get('outside') === '1') {
     h('span', { class: 'eyebrow' }, 'POLKADOT'), h('h1', { class: 'title' }, 'Esta vista de Polkadot Desktop aún no está conectada'),
     h('p', { class: 'hint' }, 'El juego local funciona en el navegador. La integración con el Host todavía está pendiente.')));
 } else {
-  app.append(startScreen.root, gameScreen.root);
+  app.append(startScreen.root, selectScreen.root, gameScreen.root);
   startScreen.reset();
   useTheme(pet?.petId ?? null);
   showScreen(pet ? 'game' : 'start');
+  window.addEventListener('storage', (event) => {
+    if (event.key !== PET_STORAGE_KEY || !app.contains(startScreen.root)) return;
+    pet = parsePetState(event.newValue);
+    bathing = false;
+    bathProgress = 0;
+    action = null;
+    lastStage = null;
+    useTheme(pet?.petId ?? null);
+    showScreen(pet ? 'game' : 'start');
+    if (pet) gameScreen.say('La partida se actualizó en otra pestaña.');
+  });
   window.setInterval(tick, 1000);
 }

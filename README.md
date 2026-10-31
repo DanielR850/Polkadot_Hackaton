@@ -1,35 +1,39 @@
 # Tamagotchi Polkadot
 
-Primera versión candidata: juego web de un solo compañero, el ajolote, con etapas de bebé, adolescente y adulto.
+Juego web con ajolote, lobo, oso grizzly, tlacuache y manatí. Cada especie tiene ilustraciones de bebé, adolescente y adulto, con movimiento para los estados del juego. Se publica como app de Polkadot en `polka-pets.dot`.
 
 ## Ejecutar
 
-Desde la raíz del repositorio:
+Desde la raíz del repositorio, con [pnpm](https://pnpm.io) 12.6.0 (las versiones del Product SDK están fijadas en `package.json` y `pnpm-workspace.yaml`):
 
 ```bash
-npm install
-npm run dev
+pnpm install
+pnpm dev
 ```
 
-`npm run build` genera la versión de producción en `dist/`.
+`pnpm build` genera la versión de producción en `dist/`. Para revisar la interfaz en otro dispositivo de la misma red, abre la dirección de red que muestra Vite; `localhost` solo funciona en la computadora que ejecuta el servidor.
 
 ## Modos de juego
 
-- **Local:** no necesita wallet; guarda el progreso en este dispositivo.
-- **Polkadot Hub TestNet:** el botón de NFT abre el frontend de `game/`, que conecta una wallet EVM del navegador mediante `viem`; adoptar y cuidar requieren transacciones aprobadas por la persona.
+- **Local:** permite elegir cualquiera de las cinco especies, no necesita wallet y guarda el progreso en este dispositivo. El menú de partida permite elegir otra mascota y reemplaza la partida local.
+- **NFT en Polkadot Hub TestNet:** usa las mismas pantallas retro que el juego local (habitación, barras, menú de comida, baño, ranking y nombre). Adoptar y cada cuidado son transacciones que firma la persona:
+  - dentro de Polkadot Desktop o la Polkadot App, con la cuenta del Host (Product SDK, `game/src/contract/host.ts`);
+  - en un navegador normal, con una wallet EVM como MetaMask (`viem`).
 
-Ambos modos usan la misma escena Phaser y los sprites del ajolote. La raíz es el punto de entrada web; `game/` contiene el frontend NFT existente y `contrato/` el Solidity/Hardhat. No se integró el Product SDK de Polkadot Desktop.
+Ambos modos usan la misma escena Phaser. El ranking NFT se lee del contrato. La raíz es el punto de entrada web; `src/app/chainApplication.ts` compone el modo NFT con el estado y las firmas de `game/src/hub/`, y `contrato/` contiene el Solidity/Hardhat. `product-app/` prepara por separado un Product PolkaVM para `tamagotchiaxolotl.paseo`, todavía sin publicar.
 
-## Especie única y contrato
+## Especies y contrato
 
-La interfaz solo ofrece el ajolote (id 0). La dirección TestNet configurada es `0x758425A3b756079B34FF97cB9C7A764fD44C008a`. Confirmamos por lectura pública que responde como PolkaPets (PPET) y permite una especie (`NUM_ESPECIES = 1`). Aún falta comparar el Solidity exacto del despliegue con el fuente del repositorio.
+La selección de cinco especies funciona en el modo local. La dirección TestNet configurada para NFT es `0x758425A3b756079B34FF97cB9C7A764fD44C008a`. Confirmamos por lectura pública que responde como PolkaPets (PPET) y permite una especie (`NUM_ESPECIES = 1`): solo el ajolote puede adoptarse como NFT en ese despliegue, y la app oculta las demás especies leyendo ese valor. El Solidity de esta rama ya declara `NUM_ESPECIES = 5`; aplica solo si se despliega un contrato nuevo y se cambia la dirección en `game/src/contract/config.ts`.
+
+Publicar `tamagotchiaxolotl.paseo` es un proceso distinto: `product-app/` necesita la dirección del contrato PolkaVM desplegado en Paseo antes de poder registrar NFT allí. El contrato EVM existente no comparte NFT ni estado con esa instancia.
 
 ## Documentación
 
 - [Arquitectura](docs/ARQUITECTURA.md)
 - [PolkaPets y contrato](docs/POLKAPETS.md)
 - [Registro de assets](docs/ASSETS.md)
-- [Publicación](docs/PUBLICACION.md)
+- [Mascotas y animaciones](docs/ANIMACIONES.md)
+- [Publicación en polka-pets.dot](docs/PUBLICACION.md)
 
 Los commits de las ramas integradas se conservan en `codex/integracion-total`.
-

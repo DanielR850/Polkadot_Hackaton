@@ -46,7 +46,16 @@ describe("PolkaPets", () => {
     const { pets } = await desplegar();
     await expect(pets.mint("", AJOLOTE)).to.be.revertedWithCustomError(pets, "NombreInvalido");
     await expect(pets.mint("x".repeat(25), AJOLOTE)).to.be.revertedWithCustomError(pets, "NombreInvalido");
-    await expect(pets.mint("Rex", 1)).to.be.revertedWithCustomError(pets, "EspecieInvalida");
+    await expect(pets.mint("Rex", 5)).to.be.revertedWithCustomError(pets, "EspecieInvalida");
+  });
+
+  it("adopta las cinco especies y conserva su id en la lectura", async () => {
+    const { pets } = await desplegar();
+    expect(await pets.NUM_ESPECIES()).to.equal(5);
+    for (let id = 0; id < 5; id += 1) {
+      await pets.mint(`Mascota ${id}`, id);
+      expect((await pets.verMascota(id + 1)).especie).to.equal(id);
+    }
   });
 
   it("cada necesidad baja a su ritmo", async () => {
@@ -182,5 +191,20 @@ describe("PolkaPets", () => {
     await pets.mint("B", AJOLOTE);
     const ids = await pets.mascotasDe(owner.address);
     expect(ids.map((x) => Number(x))).to.deep.equal([1, 2]);
+  });
+
+  it("aísla dos dueños y actualiza permisos al transferir el NFT", async () => {
+    const { pets, owner, otro } = await desplegar();
+    await pets.mint("Luna", AJOLOTE);
+    await pets.connect(otro).mint("Sol", 1);
+    expect((await pets.mascotasDe(owner.address)).map(Number)).to.deep.equal([1]);
+    expect((await pets.mascotasDe(otro.address)).map(Number)).to.deep.equal([2]);
+    await expect(pets.connect(otro).jugar(1)).to.be.revertedWithCustomError(pets, "NoEresDueno");
+
+    await pets.transferFrom(owner.address, otro.address, 1);
+    expect(await pets.mascotasDe(owner.address)).to.deep.equal([]);
+    expect((await pets.mascotasDe(otro.address)).map(Number).sort()).to.deep.equal([1, 2]);
+    await expect(pets.jugar(1)).to.be.revertedWithCustomError(pets, "NoEresDueno");
+    await expect(pets.connect(otro).jugar(1)).to.emit(pets, "Cuidada");
   });
 });

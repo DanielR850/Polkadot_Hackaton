@@ -2,8 +2,8 @@
 
 Este directorio contiene el cliente para `tamagotchiaxolotl.paseo`. Usa el
 Product SDK para conectarse al Host, derivar la cuenta del Product y llamar al
-contrato PolkaVM. Incluye adopción, cuidados, cambio de nombre, ranking y la
-escena animada del ajolote.
+contrato PolkaVM. Incluye selección de cinco especies, adopción, cuidados,
+cambio de nombre, ranking y la escena animada de cada mascota.
 
 El manifiesto `src/cdm.json` contiene la ABI compilada, pero su dirección
 `0x000…000` es provisional. El cliente muestra una pantalla de espera y no
@@ -19,5 +19,6 @@ instale la dirección del contrato desplegado.
 5. Registrar y publicar `tamagotchiaxolotl.paseo` con `playground deploy`,
    sin volver a desplegar el contrato en ese paso.
 
-El contrato EVM de Polkadot Hub TestNet no comparte estado con esta instancia
-PolkaVM de Paseo. Los NFT EVM anteriores no aparecen aquí.
+El contrato PolkaVM preparado aquí admite cinco especies (ids 0–4). El contrato
+EVM ya desplegado en Polkadot Hub TestNet admite solo el ajolote y no comparte
+estado con esta instancia de Paseo. Los NFT EVM anteriores no aparecen aquí.

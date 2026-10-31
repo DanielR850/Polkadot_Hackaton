@@ -170,10 +170,11 @@ export function createChainSpeciesScreen(onAdopt: (petId: number) => void, onBac
       h('input', { type: 'radio', name: 'nft-pet', value: pet.id, class: 'sr-only', checked: index === 0 }),
       h('span', { class: 'pet-frame' }, portrait),
       h('b', {}, pet.label),
-      h('small', {}, 'Tu compañero acuático.'));
+      h('small', {}, pet.description));
   });
+  const grid = h('div', { class: 'pet-grid', role: 'radiogroup', 'aria-label': 'Mascotas' }, ...cards);
   const form = h('form', { class: 'select-form' },
-    h('div', { class: 'pet-grid chain-pet-grid', role: 'radiogroup', 'aria-label': 'Mascotas' }, ...cards),
+    grid,
     h('div', { class: 'row' }, back, adopt));
   const root = h('section', { class: 'screen select-screen', 'aria-label': 'Elegir mascota' },
     h('span', { class: 'eyebrow' }, 'PASO 3 DE 3'), title,
@@ -187,10 +188,15 @@ export function createChainSpeciesScreen(onAdopt: (petId: number) => void, onBac
 
   return {
     root,
-    sync(name: string, busy: boolean) {
+    /** `available`: especies que admite el contrato desplegado (las demás se ocultan). */
+    sync(name: string, busy: boolean, available: number) {
       title.textContent = `Elige a ${name || 'tu mascota'}`;
       adopt.disabled = busy;
       back.disabled = busy;
+      cards.forEach((card, index) => { card.hidden = index >= available; });
+      grid.classList.toggle('chain-pet-grid', available <= 1);
+      const checked = form.querySelector<HTMLInputElement>('input:checked');
+      if (!checked || Number(checked.value) >= available) form.querySelector<HTMLInputElement>('input')!.checked = true;
       for (const input of form.querySelectorAll('input')) input.disabled = busy;
     },
   };

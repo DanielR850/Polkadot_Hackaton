@@ -28,7 +28,7 @@ const H = 360;
 const PIXEL = 0.4;
 const ROOM_POS = { x: W / 2, y: 190 };
 const BATH_POS = { x: W / 2, y: 205 };
-const STAGE_SCALE: Record<Stage, number> = { baby: 0.6, teen: 0.8, adult: 1 };
+const STAGE_SCALE: Record<Stage, number> = { baby: 0.8, teen: 0.95, adult: 1.1 };
 const BODY = { rx: 61, ry: 56, offsetY: 8 };
 const SPONGE_R = 22;
 const DEAD_COLORS = { color: 0xb8b2bd, outline: 0x8a8490, belly: 0xd6d2da };
@@ -38,6 +38,56 @@ const MX = {
   turquoise: 0x00a6a6, blue: 0x1f4fa3, purple: 0x7b2d8e, red: 0xd7263d,
 };
 const INK = 0x302b43;
+
+/** La hoja del ajolote bebé trae un fondo granate en cada cuadro. Se elimina
+ * al cargarla para que el personaje comparta la habitación con las demás edades. */
+function transparentAxolotlSheet(source: HTMLImageElement | HTMLCanvasElement, frameWidth: number, frameHeight: number): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.width = source.width;
+  canvas.height = source.height;
+  const context = canvas.getContext('2d', { willReadFrequently: true })!;
+  context.drawImage(source, 0, 0);
+  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  const data = pixels.data;
+  const columns = Math.floor(canvas.width / frameWidth);
+  const rows = Math.floor(canvas.height / frameHeight);
+  const frameSize = frameWidth * frameHeight;
+  const visited = new Uint8Array(frameSize);
+  const queue = new Int32Array(frameSize);
+  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+    visited.fill(0);
+    let head = 0, tail = 0;
+    const background = (local: number) => {
+      const x = column * frameWidth + local % frameWidth;
+      const y = row * frameHeight + Math.floor(local / frameWidth);
+      const i = (y * canvas.width + x) * 4;
+      const red = data[i], green = data[i + 1], blue = data[i + 2];
+      // El fondo es rojo oscuro con un gradiente; la piel, branquias y contorno
+      // tienen otra paleta. Solo se borran píxeles conectados al borde del cuadro.
+      return red < 180 && green >= 12 && green < 105 && blue < 125 && red > green * 1.2;
+    };
+    const enqueue = (local: number) => {
+      if (visited[local] || !background(local)) return;
+      visited[local] = 1;
+      queue[tail++] = local;
+    };
+    for (let x = 0; x < frameWidth; x++) { enqueue(x); enqueue((frameHeight - 1) * frameWidth + x); }
+    for (let y = 0; y < frameHeight; y++) { enqueue(y * frameWidth); enqueue(y * frameWidth + frameWidth - 1); }
+    while (head < tail) {
+      const local = queue[head++];
+      const x = local % frameWidth;
+      const y = Math.floor(local / frameWidth);
+      const i = ((row * frameHeight + y) * canvas.width + column * frameWidth + x) * 4;
+      data[i + 3] = 0;
+      if (x > 0) enqueue(local - 1);
+      if (x + 1 < frameWidth) enqueue(local + 1);
+      if (y > 0) enqueue(local - frameWidth);
+      if (y + 1 < frameHeight) enqueue(local + frameWidth);
+    }
+  }
+  context.putImageData(pixels, 0, 0);
+  return canvas;
+}
 
 export function createPetScene(parent: HTMLElement, onScrub: (progress: number) => void): PetSceneHandle {
   class RoomScene extends Phaser.Scene {
@@ -78,6 +128,20 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     create() {
       // El mundo sigue midiendo W×H; la cámara lo reduce al lienzo pequeño.
       this.cameras.main.setZoom(PIXEL).centerOn(W / 2, H / 2);
+      const babySheet = SPRITES.find((s) => s.petId === 0 && s.stage === 'baby');
+      if (babySheet) {
+        const firstKey = spriteKey(0, 'baby', babySheet.anim);
+        if (this.textures.exists(firstKey)) {
+          const source = this.textures.get(firstKey).getSourceImage() as HTMLImageElement;
+          const clean = transparentAxolotlSheet(source, babySheet.frameWidth, babySheet.frameHeight);
+          for (const sheet of SPRITES.filter((s) => s.petId === 0 && s.stage === 'baby')) {
+            const key = spriteKey(0, 'baby', sheet.anim);
+            this.textures.remove(key);
+            // Phaser admite canvas en tiempo de ejecución, aunque su tipo solo declara imágenes.
+            this.textures.addSpriteSheet(key, clean as unknown as HTMLImageElement, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
+          }
+        }
+      }
       for (const s of SPRITES) {
         const key = spriteKey(s.petId, s.stage, s.anim);
         if (!this.textures.exists(key)) continue;
@@ -166,17 +230,60 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (spriteAnim) {
         this.sprite.play(spriteAnim.key);
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
-        this.sprite.setScale((BODY.ry * 2.4) / spriteAnim.frameHeight);
+        this.animateSprite(view, (BODY.ry * 3) / spriteAnim.frameHeight);
         return;
       }
       this.paintPlaceholder(view);
     }
 
+    /** Da movimiento propio a los retratos de un fotograma en cada estado del juego. */
+    private animateSprite(view: SceneView, scale: number) {
+      const { anim, petId } = view;
+      this.tweens.killTweensOf(this.sprite);
+      this.sprite.clearTint().setAlpha(1).setAngle(0).setPosition(0, 0).setScale(scale);
+      if (anim === 'dead') {
+        this.sprite.setTint(0x888888).setAngle(75).setY(25);
+        return;
+      }
+      if (anim === 'sad') {
+        this.sprite.setTint(0xb8c5dd).setY(8);
+        this.tweens.add({ targets: this.sprite, y: 12, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'sleep') {
+        this.sprite.setAngle(-9).setY(8);
+        this.tweens.add({ targets: this.sprite, scaleY: scale * 1.04, duration: 1550, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'play') {
+        // Cada especie conserva una forma reconocible de jugar.
+        if (petId === 4) this.tweens.add({ targets: this.sprite, x: 12, y: -5, angle: 5, duration: 470, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        else if (petId === 2) this.tweens.add({ targets: this.sprite, y: 7, scaleY: scale * 0.92, duration: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        else if (petId === 3) this.tweens.add({ targets: this.sprite, x: 11, angle: -5, duration: 190, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        else this.tweens.add({ targets: this.sprite, y: -16, angle: 7, duration: 230, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'eat') {
+        this.tweens.add({ targets: this.sprite, angle: -7, scaleY: scale * 0.94, duration: 180, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (anim === 'bath') {
+        this.tweens.add({ targets: this.sprite, angle: 4, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        return;
+      }
+      if (petId === 4) this.tweens.add({ targets: this.sprite, y: -5, angle: 2, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      else this.tweens.add({ targets: this.sprite, scaleY: scale * 1.025, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
+
     private findSprite(view: SceneView): { key: string; frameHeight: number } | null {
-      for (const anim of [view.anim, 'idle'] as const) {
-        const key = spriteKey(view.petId, view.stage, anim);
-        const sheet = SPRITES.find((s) => s.petId === view.petId && s.stage === view.stage && s.anim === anim);
-        if (sheet && this.anims.exists(key)) return { key, frameHeight: sheet.frameHeight };
+      // Conserva la etapa visible: si una acción no tiene cuadros propios,
+      // anima el retrato de esa misma edad antes de buscar arte de otra edad.
+      for (const stage of [view.stage, 'baby'] as const) {
+        for (const anim of [view.anim, 'idle'] as const) {
+          const key = spriteKey(view.petId, stage, anim);
+          const sheet = SPRITES.find((s) => s.petId === view.petId && s.stage === stage && s.anim === anim);
+          if (sheet && this.anims.exists(key)) return { key, frameHeight: sheet.frameHeight };
+        }
       }
       return null;
     }

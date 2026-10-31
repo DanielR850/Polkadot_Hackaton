@@ -8,6 +8,7 @@ import { createPetScene, type PetSceneHandle, type SceneView } from "../../../sr
 import type { PetAnim } from "../../../src/game/animations.ts";
 import type { Stage } from "../../../src/game/types.ts";
 import { buildTheme } from "../../../src/ui/theme.ts";
+import { findPet } from "../../../src/game/catalog.ts";
 
 export interface Juego {
   element: HTMLElement;
@@ -24,7 +25,7 @@ export interface JuegoAcciones {
 }
 
 export function createJuego(acc: JuegoAcciones): Juego {
-  const gameHost = el("div", { class: "onchain-pet-scene", attrs: { "aria-label": "Ajolote NFT animado" } });
+  const gameHost = el("div", { class: "onchain-pet-scene", attrs: { "aria-label": "Mascota NFT animada" } });
   const nombre = el("h2", { class: "mascota-nombre" });
   const meta = el("p", { class: "mascota-meta" });
   const xp = el("span");
@@ -69,7 +70,7 @@ export function createJuego(acc: JuegoAcciones): Juego {
   let currentStage: Stage = "baby";
   let idleView: SceneView = { petId: 0, stage: "baby", anim: "idle" };
   let reactionTimer = 0;
-  let roomThemeApplied = false;
+  let themedPetId = -1;
 
   const element = el(
     "section",
@@ -95,11 +96,11 @@ export function createJuego(acc: JuegoAcciones): Juego {
       const growth = m.etapa === Etapa.Enferma || m.etapa === Etapa.Muerta ? etapaPorNivel(m.nivel) : m.etapa;
       currentStage = growth === Etapa.Adulta ? "adult" : growth === Etapa.Joven ? "teen" : "baby";
       const anim: PetAnim = !m.viva ? "dead" : m.etapa === Etapa.Enferma ? "sad" : "idle";
-      idleView = { petId: 0, stage: currentStage, anim };
+      idleView = { petId: m.especie, stage: currentStage, anim };
       scene ??= createPetScene(gameHost, () => {});
-      if (!roomThemeApplied) {
-        scene.setRoomColors(buildTheme(0xe4007c).room);
-        roomThemeApplied = true;
+      if (themedPetId !== m.especie) {
+        scene.setRoomColors(buildTheme(findPet(m.especie)?.theme ?? 0xe4007c).room);
+        themedPetId = m.especie;
       }
       scene.show(idleView);
       nombre.textContent = m.nombre;
@@ -129,7 +130,7 @@ export function createJuego(acc: JuegoAcciones): Juego {
       if (!scene) return;
       const anim: Record<Accion, PetAnim> = { alimentar: "eat", jugar: "play", dormir: "sleep", banar: "bath" };
       const icon: Record<Accion, string> = { alimentar: "🍓", jugar: "🎾", dormir: "🌙", banar: "🫧" };
-      scene.show({ petId: 0, stage: currentStage, anim: anim[action] });
+      scene.show({ petId: idleView.petId, stage: currentStage, anim: anim[action] });
       scene.react(icon[action]);
       window.clearTimeout(reactionTimer);
       reactionTimer = window.setTimeout(() => scene?.show(idleView), 1400);

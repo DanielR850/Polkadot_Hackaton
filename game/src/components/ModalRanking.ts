@@ -11,9 +11,11 @@ export interface ModalRanking {
   abrir(cuenta: string | null): void;
 }
 
-export function createModalRanking(leer: () => Promise<FilaRanking[]>): ModalRanking {
+export function createModalRanking(leer: () => Promise<FilaRanking[]>, onConnect: () => void): ModalRanking {
   const modal = createModal("🏆 Ranking de longevidad");
   const contenido = el("div", { class: "ranking" });
+  const aviso = el("p", { class: "ayuda ranking-connect", text: "Vincula tu cuenta para registrar tu récord NFT en la cadena." });
+  const conectar = boton("Vincular cuenta", () => { modal.cerrar(); onConnect(); }, "btn primary");
   let cuenta: string | null = null;
   let pedido = 0;
 
@@ -58,6 +60,8 @@ export function createModalRanking(leer: () => Promise<FilaRanking[]>): ModalRan
 
   modal.cuerpo.append(
     el("p", { class: "ayuda", text: "Las 10 mascotas que más tiempo han vivido. Las vivas siguen sumando." }),
+    aviso,
+    conectar,
     contenido,
   );
 
@@ -65,6 +69,8 @@ export function createModalRanking(leer: () => Promise<FilaRanking[]>): ModalRan
     element: modal.element,
     abrir(c) {
       cuenta = c;
+      aviso.hidden = Boolean(c);
+      conectar.hidden = Boolean(c);
       modal.abrir();
       void cargar();
     },

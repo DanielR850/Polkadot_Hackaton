@@ -24,7 +24,7 @@ export function startApp(root: HTMLElement, onReturnToLocal?: () => void): void 
     if (onReturnToLocal) onReturnToLocal();
   }, onReturnToLocal ? "Volver al juego local" : "Salir");
   const mensajes = createMensajes(() => hub.limpiarMensajes());
-  const ranking = createModalRanking(leerRanking);
+  const ranking = createModalRanking(leerRanking, () => hub.empezar());
   const abrirRanking = () => ranking.abrir(hub.getState().cuenta);
   const modalNombre = createModalNombre((n) => hub.renombrar(n));
 

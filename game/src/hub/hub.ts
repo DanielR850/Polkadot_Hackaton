@@ -33,6 +33,7 @@ export interface HubState {
   firmante: red.Firmante | null;
   cuenta: Address | null;
   saldo: bigint | null;
+  numEspecies: number;
   /** Nombre elegido en la pantalla "nombre", mientras se elige la especie. */
   nombreNuevo: string;
   mascota: Mascota | null;
@@ -77,6 +78,7 @@ export function createHub(): Hub {
     firmante: null,
     cuenta: null,
     saldo: null,
+    numEspecies: 1,
     nombreNuevo: "",
     mascota: null,
     leidaEn: 0,
@@ -149,7 +151,9 @@ export function createHub(): Hub {
 
   /** Con la cuenta lista: busca su mascota viva o pasa a elegir nombre. */
   async function entrar(firmante: red.Firmante): Promise<void> {
-    set({ firmante, cuenta: firmante.cuenta });
+    // El contrato EVM desplegado solo admite el ajolote; una versión nueva puede admitir cinco.
+    const numEspecies = await red.numEspecies();
+    set({ firmante, cuenta: firmante.cuenta, numEspecies });
     void actualizarSaldo();
     const mascotas = await red.cargarMascotas(firmante.cuenta);
     const viva = mascotas.find((m) => m.viva);
@@ -224,6 +228,10 @@ export function createHub(): Hub {
     async adoptar(especie) {
       const { firmante, nombreNuevo } = state;
       if (!firmante) return hub.salir();
+      if (!Number.isInteger(especie) || especie < 0 || especie >= state.numEspecies) {
+        set({ error: "Este contrato aún no admite esa especie como NFT." });
+        return;
+      }
       await operar(`Adoptando a ${nombreNuevo}…`, async () => {
         const id = await red.adoptar(firmante, nombreNuevo, especie);
         mostrarMascota(await red.verMascota(id));
@@ -278,6 +286,7 @@ export function createHub(): Hub {
         firmante: null,
         cuenta: null,
         saldo: null,
+        numEspecies: 1,
         mascota: null,
         nombreNuevo: "",
         ocupado: null,

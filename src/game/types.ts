@@ -10,7 +10,7 @@ export type Stats = Needs & { health: number };
 
 export type Stage = 'baby' | 'teen' | 'adult';
 
-/** El catálogo actual solo permite id 0; number mantiene compatibilidad con datos externos/históricos. */
+/** Identificador estable de especie. */
 export type PetId = number;
 
 /**

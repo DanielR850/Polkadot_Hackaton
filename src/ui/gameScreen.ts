@@ -35,7 +35,7 @@ export interface GameScreenOptions {
 
 /** Pantalla de juego: habitación (canvas), barras y acciones. Solo muestra y devuelve intenciones. */
 export function createGameScreen(intents: GameIntents, options: GameScreenOptions = {}) {
-  const note = options.note ?? { text: 'Tu partida se guarda en este dispositivo.', detail: 'La conexión con Polkadot la añadiremos después.' };
+  const note = options.note ?? { text: 'Tu partida local se guarda en este dispositivo.', detail: 'El modo NFT se abre desde la pantalla inicial.' };
   const nameEl = h('h1', {});
   const stageEl = h('span', {});
   const ageEl = h('span', { class: 'age' });
@@ -44,6 +44,20 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const moodText = h('span', {});
   const feedback = h('p', { class: 'feedback', 'aria-live': 'polite' }, 'Tu mascota te está esperando.');
   const toast = h('div', { class: 'toast', role: 'status', hidden: true });
+  const menuButton = h('button', { type: 'button', class: 'menu-button', 'aria-expanded': 'false', 'aria-controls': 'game-menu' }, '☰ Menú');
+  const menuClose = h('button', { type: 'button', class: 'ghost' }, 'Continuar partida');
+  const chooseAnother = h('button', { type: 'button', class: 'ghost' }, 'Elegir otra mascota');
+  const menu = h('div', { id: 'game-menu', class: 'game-menu', hidden: true },
+    h('strong', {}, 'MENÚ DE PARTIDA'),
+    h('p', {}, 'Elegir otra mascota reemplaza esta partida guardada en tu dispositivo.'),
+    menuClose, chooseAnother);
+  const toggleMenu = (open: boolean) => {
+    menu.hidden = !open;
+    menuButton.setAttribute('aria-expanded', String(open));
+  };
+  menuButton.addEventListener('click', () => toggleMenu(menu.hidden));
+  menuClose.addEventListener('click', () => toggleMenu(false));
+  chooseAnother.addEventListener('click', () => { toggleMenu(false); intents.restart(); });
 
   const bars = BAR_INFO.map((info) => {
     const value = h('strong', {});
@@ -87,7 +101,8 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const root = h('section', { class: 'screen game-screen', 'aria-label': 'Juego' },
     h('header', { class: 'topbar' },
       h('div', {}, h('span', { class: 'eyebrow' }, 'MI PEQUEÑO MUNDO'), nameEl),
-      h('div', { class: 'day-pill' }, h('span', { class: 'live-dot' }), stageEl, ageEl)),
+      h('div', { class: 'topbar-tools' }, menuButton,
+        h('div', { class: 'day-pill' }, h('span', { class: 'live-dot' }), stageEl, ageEl), menu)),
     h('main', { class: 'layout' },
       h('section', { class: 'pet-card', 'aria-label': 'Habitación de la mascota' },
         h('div', { class: 'room-label' }, h('span', {}, '⌂'), ' HABITACIÓN'), gameHost,

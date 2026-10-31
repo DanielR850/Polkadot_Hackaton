@@ -129,7 +129,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
       }));
     },
   };
-  const rankingDialog = createRankingDialog(ranking, 'Las 10 mascotas que más tiempo han vivido, leídas del contrato.');
+  const rankingDialog = createRankingDialog(ranking, undefined, 'Las 10 mascotas que más tiempo han vivido, leídas del contrato.');
 
   const screens = { conectar: connect.root, nombre: nameScreen.root, especie: species.root, juego: game.root } as const;
   app.replaceChildren(chainBar.bar, chainBar.banner, ...Object.values(screens));
@@ -199,7 +199,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
       suggested: WALLETS_SUGERIDAS.map((w) => ({ name: w.nombre, url: w.url })),
       busy,
     });
-    species.sync(s.nombreNuevo, busy);
+    species.sync(s.nombreNuevo, busy, s.numEspecies);
     if (s.pantalla === 'juego') renderGame(s);
   }
 

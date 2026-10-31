@@ -1,8 +1,12 @@
 import type { CareItem, ItemKind, PetId, PetSpecies } from './types.ts';
 
-// Primera versión: solo se puede adoptar el ajolote. Conservamos el id 0 en las partidas guardadas.
+// Los ids son estables para conservar las partidas guardadas y el ranking local.
 export const PETS: readonly PetSpecies[] = [
   { id: 0, slug: 'axolotl', label: 'Ajolote', description: 'Sonriente y acuático.', theme: 0xe4007c, color: 0xf5a3bf, outline: 0xc4506f, belly: 0xfbd2df },
+  { id: 1, slug: 'wolf', label: 'Lobo', description: 'Curioso y juguetón.', theme: 0x6575ad, color: 0x9396a8, outline: 0x4f526d, belly: 0xece6e0 },
+  { id: 2, slug: 'bear', label: 'Oso grizzly', description: 'Dulce y aventurero.', theme: 0xa96b40, color: 0x9c6245, outline: 0x593a36, belly: 0xecc99c },
+  { id: 3, slug: 'opossum', label: 'Tlacuache', description: 'Travieso y nocturno.', theme: 0x9b7590, color: 0x82777c, outline: 0x48435b, belly: 0xf0dfd1 },
+  { id: 4, slug: 'manatee', label: 'Manatí', description: 'Tranquilo y amigable.', theme: 0x5b9baa, color: 0x819fb3, outline: 0x435c78, belly: 0xc8d9e2 },
 ];
 
 export const ITEMS: readonly CareItem[] = [

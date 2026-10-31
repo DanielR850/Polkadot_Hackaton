@@ -5,6 +5,8 @@ import { ContractManager, ensureContractAccountMapped } from '@parity/product-sd
 import type { SignerAccount } from '@parity/product-sdk/wallet';
 import { paseo_asset_hub } from '@parity/product-sdk-descriptors/paseo-asset-hub';
 import { createPetScene, type PetSceneHandle } from '../../src/game/petScene.ts';
+import { portraitUrl } from '../../src/game/assets.ts';
+import { findPet, PETS } from '../../src/game/catalog.ts';
 import { buildTheme } from '../../src/ui/theme.ts';
 import manifest from './cdm.json';
 
@@ -15,7 +17,7 @@ const root = document.querySelector<HTMLElement>('#app')!;
 
 type Action = 'alimentar' | 'jugar' | 'dormir' | 'banar';
 type Pet = {
-  tokenId: bigint; nombre: string; nivel: number; etapa: number; viva: boolean;
+  tokenId: bigint; nombre: string; especie: number; nivel: number; etapa: number; viva: boolean;
   hambre: number; sed: number; energia: number; felicidad: number; limpieza: number; vida: number;
 };
 
@@ -26,7 +28,11 @@ shell.innerHTML = `
   <h1>Tamagotchi Axolotl</h1>
   <p class="product-status" role="status" aria-live="polite"></p>
   <div class="product-actions"><button id="connect" type="button">Conectar con Polkadot App</button></div>
-  <form id="adopt" hidden><label>Nombre del ajolote <input name="name" maxlength="24" required /></label> <button type="submit">Adoptar NFT</button></form>
+  <form id="adopt" hidden>
+    <label>Nombre de tu mascota <input name="name" maxlength="24" required /></label>
+    <fieldset class="product-species"><legend>Elige tu mascota NFT</legend></fieldset>
+    <button type="submit">Adoptar NFT</button>
+  </form>
   <section id="pet" hidden>
     <h2 id="pet-name"></h2>
     <div class="product-scene" id="scene"></div>
@@ -42,6 +48,20 @@ root.append(shell);
 const status = shell.querySelector<HTMLElement>('.product-status')!;
 const connectButton = shell.querySelector<HTMLButtonElement>('#connect')!;
 const adoptForm = shell.querySelector<HTMLFormElement>('#adopt')!;
+const speciesField = adoptForm.querySelector<HTMLElement>('.product-species')!;
+for (const pet of PETS) {
+  const label = document.createElement('label');
+  label.className = 'product-species-option';
+  const radio = document.createElement('input');
+  radio.type = 'radio'; radio.name = 'species'; radio.value = String(pet.id);
+  radio.required = true;
+  if (pet.id === 0) radio.checked = true;
+  const portrait = document.createElement('img');
+  portrait.src = portraitUrl(pet.slug); portrait.alt = '';
+  const title = document.createElement('span'); title.textContent = pet.label;
+  label.append(radio, portrait, title);
+  speciesField.append(label);
+}
 const renameForm = shell.querySelector<HTMLFormElement>('#rename-form')!;
 const petSection = shell.querySelector<HTMLElement>('#pet')!;
 const sceneHost = shell.querySelector<HTMLElement>('#scene')!;
@@ -49,6 +69,7 @@ const statsHost = shell.querySelector<HTMLElement>('#stats')!;
 const careHost = shell.querySelector<HTMLElement>('#care')!;
 const rankingList = shell.querySelector<HTMLOListElement>('#ranking-list')!;
 let scene: PetSceneHandle | null = null;
+let reactionTimer = 0;
 let busy = false;
 let currentPet: Pet | null = null;
 let owner: `0x${string}` | null = null;
@@ -62,7 +83,7 @@ function errorMessage(cause: unknown): string {
 function petFrom(raw: unknown): Pet {
   const value = raw as Record<string, unknown>;
   return {
-    tokenId: BigInt(value.tokenId as bigint), nombre: String(value.nombre),
+    tokenId: BigInt(value.tokenId as bigint), nombre: String(value.nombre), especie: Number(value.especie),
     nivel: Number(value.nivel), etapa: Number(value.etapa), viva: Boolean(value.viva),
     hambre: Number(value.hambre), sed: Number(value.sed), energia: Number(value.energia),
     felicidad: Number(value.felicidad), limpieza: Number(value.limpieza), vida: Number(value.vida),
@@ -98,9 +119,9 @@ function showPet(pet: Pet | null) {
   if (!pet) return;
   shell.querySelector<HTMLElement>('#pet-name')!.textContent = `${pet.nombre} · NFT #${pet.tokenId}`;
   scene ??= createPetScene(sceneHost, () => {});
-  scene.setRoomColors(buildTheme(0xe4007c).room);
+  scene.setRoomColors(buildTheme(findPet(pet.especie)?.theme ?? 0xe4007c).room);
   const stage = pet.nivel >= 10 ? 'adult' : pet.nivel >= 2 ? 'teen' : 'baby';
-  scene.show({ petId: 0, stage, anim: !pet.viva ? 'dead' : pet.etapa === 3 ? 'sad' : 'idle' });
+  scene.show({ petId: pet.especie, stage, anim: !pet.viva ? 'dead' : pet.etapa === 3 ? 'sad' : 'idle' });
   statsHost.replaceChildren();
   for (const [label, value] of Object.entries({ Vida: pet.vida, Hambre: pet.hambre, Sed: pet.sed, Energía: pet.energia, Felicidad: pet.felicidad, Limpieza: pet.limpieza })) {
     const stat = document.createElement('div');
@@ -111,6 +132,14 @@ function showPet(pet: Pet | null) {
     stat.append(meter); statsHost.append(stat);
   }
   careHost.querySelectorAll<HTMLButtonElement>('button').forEach((button) => { button.disabled = !pet.viva; });
+}
+function reactToCare(anim: 'eat' | 'play' | 'sleep' | 'bath', icon: string) {
+  if (!currentPet || !scene) return;
+  const stage = currentPet.nivel >= 10 ? 'adult' : currentPet.nivel >= 2 ? 'teen' : 'baby';
+  scene.show({ petId: currentPet.especie, stage, anim });
+  scene.react(icon);
+  window.clearTimeout(reactionTimer);
+  reactionTimer = window.setTimeout(() => showPet(currentPet), 1400);
 }
 async function reloadPet() {
   if (!owner) return;
@@ -133,7 +162,7 @@ for (const [label, action, icon] of [
     if (!currentPet) return;
     await transact(action, currentPet.tokenId);
     await reloadPet();
-    scene?.react(icon);
+    reactToCare(action === 'alimentar' ? 'eat' : action === 'jugar' ? 'play' : action === 'dormir' ? 'sleep' : 'bath', icon);
     say(`${label}: transacción confirmada.`);
   }));
   careHost.append(button);
@@ -162,11 +191,13 @@ connectButton.addEventListener('click', () => void operation('Conectando con el 
 adoptForm.addEventListener('submit', (event) => {
   event.preventDefault();
   const name = String(new FormData(adoptForm).get('name') ?? '').trim();
+  const species = Number(new FormData(adoptForm).get('species'));
   if (!name || new TextEncoder().encode(name).length > 24) { say('El nombre debe tener entre 1 y 24 bytes.'); return; }
-  void operation('Adoptando ajolote…', async () => {
-    await transact('mint', name, 0);
+  if (!findPet(species)) { say('Selecciona una especie válida.'); return; }
+  void operation('Adoptando mascota…', async () => {
+    await transact('mint', name, species);
     await reloadPet();
-    say('Ajolote adoptado.');
+    say('Mascota adoptada.');
   });
 });
 shell.querySelector<HTMLButtonElement>('#new-pet')!.addEventListener('click', () => showPet(null));

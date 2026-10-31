@@ -5,10 +5,15 @@ con `pad` 0.22.1 y Product SDK 0.39.0.
 
 - Dominio: `polka-pets.dot` (Products Devnet, registrado).
 - Contrato: `0x758425A3b756079B34FF97cB9C7A764fD44C008a` en Polkadot Hub TestNet (chain id 420420417).
+  El despliegue tiene `NUM_ESPECIES = 1`: como NFT solo se adopta el ajolote. El Solidity de esta
+  rama ya declara cinco especies, pero no aplica hasta desplegar un contrato nuevo y cambiar la
+  dirección en `game/src/contract/config.ts`.
 - Dentro de Polkadot Desktop o la Polkadot App, adoptar, cuidar y renombrar se firman con el Host
   (`game/src/contract/host.ts`). En un navegador normal se firma con MetaMask.
 - La cuenta del Host es una cuenta derivada de `polka-pets.dot`: es distinta de la de MetaMask, así
   que sus mascotas también son distintas.
+- `product-app/` y `tamagotchiaxolotl.paseo` son otra ruta (contrato PolkaVM en Paseo) y no se
+  publican con este ciclo. Su manifiesto todavía tiene la dirección provisional `0x000…000`.
 
 ## Ciclo de publicación
 
@@ -39,6 +44,6 @@ pega el CID nuevo con Resolve.
 
 ## Publicaciones
 
-| Fecha | CID raíz | Icono |
-|---|---|---|
-| 2026-10-31 | `bafybeihjop464rvo3ocpej6vixt3dqrv2bgijzcrchtsw3sdgafrmu7ulu` | `bafk2bzacebhbstrmm2asv46ogqimiwehspkbsnomx5hagjkpsquuujuw6p5o4` |
+| Fecha | CID raíz | Icono | Contenido |
+|---|---|---|---|
+| 2026-10-31 | `bafybeihjop464rvo3ocpej6vixt3dqrv2bgijzcrchtsw3sdgafrmu7ulu` | `bafk2bzacebhbstrmm2asv46ogqimiwehspkbsnomx5hagjkpsquuujuw6p5o4` | Primera versión con firmas por el Host; NFT con estilo morado y solo ajolote |

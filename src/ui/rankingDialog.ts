@@ -4,11 +4,21 @@ import { createDialog, h } from './dom.ts';
 import { formatDuration } from './format.ts';
 
 /** Ranking por tiempo vivido. Muestra carga, vacío y error; la fila propia va resaltada. */
-export function createRankingDialog(source: RankingSource, subtitle = 'Mascotas que más tiempo han vivido. Datos de ejemplo.') {
+/**
+ * `onConnect`: si se pasa, muestra la invitación a vincular una cuenta (juego local).
+ * `subtitle`: texto de arriba; el modo NFT pone el suyo porque sus datos vienen del contrato.
+ */
+export function createRankingDialog(source: RankingSource, onConnect?: () => void, subtitle = 'Estos son récords de ejemplo del juego local.') {
   const { dialog, body } = createDialog('Ranking', 'ranking-dialog');
   const status = h('p', { class: 'hint', 'aria-live': 'polite' });
   const list = h('ol', { class: 'ranking-list' });
-  body.append(h('p', { class: 'hint' }, subtitle), status, list);
+  body.append(h('p', { class: 'hint' }, subtitle));
+  if (onConnect) {
+    const connect = h('button', { class: 'primary', type: 'button' }, 'Vincular cuenta para registrar mi récord');
+    connect.addEventListener('click', () => { dialog.close(); onConnect(); });
+    body.append(h('p', { class: 'hint', 'aria-live': 'polite' }, 'Vincula tu cuenta para registrar tu récord NFT en la cadena.'), connect);
+  }
+  body.append(status, list);
   let request = 0;
 
   async function load() {

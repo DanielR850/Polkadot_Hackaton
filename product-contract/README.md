@@ -7,6 +7,9 @@ previsto es `@tamagotchiaxolotl/polkapets`.
 ## Estado
 
 El contrato compiló con Hardhat Polkadot y se empaquetó con `cdm build`.
+A partir de esta rama, la versión preparada para Paseo admite cinco especies
+(ajolote, lobo, oso grizzly, tlacuache y manatí). Se debe recompilar y empaquetar
+antes del despliegue; el contrato EVM ya publicado conserva su límite de una especie.
 Aún no está desplegado ni registrado. La dirección EVM `0x758425A3b756079B34FF97cB9C7A764fD44C008a`
 pertenece a otra ejecución y no es una dirección de este contrato PolkaVM.
 

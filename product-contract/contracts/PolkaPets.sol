@@ -84,7 +84,7 @@ contract PolkaPets is ERC721, ERC721Enumerable {
     // ─────────────────────────────────────────────────────────────────────────
 
     uint8 public constant STAT_MAX = 100;
-    uint8 public constant NUM_ESPECIES = 1; // 0 ajolote
+    uint8 public constant NUM_ESPECIES = 5; // 0 ajolote, 1 lobo, 2 oso, 3 tlacuache, 4 manatí
     uint8 public constant NOMBRE_MAX = 24;
     uint16 public constant XP_POR_NIVEL = 100;
     uint32 public constant XP_POR_CUIDADO = 10;

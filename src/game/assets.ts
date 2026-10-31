@@ -21,7 +21,7 @@ export interface SpriteSheet {
   loop?: boolean;
 }
 
-/** Assets disponibles. Las especies que aún no tienen arte usan el marcador vectorial. */
+/** Cada especie tiene arte de las tres edades; los estados usan cuadros o movimiento Phaser. */
 export const SPRITES: SpriteSheet[] = [
   { petId: 0, stage: 'baby', anim: 'idle', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 4, firstFrame: 0, lastFrame: 3 },
   { petId: 0, stage: 'baby', anim: 'play', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 7, firstFrame: 4, lastFrame: 7 },
@@ -29,10 +29,17 @@ export const SPRITES: SpriteSheet[] = [
   { petId: 0, stage: 'baby', anim: 'sleep', file: 'pets/axolotl/animations.png', frameWidth: 356, frameHeight: 276, fps: 3, firstFrame: 12, lastFrame: 15 },
   { petId: 0, stage: 'teen', anim: 'idle', file: 'pets/axolotl/teen.png', frameWidth: 1254, frameHeight: 1254, fps: 1 },
   { petId: 0, stage: 'adult', anim: 'idle', file: 'pets/axolotl/adult.png', frameWidth: 1254, frameHeight: 1254, fps: 1 },
+  ...(['wolf', 'bear', 'opossum', 'manatee'] as const).flatMap((slug, index) =>
+    (['baby', 'teen', 'adult'] as const).map((stage) => ({
+      petId: index + 1, stage, anim: 'idle' as const,
+      file: `pets/${slug}/${stage === 'baby' ? 'idle' : stage}.png`,
+      frameWidth: 1254, frameHeight: 1254, fps: 1,
+    }))),
 ];
 
-/** Retrato de la pantalla "Elige tu mascota": `public/assets/characters/<slug>-portrait.png`. */
-export const portraitUrl = (slug: string) => characterUrl(`${slug}-portrait.png`);
+/** La selección usa las mismas imágenes que la escena. */
+export const portraitUrl = (slug: string) => slug === 'axolotl'
+  ? assetUrl('pets/axolotl/teen.png') : assetUrl(`pets/${slug}/idle.png`);
 
 /** Fondos opcionales en `public/assets/backgrounds/`; null = fondo dibujado. */
 export const BACKGROUNDS: { room: string | null; bath: string | null } = {
