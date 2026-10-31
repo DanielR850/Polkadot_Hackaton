@@ -16,7 +16,7 @@ Las rutas anteriores son relativas a `TomoDachi/`. Todos los archivos son JPEG; 
 
 ## Estado de integración
 
-- Los archivos están versionados, pero actualmente la aplicación no los carga: Phaser todavía dibuja el personaje con formas vectoriales.
+- Los 12 JPEG originales se conservan como material de referencia, pero el juego no los carga. El personaje actual se dibuja con código en Phaser.
 - Son imágenes completas, no spritesheets ni animaciones por cuadros. Las muestras del ajolote tienen un fondo blanco incrustado; mostrarlas sobre la escena actual puede dejar un rectángulo blanco.
 - Para usarlas en Phaser hay que decidir una presentación compatible con ese fondo, adaptar tamaños para que el paquete web no cargue imágenes innecesariamente grandes y definir qué ilustración corresponde a cada estado del juego.
 - La rama de interfaz `Guillermo-Interfaz` no aporta commits distintos del código inicial. No hay una segunda implementación de interfaz que conectar todavía.
@@ -30,14 +30,12 @@ Las rutas anteriores son relativas a `TomoDachi/`. Todos los archivos son JPEG; 
 
 No incluir imágenes, música, modelos o fuentes en una publicación hasta confirmar que su licencia permite ese uso y distribución.
 
-## Sprite nuevo para el juego
+## Personaje generado por código
 
-`public/assets/pets/axolotl/states.png` es una hoja de cuatro poses originales del ajolote (quieto,
-feliz, comiendo y dormido), generada para este proyecto con ImageGen y fondo transparente. Mide
-2172×724 px; cada cuadro mide 543×724 px. Phaser la carga como spritesheet y muestra una pose distinta
-cuando la persona alimenta, juega, limpia o manda a dormir a la mascota. Es un archivo PNG de unos
-906 KB.
+La escena de Phaser construye al ajolote en una cuadrícula de píxeles mediante `Graphics` y una paleta
+de colores definida en TypeScript. Al alimentar, jugar, limpiar o dormir, el programa vuelve a dibujar
+la cara y los detalles para reflejar la acción. Así el personaje no depende de una imagen distinta por
+estado; se pueden agregar expresiones, colores y animaciones ajustando las reglas del dibujo.
 
-La hoja genera arte para estados visuales, no una animación continua: cada pose ocupa un cuadro. Si
-queremos caminar o mover la boca de forma fluida, necesitaremos varios cuadros por acción. Confirmar
-los términos de uso aplicables antes de distribuir el juego.
+La hoja de sprites que se generó como prueba ya no forma parte del juego. Los JPEG recibidos en
+`TomoDachi/` permanecen como referencias visuales, no como recursos cargados por la aplicación.
