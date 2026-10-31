@@ -22,6 +22,19 @@ export function textoRevert(errorName: string): string {
 /** Mensajes reconocibles en errores que no vienen del contrato. */
 export function textoGenerico(mensaje: string, codigo?: unknown): string {
   const m = mensaje.toLowerCase();
+  // Errores del Host de Polkadot (Product SDK).
+  if (/invalid\.?\s*payment/i.test(mensaje)) {
+    return "Tu cuenta no tiene gas (PGAS). Toca Salir, vuelve a conectar y acepta el permiso de gas.";
+  }
+  if (/signingrejected|user (refused|closed)|\bcancel|\bdenied|\bdeclin/i.test(mensaje)) {
+    return "No se aprobó la firma. Puedes intentarlo otra vez.";
+  }
+  if (/host provider|not connected|disconnect/i.test(mensaje)) {
+    return "Se perdió la conexión con la Polkadot App. Cierra la app y vuelve a abrirla.";
+  }
+  if (/sin respuesta en/i.test(mensaje)) {
+    return "La Polkadot App no respondió a tiempo. Revisa tu teléfono y reintenta.";
+  }
   if (codigo === 4001 || m.includes("user rejected") || m.includes("user denied") || m.includes("rejected the request")) {
     return "Cancelaste la operación en la wallet.";
   }
@@ -46,6 +59,14 @@ export function mensajeError(e: unknown): string {
   if (e instanceof Error) return textoGenerico(e.message, (e as { code?: unknown }).code);
   if (typeof e === "object" && e !== null && "message" in e) {
     return textoGenerico(String((e as { message: unknown }).message), (e as { code?: unknown }).code);
+  }
+  // El SDK del Host a veces rechaza con objetos sin `message`.
+  if (typeof e === "object" && e !== null) {
+    try {
+      return textoGenerico(JSON.stringify(e, (_k, v) => (typeof v === "bigint" ? v.toString() : v)));
+    } catch {
+      /* cae al mensaje genérico */
+    }
   }
   return "Ocurrió un error inesperado.";
 }

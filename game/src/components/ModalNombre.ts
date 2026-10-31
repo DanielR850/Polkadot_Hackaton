@@ -18,7 +18,7 @@ export function createModalNombre(onGuardar: (nombre: string) => Promise<boolean
   const btnGuardar = boton("Guardar", () => void guardar(), "btn primary");
 
   modal.cuerpo.append(
-    el("p", { class: "ayuda", text: "Cambiar el nombre es una transacción: tu wallet te pedirá firmarla." }),
+    el("p", { class: "ayuda", text: "Cambiar el nombre es una transacción: tendrás que aprobar la firma." }),
     campo.element,
     el("div", { class: "botones-fila" }, boton("Cancelar", () => modal.cerrar(), "btn ghost"), btnGuardar),
   );

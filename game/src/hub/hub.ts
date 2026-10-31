@@ -5,6 +5,10 @@
  * Flujo: inicio → conectar → nombre → especie → juego (+ modales de nombre y ranking).
  * Si la cuenta ya tiene una mascota viva, "conectar" lleva directo al juego.
  *
+ * Dos formas de firmar (contract/pets.ts, `Firmante`):
+ *  - dentro de Polkadot Desktop o la Polkadot App: el Host (contract/host.ts);
+ *  - en un navegador normal: una wallet EVM (MetaMask, Talisman…).
+ *
  * Invariantes:
  *  - una operación con la wallet a la vez (`ocupado`);
  *  - cada escritura se simula antes de pedir la firma (contract/pets.ts);
@@ -12,6 +16,7 @@
  */
 import type { Address } from "viem";
 import { RELECTURA_MS } from "../contract/config";
+import { conectarHost, dentroDelHost, type SesionHost } from "../contract/host";
 import * as red from "../contract/pets";
 import { nombreValido, type Accion, type Mascota } from "../contract/polkapets";
 import { descubrirWallets, type WalletInfo } from "../contract/wallets";
@@ -21,9 +26,11 @@ export type Pantalla = "inicio" | "conectar" | "nombre" | "especie" | "juego";
 
 export interface HubState {
   pantalla: Pantalla;
+  /** null mientras se comprueba; true dentro de Polkadot Desktop o la Polkadot App. */
+  enHost: boolean | null;
   wallets: WalletInfo[];
   buscandoWallets: boolean;
-  wallet: WalletInfo | null;
+  firmante: red.Firmante | null;
   cuenta: Address | null;
   saldo: bigint | null;
   /** Nombre elegido en la pantalla "nombre", mientras se elige la especie. */
@@ -43,6 +50,7 @@ export interface Hub {
   empezar(): void;
   buscarWallets(): Promise<void>;
   conectar(wallet: WalletInfo): Promise<void>;
+  conectarHost(): Promise<void>;
   elegirNombre(nombre: string): boolean;
   adoptar(especie: number): Promise<void>;
   cuidar(accion: Accion): Promise<boolean>;
@@ -63,9 +71,10 @@ const TEXTO_ACCION: Record<Accion, string> = {
 export function createHub(): Hub {
   let state: HubState = {
     pantalla: "inicio",
+    enHost: null,
     wallets: [],
     buscandoWallets: false,
-    wallet: null,
+    firmante: null,
     cuenta: null,
     saldo: null,
     nombreNuevo: "",
@@ -78,6 +87,8 @@ export function createHub(): Hub {
   const listeners = new Set<(s: HubState) => void>();
   let relectura: ReturnType<typeof setInterval> | null = null;
   let desuscribirWallet: (() => void) | null = null;
+  /** La sesión del Host se reutiliza: volver a conectar no vuelve a pedir permisos. */
+  let sesionHost: SesionHost | null = null;
 
   const set = (patch: Partial<HubState>) => {
     state = { ...state, ...patch };
@@ -108,7 +119,8 @@ export function createHub(): Hub {
   }
 
   async function actualizarSaldo(): Promise<void> {
-    if (!state.cuenta) return;
+    // Dentro del Host el gas es PGAS y lo da el permiso de gas: el saldo de PAS no aplica.
+    if (!state.cuenta || state.firmante?.tipo !== "evm") return;
     try {
       set({ saldo: await red.saldo(state.cuenta) });
     } catch {
@@ -133,6 +145,20 @@ export function createHub(): Hub {
   function mostrarMascota(m: Mascota): void {
     set({ mascota: m, leidaEn: performance.now(), pantalla: "juego" });
     arrancarRelectura();
+  }
+
+  /** Con la cuenta lista: busca su mascota viva o pasa a elegir nombre. */
+  async function entrar(firmante: red.Firmante): Promise<void> {
+    set({ firmante, cuenta: firmante.cuenta });
+    void actualizarSaldo();
+    const mascotas = await red.cargarMascotas(firmante.cuenta);
+    const viva = mascotas.find((m) => m.viva);
+    if (viva) {
+      mostrarMascota(viva);
+      set({ aviso: `¡Hola de nuevo! ${viva.nombre} te estaba esperando.` });
+    } else {
+      set({ pantalla: "nombre", nombreNuevo: "" });
+    }
   }
 
   /** Si la wallet cambia de cuenta o se desconecta, la partida vuelve al inicio. */
@@ -165,24 +191,24 @@ export function createHub(): Hub {
 
     async buscarWallets() {
       set({ buscandoWallets: true });
-      const wallets = await descubrirWallets();
-      set({ wallets, buscandoWallets: false });
+      const enHost = await dentroDelHost();
+      // Dentro del Host no hay extensiones de navegador: la cuenta la da el Host.
+      const wallets = enHost ? [] : await descubrirWallets();
+      set({ enHost, wallets, buscandoWallets: false });
     },
 
     async conectar(wallet) {
       await operar(`Conectando con ${wallet.nombre}…`, async () => {
         const cuenta = await red.conectar(wallet.provider);
-        set({ wallet, cuenta });
         vigilarWallet(wallet);
-        void actualizarSaldo();
-        const mascotas = await red.cargarMascotas(cuenta);
-        const viva = mascotas.find((m) => m.viva);
-        if (viva) {
-          mostrarMascota(viva);
-          set({ aviso: `¡Hola de nuevo! ${viva.nombre} te estaba esperando.` });
-        } else {
-          set({ pantalla: "nombre", nombreNuevo: "" });
-        }
+        await entrar(red.firmanteEvm(wallet.nombre, wallet.provider, cuenta));
+      });
+    },
+
+    async conectarHost() {
+      await operar("Conectando con la Polkadot App… Acepta los permisos en tu teléfono.", async () => {
+        sesionHost ??= await conectarHost();
+        await entrar(red.firmanteHost(sesionHost));
       });
     },
 
@@ -196,10 +222,10 @@ export function createHub(): Hub {
     },
 
     async adoptar(especie) {
-      const { wallet, cuenta, nombreNuevo } = state;
-      if (!wallet || !cuenta) return hub.salir();
+      const { firmante, nombreNuevo } = state;
+      if (!firmante) return hub.salir();
       await operar(`Adoptando a ${nombreNuevo}…`, async () => {
-        const id = await red.adoptar(wallet.provider, cuenta, nombreNuevo, especie);
+        const id = await red.adoptar(firmante, nombreNuevo, especie);
         mostrarMascota(await red.verMascota(id));
         set({ aviso: `¡${nombreNuevo} llegó a casa! Cuídala para que dure mucho.` });
         void actualizarSaldo();
@@ -207,24 +233,24 @@ export function createHub(): Hub {
     },
 
     async cuidar(accion) {
-      const { wallet, cuenta, mascota } = state;
-      if (!wallet || !cuenta || !mascota) return false;
+      const { firmante, mascota } = state;
+      if (!firmante || !mascota) return false;
       return operar(TEXTO_ACCION[accion], async () => {
-        await red.cuidar(wallet.provider, cuenta, accion, mascota.tokenId);
+        await red.cuidar(firmante, accion, mascota.tokenId);
         await releer();
         void actualizarSaldo();
       });
     },
 
     async renombrar(nombre) {
-      const { wallet, cuenta, mascota } = state;
-      if (!wallet || !cuenta || !mascota) return false;
+      const { firmante, mascota } = state;
+      if (!firmante || !mascota) return false;
       if (!nombreValido(nombre)) {
         set({ error: "El nombre debe tener entre 1 y 24 caracteres." });
         return false;
       }
       return operar("Cambiando el nombre…", async () => {
-        await red.cambiarNombre(wallet.provider, cuenta, mascota.tokenId, nombre);
+        await red.cambiarNombre(firmante, mascota.tokenId, nombre);
         await releer();
         set({ aviso: `Ahora se llama ${nombre.trim()}.` });
         void actualizarSaldo();
@@ -249,7 +275,7 @@ export function createHub(): Hub {
       desuscribirWallet = null;
       set({
         pantalla: "inicio",
-        wallet: null,
+        firmante: null,
         cuenta: null,
         saldo: null,
         mascota: null,

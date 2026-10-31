@@ -24,7 +24,8 @@ export function createMensajes(onCerrar: () => void): Mensajes {
       spinner.hidden = tipo !== "tx";
       cerrar.hidden = tipo === "tx";
       texto.textContent =
-        tipo === "tx" ? `${s.ocupado} Revisa tu wallet si te pide firmar.` : tipo === "error" ? `⚠️ ${s.error}` : `${s.aviso}`;
+        tipo === "tx"
+          ? `${s.ocupado} ${s.firmante?.tipo === "host" || s.enHost ? "Aprueba la firma en tu teléfono." : "Revisa tu wallet si te pide firmar."}` : tipo === "error" ? `⚠️ ${s.error}` : `${s.aviso}`;
     },
   };
 }

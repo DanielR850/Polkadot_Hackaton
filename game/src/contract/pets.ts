@@ -1,4 +1,5 @@
-// Cliente de red. Lecturas por el ETH-RPC público; escrituras firmadas por la wallet elegida.
+// Cliente de red. Lecturas por el ETH-RPC público; escrituras firmadas por la wallet elegida
+// (MetaMask en un navegador normal, o el Host de Polkadot dentro de la Polkadot App/Desktop).
 // Antes de pedir una firma se simula la llamada: si el contrato la rechazaría, no se molesta al usuario.
 import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Hex } from "viem";
 import {
@@ -15,6 +16,7 @@ import {
   TX_TIMEOUT_MS,
 } from "./config";
 import { decodeMascota, decodeRanking, polkaPetsAbi, type Accion, type FilaRanking, type Mascota } from "./polkapets";
+import type { SesionHost } from "./host";
 import type { Eip1193Provider } from "./wallets";
 
 export const polkadotHub = defineChain({
@@ -109,36 +111,70 @@ export async function leerRanking(): Promise<FilaRanking[]> {
 
 // ───────────────────────────────────────────────────────────── escrituras
 
-type Escritura =
+export type Escritura =
   | { functionName: "mint"; args: [string, number] }
   | { functionName: "cambiarNombre"; args: [bigint, string] }
   | { functionName: Accion; args: [bigint] };
 
-/** Simula, pide la firma y espera el recibo. Devuelve el hash. */
-async function escribir(provider: Eip1193Provider, cuenta: Address, llamada: Escritura): Promise<Hex> {
-  await asegurarRed(provider);
-  const { request } = await publicClient.simulateContract({ ...contrato, ...llamada, account: cuenta } as never);
-  const wallet = createWalletClient({ account: cuenta, chain: polkadotHub, transport: custom(provider) });
-  const hash = await wallet.writeContract(request as never);
-  const recibo = await publicClient.waitForTransactionReceipt({ hash, timeout: TX_TIMEOUT_MS });
-  if (recibo.status !== "success") throw new Error("La transacción se revirtió en la cadena.");
-  return hash;
+/** Quien firma: una wallet EVM del navegador (MetaMask…) o el Host de Polkadot. */
+export interface Firmante {
+  tipo: "evm" | "host";
+  nombre: string;
+  cuenta: Address;
+  /** Firma y envía una llamada ya simulada. Resuelve cuando entra en la cadena. */
+  enviar(llamada: Escritura): Promise<void>;
+}
+
+export function firmanteEvm(nombre: string, provider: Eip1193Provider, cuenta: Address): Firmante {
+  return {
+    tipo: "evm",
+    nombre,
+    cuenta,
+    async enviar(llamada) {
+      await asegurarRed(provider);
+      const { request } = await publicClient.simulateContract({ ...contrato, ...llamada, account: cuenta } as never);
+      const wallet = createWalletClient({ account: cuenta, chain: polkadotHub, transport: custom(provider) });
+      const hash: Hex = await wallet.writeContract(request as never);
+      const recibo = await publicClient.waitForTransactionReceipt({ hash, timeout: TX_TIMEOUT_MS });
+      if (recibo.status !== "success") throw new Error("La transacción se revirtió en la cadena.");
+    },
+  };
+}
+
+export function firmanteHost(sesion: SesionHost): Firmante {
+  return {
+    tipo: "host",
+    nombre: "Polkadot App",
+    cuenta: sesion.cuenta.h160,
+    enviar: (llamada) => sesion.enviar(llamada),
+  };
+}
+
+/** Simula por ETH-RPC (si el contrato la rechazaría, no se pide firma) y después firma. */
+async function escribir(firmante: Firmante, llamada: Escritura): Promise<void> {
+  await publicClient.simulateContract({ ...contrato, ...llamada, account: firmante.cuenta } as never);
+  await firmante.enviar(llamada);
 }
 
 /** Adopta una mascota. Devuelve el tokenId nuevo. */
-export async function adoptar(provider: Eip1193Provider, cuenta: Address, nombre: string, especie: number): Promise<bigint> {
+export async function adoptar(firmante: Firmante, nombre: string, especie: number): Promise<bigint> {
+  const cuenta = firmante.cuenta;
   const antes = new Set((await mascotasDe(cuenta)).map(String));
-  await escribir(provider, cuenta, { functionName: "mint", args: [nombre.trim(), especie] });
-  const despues = await mascotasDe(cuenta);
-  const nueva = despues.filter((id) => !antes.has(String(id))).sort((a, b) => (a > b ? -1 : 1))[0];
-  if (nueva === undefined) throw new Error("La mascota se creó, pero todavía no aparece. Recarga en unos segundos.");
-  return nueva;
+  await escribir(firmante, { functionName: "mint", args: [nombre.trim(), especie] });
+  // El ETH-RPC puede ir un bloque atrás: se relee unas veces antes de rendirse.
+  for (let intento = 0; intento < 4; intento++) {
+    if (intento > 0) await new Promise((r) => setTimeout(r, 2_000));
+    const despues = await mascotasDe(cuenta);
+    const nueva = despues.filter((id) => !antes.has(String(id))).sort((a, b) => (a > b ? -1 : 1))[0];
+    if (nueva !== undefined) return nueva;
+  }
+  throw new Error("La mascota se creó, pero todavía no aparece. Recarga en unos segundos.");
 }
 
-export async function cuidar(provider: Eip1193Provider, cuenta: Address, accion: Accion, tokenId: bigint): Promise<void> {
-  await escribir(provider, cuenta, { functionName: accion, args: [tokenId] });
+export async function cuidar(firmante: Firmante, accion: Accion, tokenId: bigint): Promise<void> {
+  await escribir(firmante, { functionName: accion, args: [tokenId] });
 }
 
-export async function cambiarNombre(provider: Eip1193Provider, cuenta: Address, tokenId: bigint, nombre: string): Promise<void> {
-  await escribir(provider, cuenta, { functionName: "cambiarNombre", args: [tokenId, nombre.trim()] });
+export async function cambiarNombre(firmante: Firmante, tokenId: bigint, nombre: string): Promise<void> {
+  await escribir(firmante, { functionName: "cambiarNombre", args: [tokenId, nombre.trim()] });
 }

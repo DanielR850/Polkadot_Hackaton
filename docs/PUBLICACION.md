@@ -1,61 +1,44 @@
-# Publicar el juego bajo un dominio Polkadot
+# Publicar PolkaPets en polka-pets.dot
 
-> Todavía no se ha desplegado el Tamagotchi ni se ha reservado un dominio. Este documento describe
-> el recorrido; antes de publicar elegiremos explícitamente la red y el nombre.
+Sigue el taller Products Devnet ([capítulos 5 y 6](https://github.com/BrandonFilth/polkadot-devnet-workshop/tree/main/contenido)),
+con `pad` 0.22.1 y Product SDK 0.39.0.
 
-## Estado de PolkaPets v1
+- Dominio: `polka-pets.dot` (Products Devnet, registrado).
+- Contrato: `0x758425A3b756079B34FF97cB9C7A764fD44C008a` en Polkadot Hub TestNet (chain id 420420417).
+- Dentro de Polkadot Desktop o la Polkadot App, adoptar, cuidar y renombrar se firman con el Host
+  (`game/src/contract/host.ts`). En un navegador normal se firma con MetaMask.
+- La cuenta del Host es una cuenta derivada de `polka-pets.dot`: es distinta de la de MetaMask, así
+  que sus mascotas también son distintas.
 
-La web ya compila con el contrato EVM de Polkadot Hub TestNet
-`0x758425A3b756079B34FF97cB9C7A764fD44C008a`. La lectura pública confirmó
-`name = PolkaPets`, `symbol = PPET` y `NUM_ESPECIES = 1`.
+## Ciclo de publicación
 
-El modo NFT actual usa `viem`, un RPC EVM y una wallet de navegador. El flujo Product
-`.paseo` carga el bundle dentro de un Host y su SDK de contratos documenta llamadas a
-contratos PolkaVM (`pallet-revive`) en Asset Hub. Antes de publicar un Product funcional
-hay que implementar y comprobar un adaptador de firma/lectura compatible con el Host,
-o portar el contrato y el frontend a la ruta PolkaVM. También hacen falta el nombre
-dotNS, una cuenta de publicación y autorización de Bulletin. El build web `dist/`
-por sí solo no resuelve esa integración.
+Desde la raíz del repositorio, en PowerShell, las cuatro líneas en la misma terminal:
 
-## Qué se publica
-
-Se compila la aplicación web a una carpeta estática (`dist/`) con HTML, JavaScript, CSS e imágenes.
-El flujo de publicación del ecosistema carga ese bundle en Bulletin y vincula su CID al nombre de
-dotNS. El Host resuelve el nombre, obtiene el contenido y abre el Product. El dominio y el bundle
-son recursos distintos: el nombre apunta a una versión del contenido.
-
-```text
-Código fuente → build estático → bundle/CID en Bulletin
-                           └── nombre dotNS → CID
-                                      └── Host abre y ejecuta el Product
+```powershell
+function pad { $env:PAD_UPDATE_CHECK = '0'; pnpm dlx --ignore-scripts @polkadot-community-foundation/polkadot-app-deploy@0.22.1 @args }
+pnpm build
+$env:APP_DOT = 'tmp' + (-join ((Get-Date -Format 'yyyyMMddHHmmss').ToCharArray() | ForEach-Object { [char](97 + [int]"$_") })) + '.dot'
+pad .\dist $env:APP_DOT --env devnet --js-merkle
 ```
 
-## Etapas
+Nunca le pases `polka-pets.dot` a `pad`: sube a un nombre temporal y el CID se pega a mano.
 
-1. **Preparar:** el juego funciona dentro del Host, tiene permisos manifiestos adecuados y usa el
-   SDK y el contrato de la red seleccionada.
-2. **Build:** el comando de compilación genera `dist/`. No se publica `node_modules`, las llaves ni
-   los archivos de desarrollo.
-3. **Registrar el nombre:** se reserva el nombre en dotNS si todavía no se tiene.
-4. **Publicar el bundle:** la herramienta sube los archivos a Bulletin y produce un CID de
-   contenido.
-5. **Vincular nombre y CID:** dotNS hace que el dominio resuelva a esa versión.
-6. **Abrir y verificar:** se prueba en Polkadot Desktop/App y, cuando exista, en la puerta web del
-   entorno. Se comprueba la mascota, assets, SDK, contrato y permisos.
-7. **Actualizar:** se crea otro build y se actualiza el CID al publicar la nueva versión.
+Copia de la salida:
 
-Las guías oficiales actuales describen `playground build`/`playground deploy` y un TestNet Paseo
-Next v2 cuyos nombres terminan en `.paseo`; el sufijo depende de la red. El repo del bootcamp usa
-otra configuración (`pad` y `--env devnet`). Por tanto, no vamos a copiar comandos de publicación
-sin verificar primero qué red y CLI utilizará el hackatón. [Guía oficial de despliegue](https://docs.polkadot.com/apps/deploy-your-app/) · [Nombres y actualización del bundle](https://docs.polkadot.com/apps/register-dot-domain/)
+1. `CID: bafybei…` (el CID raíz, el que también sale en `Verified on-chain`).
+2. El JSON de `Verified text[manifest]:`. Si los acentos salen raros (`cu├¡dalo`), corrígelos.
 
-## Qué hace falta antes de ejecutar el despliegue
+Después, en la Polkadot App o Desktop: `dotns.dot` → Profile → My Domains → fila de `polka-pets.dot`:
 
-- Elegir si seguiremos el devnet del taller o el flujo oficial actual.
-- Confirmar el sufijo disponible (`.dot` o `.paseo`) y el nombre deseado.
-- Verificar autorización de almacenamiento y cuenta de despliegue en esa red.
-- Confirmar el destino del contrato y su dirección/ABI/manifest, si el juego ya lo utiliza.
-- Revisar el bundle y los permisos antes de firmar.
+- **Resolve** → pega el CID → Save → firma en el teléfono.
+- **Edit** → Custom Records → Add Record → key `manifest`, value el JSON → Save → firma.
+  Solo hace falta otra vez si cambian el nombre, la descripción o el icono.
 
-Por ahora solo tenemos el servidor de desarrollo local. La publicación en Bulletin o el registro del
-dominio aún no se ha ejecutado.
+Bulletin borra el contenido a los ~14 días: vuelve a publicar antes (por ejemplo, el día 11) y
+pega el CID nuevo con Resolve.
+
+## Publicaciones
+
+| Fecha | CID raíz | Icono |
+|---|---|---|
+| 2026-10-31 | `bafybeihjop464rvo3ocpej6vixt3dqrv2bgijzcrchtsw3sdgafrmu7ulu` | `bafk2bzacebhbstrmm2asv46ogqimiwehspkbsnomx5hagjkpsquuujuw6p5o4` |

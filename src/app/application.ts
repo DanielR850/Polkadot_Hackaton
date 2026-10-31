@@ -48,12 +48,9 @@ const startScreen = createStartScreen((name) => {
 
 async function openContractGame() {
   try {
-    document.documentElement.removeAttribute('style');
-    const [, { startApp }] = await Promise.all([
-      import('../../game/src/styles.css'),
-      import('../../game/src/app.ts'),
-    ]);
-    startApp(app, () => window.location.reload());
+    // Mismo estilo retro que el juego local; solo cambia de dónde salen los datos (el contrato).
+    const { startChainApp } = await import('./chainApplication.ts');
+    startChainApp(app, () => window.location.reload());
   } catch (error) {
     console.error('No se pudo abrir el juego con contrato:', error);
     startScreen.say('No se pudo cargar el modo Polkadot. Revisa la conexión e inténtalo de nuevo.');

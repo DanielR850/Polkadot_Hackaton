@@ -276,6 +276,30 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .ranking-list .species { grid-area: species; font-size: 16px; color: var(--muted); line-height: 1; }
 .ranking-list .time { grid-area: time; font-size: 20px; color: var(--accent-dark); }
 
+/* ===== Modo NFT: mismas piezas retro, más la barra de cuenta y los avisos de firma ===== */
+.chain-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  max-width: 960px; margin: 0 auto 18px; padding: 8px 12px;
+  background: var(--panel); border: var(--px) solid var(--ink); box-shadow: 4px 4px 0 var(--accent), 7px 7px 0 var(--ink);
+}
+.chain-brand { display: flex; align-items: center; gap: 10px; }
+.chain-bar-right { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.chain-account { font-size: 18px; color: var(--muted); }
+.chain-faucet, .chain-links a { color: var(--ink); text-decoration: none; font-family: var(--title); }
+.chain-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  max-width: 960px; margin: 0 auto 18px; padding: 10px 14px; font-size: 20px;
+  background: var(--accent-soft); border: var(--px) solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+}
+.chain-banner[data-kind="error"] { background: #f6c9c4; }
+.chain-banner[data-kind="busy"] { background: var(--panel-2); }
+.chain-options { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 18px 0 6px; }
+.chain-wallet { display: flex; align-items: center; justify-content: center; gap: 12px; min-width: min(320px, 100%); font-size: 11px; }
+.chain-wallet:disabled { cursor: not-allowed; filter: grayscale(.6); }
+.chain-links { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.chain-row { justify-content: center; }
+.chain-pet-grid { grid-template-columns: minmax(0, 200px); justify-content: center; }
+
 /* ===== Responsivo =====
    Las reglas dependen del tamaño de la ventana, no del dispositivo: una ventana de escritorio
    acomodada a media pantalla se ve igual que un teléfono o una tableta del mismo ancho. */

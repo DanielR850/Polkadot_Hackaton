@@ -33,6 +33,7 @@ export function startApp(root: HTMLElement, onReturnToLocal?: () => void): void 
     (w) => void hub.conectar(w),
     () => void hub.buscarWallets(),
     () => hub.volver(),
+    () => void hub.conectarHost(),
   );
   const nombre = createNombre(
     (n) => hub.elegirNombre(n),

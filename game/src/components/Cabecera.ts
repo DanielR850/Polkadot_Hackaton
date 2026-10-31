@@ -34,7 +34,7 @@ export function createCabecera(onSalir: () => void, salirLabel = "Salir"): Cabec
       derecha.hidden = s.cuenta === null && !keepExitVisible;
       if (!s.cuenta) return;
       const saldo = s.saldo === null ? "" : ` · ${Number(formatEther(s.saldo)).toFixed(2)} ${NATIVE_SYMBOL}`;
-      cuenta.textContent = `${s.wallet?.nombre ?? "Wallet"} · ${acortarDireccion(s.cuenta)}${saldo}`;
+      cuenta.textContent = `${s.firmante?.nombre ?? "Wallet"} · ${acortarDireccion(s.cuenta)}${saldo}`;
       faucet.hidden = !(s.saldo !== null && s.saldo < 10n ** 16n); // menos de 0.01 PAS
       salir.disabled = s.ocupado !== null;
     },

@@ -18,9 +18,20 @@ export const NATIVE_DECIMALS = 18;
 /** Faucet para conseguir PAS de prueba. */
 export const FAUCET_URL = "https://faucet.polkadot.io/";
 
+/** Dominio .dot de la app. El Host deriva de este nombre la cuenta del jugador. */
+export const PRODUCT_DOMAIN = "polka-pets.dot";
+/** Índice de la cuenta derivada del Product (igual que el taller). */
+export const DERIVATION_INDEX = 0;
+
 /** Timeouts (ms). */
 export const READ_TIMEOUT_MS = 20_000;
 export const TX_TIMEOUT_MS = 120_000;
+/** El Host puede no responder a getProductContext(); entonces el id sale de la URL. */
+export const PRODUCT_CONTEXT_TIMEOUT_MS = 3_000;
+/** La persona aprueba en el teléfono: se le da tiempo. */
+export const HOST_SIGN_TIMEOUT_MS = 300_000;
+export const HOST_CONNECT_TIMEOUT_MS = 60_000;
+export const HOST_ALLOWANCE_TIMEOUT_MS = 90_000;
 
 /** Cada cuánto se vuelve a leer la mascota de la cadena (entre lecturas la UI simula el tiempo). */
 export const RELECTURA_MS = 20_000;

@@ -14,7 +14,7 @@ export function createStartScreen(onPlay: (name: string) => void, onChain: () =>
   const form = h('form', { class: 'start-form' },
     h('label', { for: 'pet-name', class: 'eyebrow' }, 'TU TAMAGOTCHI SE LLAMA'), input, hint, play);
   const root = h('section', { class: 'screen start-screen', 'aria-label': 'Inicio' },
-    h('img', { class: 'app-logo', src: '/app-logo.jpeg', alt: 'Logo de la aplicación' }),
+    h('img', { class: 'app-logo', src: 'app-logo.jpeg', alt: 'Logo de la aplicación' }),
     h('span', { class: 'eyebrow' }, 'MI PEQUEÑO MUNDO'),
     h('h1', { class: 'title' }, 'Tamagotchi Polkadot'),
     form,

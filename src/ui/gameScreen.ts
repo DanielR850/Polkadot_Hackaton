@@ -28,8 +28,14 @@ export interface GameIntents {
   restart(): void;
 }
 
+export interface GameScreenOptions {
+  /** Nota al pie de los cuidados. Por defecto, la del juego local. */
+  note?: { text: string; detail: string };
+}
+
 /** Pantalla de juego: habitación (canvas), barras y acciones. Solo muestra y devuelve intenciones. */
-export function createGameScreen(intents: GameIntents) {
+export function createGameScreen(intents: GameIntents, options: GameScreenOptions = {}) {
+  const note = options.note ?? { text: 'Tu partida se guarda en este dispositivo.', detail: 'La conexión con Polkadot la añadiremos después.' };
   const nameEl = h('h1', {});
   const stageEl = h('span', {});
   const ageEl = h('span', { class: 'age' });
@@ -90,7 +96,7 @@ export function createGameScreen(intents: GameIntents) {
         h('div', { class: 'card-heading' }, h('div', {}, h('span', { class: 'eyebrow' }, 'CUIDADOS'), h('h2', {}, '¿Qué hacemos?')), h('span', { class: 'sparkle' }, '✦')),
         careControls, deathPanel,
         h('div', { class: 'local-note' }, h('span', {}, '☁'),
-          h('p', {}, 'Tu partida se guarda en este dispositivo.', h('br'), h('small', {}, 'La conexión con Polkadot la añadiremos después.'))))));
+          h('p', {}, note.text, h('br'), h('small', {}, note.detail))))));
 
   let currentMode: GameMode = 'normal';
   let toastTimer = 0;

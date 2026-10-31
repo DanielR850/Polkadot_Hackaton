@@ -1,4 +1,5 @@
-// Pantalla para vincular la cuenta: lista las wallets que encuentra en el navegador.
+// Pantalla para vincular la cuenta. Dentro de Polkadot Desktop o la Polkadot App la cuenta la da
+// el Host; en un navegador normal se listan las wallets EVM que haya (MetaMask, Talisman…).
 import { WALLETS_SUGERIDAS, type WalletInfo } from "../contract/wallets";
 import type { HubState } from "../hub/hub";
 import { boton, el } from "./dom";
@@ -12,17 +13,16 @@ export function createConectar(
   onElegir: (w: WalletInfo) => void,
   onReintentar: () => void,
   onVolver: () => void,
+  onHost: () => void,
 ): Conectar {
+  const ayuda = el("p", { class: "ayuda" });
   const lista = el("div", { class: "wallets" });
   const element = el(
     "section",
     { class: "pantalla" },
     el("p", { class: "paso", text: "Paso 1 de 3" }),
     el("h2", { text: "Vincula tu cuenta" }),
-    el("p", {
-      class: "ayuda",
-      text: "Elige tu wallet. Funciona con MetaMask y con wallets de Polkadot compatibles con EVM (Talisman, SubWallet, Nova).",
-    }),
+    ayuda,
     lista,
     el("div", { class: "botones-fila" }, boton("← Volver", onVolver, "btn ghost")),
   );
@@ -30,14 +30,27 @@ export function createConectar(
   let ultimaClave = "";
 
   function sync(s: HubState): void {
-    const clave = `${s.buscandoWallets}|${s.wallets.map((w) => w.id).join(",")}|${s.ocupado ?? ""}`;
+    const clave = `${s.enHost}|${s.buscandoWallets}|${s.wallets.map((w) => w.id).join(",")}|${s.ocupado ?? ""}`;
     if (clave === ultimaClave) return;
     ultimaClave = clave;
 
-    if (s.buscandoWallets) {
-      lista.replaceChildren(el("p", { class: "ayuda", text: "Buscando wallets…" }));
+    if (s.buscandoWallets || s.enHost === null) {
+      ayuda.textContent = "";
+      lista.replaceChildren(el("p", { class: "ayuda", text: "Buscando tu cuenta…" }));
       return;
     }
+
+    if (s.enHost) {
+      ayuda.textContent =
+        "Tu cuenta es la de la Polkadot App. Al conectar, acepta en tu teléfono los permisos de cuenta, transacciones y gas.";
+      const b = boton("Conectar con la Polkadot App", onHost, "btn");
+      b.disabled = s.ocupado !== null;
+      lista.replaceChildren(b);
+      return;
+    }
+
+    ayuda.textContent =
+      "Elige tu wallet. Funciona con MetaMask y con wallets de Polkadot compatibles con EVM (Talisman, SubWallet, Nova).";
 
     if (s.wallets.length === 0) {
       const enlaces = el("div", { class: "sugeridas" });

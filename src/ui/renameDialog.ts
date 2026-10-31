@@ -1,7 +1,8 @@
-import { NAME_MAX_LENGTH, validateName } from '../game/petState.ts';
+import { NAME_MAX_LENGTH, validateName, type NameResult } from '../game/petState.ts';
 import { createDialog, h } from './dom.ts';
 
-export function createRenameDialog(onSave: (name: string) => void) {
+/** `validate` permite reglas extra (por ejemplo, el límite en bytes del contrato). */
+export function createRenameDialog(onSave: (name: string) => void, validate: (raw: string) => NameResult = validateName) {
   const { dialog, body, close } = createDialog('Cambiar nombre');
   const input = h('input', { type: 'text', class: 'name-input small', maxlength: NAME_MAX_LENGTH, autocomplete: 'off', 'aria-label': 'Nuevo nombre' });
   const error = h('p', { class: 'hint', 'aria-live': 'polite' });
@@ -10,7 +11,7 @@ export function createRenameDialog(onSave: (name: string) => void) {
   body.append(form);
 
   const refresh = () => {
-    const result = validateName(input.value);
+    const result = validate(input.value);
     save.disabled = !result.ok;
     error.textContent = result.ok ? `De 1 a ${NAME_MAX_LENGTH} caracteres.` : result.error;
     error.classList.toggle('error', !result.ok);
@@ -18,7 +19,7 @@ export function createRenameDialog(onSave: (name: string) => void) {
   input.addEventListener('input', refresh);
   form.addEventListener('submit', (event) => {
     event.preventDefault();
-    const result = validateName(input.value);
+    const result = validate(input.value);
     if (!result.ok) return;
     close();
     onSave(result.value);

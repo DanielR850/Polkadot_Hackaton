@@ -4,11 +4,11 @@ import { createDialog, h } from './dom.ts';
 import { formatDuration } from './format.ts';
 
 /** Ranking por tiempo vivido. Muestra carga, vacío y error; la fila propia va resaltada. */
-export function createRankingDialog(source: RankingSource) {
+export function createRankingDialog(source: RankingSource, subtitle = 'Mascotas que más tiempo han vivido. Datos de ejemplo.') {
   const { dialog, body } = createDialog('Ranking', 'ranking-dialog');
   const status = h('p', { class: 'hint', 'aria-live': 'polite' });
   const list = h('ol', { class: 'ranking-list' });
-  body.append(h('p', { class: 'hint' }, 'Mascotas que más tiempo han vivido. Datos de ejemplo.'), status, list);
+  body.append(h('p', { class: 'hint' }, subtitle), status, list);
   let request = 0;
 
   async function load() {
