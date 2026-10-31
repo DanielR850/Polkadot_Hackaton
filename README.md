@@ -15,12 +15,28 @@ Los recursos del juego viven en `public/assets/` y se organizan por tipo:
 
 Usa nombres descriptivos y minúsculas, por ejemplo `axolotl-idle.png` o `room-day.webp`. Guarda aquí solo recursos que podamos usar legalmente y registra su fuente/licencia en `docs/ASSETS.md`.
 
-## Código previsto
+## Arquitectura del proyecto
 
-- `src/game/`: reglas y escenas del juego.
-- `src/ui/`: interfaz y menús.
-- `src/polkadot/`: integración posterior con Host, wallet y contrato.
-- `docs/`: especificaciones, decisiones y registro de recursos.
+```text
+tamagotchi-polkadot/
+├── index.html, package.json, vite.config.ts  # aplicación web y herramientas
+├── public/assets/                            # sprites, fondos, audio e iconos
+├── src/
+│   ├── app/                                  # arranque y coordinación de módulos
+│   ├── domain/pet/                           # estado y reglas puras de la mascota
+│   ├── game/scenes/                          # escena y animación Phaser
+│   ├── ui/                                   # interfaz HTML y controles
+│   ├── infrastructure/storage/               # adaptador de guardado local
+│   └── polkadot/                             # futuras integraciones con Host y contratos
+├── contracts/tamagotchi/                     # futuro proyecto Solidity separado
+├── docs/                                     # arquitectura, SDK, publicación y decisiones
+├── AGENTS.md                                 # límites de módulos para cambios asistidos
+└── CONTRIBUTING.md                           # ramas y commits
+```
+
+La web se organiza como MVC ligero: `domain` es el modelo, `ui` la vista y `app/petController.ts`
+el controlador. Phaser vive en `game`. El contrato se compila y despliega de forma independiente,
+aunque vive en este mismo repositorio.
 
 ## Cómo viajaría una acción hasta el smart contract
 
@@ -81,9 +97,14 @@ sequenceDiagram
 ```
 
 La explicación completa, incluyendo qué se compila, qué se despliega y qué partes aún son diseño,
-está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md).
+está en [docs/ARQUITECTURA.md](docs/ARQUITECTURA.md). Para aprender el SDK ve
+[docs/SDK-GUIDE.md](docs/SDK-GUIDE.md); para publicar en un dominio ve
+[docs/PUBLICACION.md](docs/PUBLICACION.md); y para ver las fases del proyecto ve
+[docs/ROADMAP.md](docs/ROADMAP.md). Las reglas para organizar cambios están en
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Estado
 
-Prototipo jugable local. La integración con el Host, la wallet y el contrato todavía no están creados.
-El diagrama anterior es el diseño propuesto, no una función ya conectada.
+Prototipo jugable local con estructura modular. La integración con el Host, la wallet y el contrato
+todavía no están creados. Los diagramas de blockchain son el diseño propuesto, no una función ya
+conectada.

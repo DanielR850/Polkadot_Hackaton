@@ -3,6 +3,45 @@
 > **Estado:** guía del diseño propuesto. El prototipo actual todavía no usa Product SDK, Host,
 > wallet ni smart contract. Sus acciones modifican el estado local del navegador.
 
+## Mapa de carpetas
+
+```text
+src/
+├── main.ts                         # punto de entrada Vite; importa estilos y arranca la app
+├── app/
+│   ├── bootstrap.ts                # encuentra el root y monta la aplicación
+│   └── petController.ts            # conecta vista, reglas, Phaser y almacenamiento
+├── domain/pet/petState.ts          # tipos, necesidades y reglas del Tamagotchi
+├── game/scenes/petScene.ts         # escena visual y animación de Phaser
+├── ui/petView.ts                   # muestra estado y convierte clicks en acciones
+├── infrastructure/storage/         # interfaz PetStorage y adaptador local actual
+└── polkadot/
+    ├── host/                       # futuro acceso a capacidades del Host
+    └── contracts/                  # futuro adaptador tipado del contrato
+
+contracts/tamagotchi/
+├── SPEC.md                         # comportamiento que decidiremos antes de Solidity
+├── src/                            # Solidity (todavía vacío)
+├── test/                           # pruebas del contrato (todavía vacío)
+└── scripts/                        # compilación/despliegue (todavía vacío)
+```
+
+El repositorio usa un solo lockfile y el proyecto web permanece en la raíz para conservar el
+prototipo actual. El contrato tendrá fuentes, herramientas y despliegue propios dentro de
+`contracts/tamagotchi/`.
+
+```mermaid
+flowchart LR
+    UI[ui / vista] --> APP[app / controlador]
+    APP --> DOMAIN[domain / reglas]
+    APP --> GAME[game / Phaser]
+    APP --> STORE[infrastructure / PetStorage]
+    APP -. futura llamada .-> PORT[polkadot / adaptadores]
+    PORT -. Host SDK .-> HOST[Polkadot Host]
+    HOST -. firma y cadena .-> CHAIN[Contrato en Polkadot]
+    CONTRACT[contracts / Solidity] --> CHAIN
+```
+
 ## Las piezas y su responsabilidad
 
 | Pieza | Qué hace | Qué no debe hacer |
