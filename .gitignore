@@ -4,3 +4,12 @@ dist/
 .env
 .env.*
 !.env.example
+
+# PolkaPets (contrato/ y game/)
+contrato/artifacts/
+contrato/cache/
+contrato/typechain-types/
+contrato/deployments/
+*.log
+npm-debug.log*
+.DS_Store
