@@ -96,8 +96,8 @@ npm run dev                # http://127.0.0.1:5173
 
 ## Despliegue actual
 
-- Contrato PolkaPets: `0x022e6adE3D707EA9E7D96D50FD388922A58cEF8E`
-  ([explorador](https://blockscout-testnet.polkadot.io/address/0x022e6adE3D707EA9E7D96D50FD388922A58cEF8E))
+- Contrato PolkaPets: `0x08Ff3f07Bca56D0ebdD4346c815B320CDCBC3aec`
+  ([explorador](https://blockscout-testnet.polkadot.io/address/0x08Ff3f07Bca56D0ebdD4346c815B320CDCBC3aec))
 - Prueba de humo: `npm run probar` dentro de `contrato/` (adopta, cuida con cada acción,
   cambia el nombre y lee el ranking).
 
@@ -120,3 +120,4 @@ actual usa wallets EVM con `viem`; el Product SDK de Polkadot Desktop no está c
 - La **Polkadot App** (la de los Products con dominio `.dot`, que usa el repo de referencia)
   no está integrada: requiere `@parity/product-sdk` y publicar la app dentro de la Polkadot
   App. Hoy se juega con wallets de navegador.
+

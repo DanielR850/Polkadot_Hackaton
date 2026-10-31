@@ -2,7 +2,7 @@
 // `npm run contrato:deploy` (también queda en contrato/deployments/polkadotHubTestnet.json).
 
 /** Dirección del contrato PolkaPets desplegado. */
-export const PETS_ADDRESS = "0x022e6adE3D707EA9E7D96D50FD388922A58cEF8E" as const;
+export const PETS_ADDRESS = "0x08Ff3f07Bca56D0ebdD4346c815B320CDCBC3aec" as const;
 
 /** ETH-RPC de Polkadot Hub TestNet. */
 export const ETH_RPC_URL = "https://eth-rpc-testnet.polkadot.io";

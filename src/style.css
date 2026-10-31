@@ -92,6 +92,7 @@ body {
   width: min(1080px, 100%); margin: 0 auto;
   padding: 26px max(30px, env(safe-area-inset-right)) max(18px, env(safe-area-inset-bottom)) max(30px, env(safe-area-inset-left));
 }
+.app-logo { display: block; width: min(180px, 48vw); height: auto; aspect-ratio: 1; object-fit: contain; margin: 0 auto 16px; }
 h1, h2, .eyebrow, button, .title { font-family: var(--title); font-weight: 400; }
 button { color: var(--ink); }
 button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); outline-offset: 3px; }
