@@ -95,8 +95,11 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const deathTime = h('p', { class: 'death-time' });
   const restart = h('button', { type: 'button', class: 'primary' }, 'Jugar de nuevo');
   restart.addEventListener('click', intents.restart);
+  const deathRanking = h('button', { type: 'button', class: 'ghost' }, 'Ver ranking');
+  deathRanking.addEventListener('click', intents.ranking);
   const deathPanel = h('div', { class: 'mode-panel death-panel', hidden: true },
-    h('span', { class: 'death-icon', 'aria-hidden': 'true' }, '🕊️'), h('h2', {}, 'Tu mascota se fue'), deathTime, restart);
+    h('span', { class: 'death-icon', 'aria-hidden': 'true' }, '🕊️'), h('h2', {}, 'Fin de la partida'), deathTime,
+    h('div', { class: 'row' }, deathRanking, restart));
 
   const careControls = h('div', {}, h('div', { class: 'meters' }, ...bars.map((b) => b.row)), actions, bathPanel, feedback);
 

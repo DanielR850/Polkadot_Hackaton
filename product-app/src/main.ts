@@ -8,6 +8,7 @@ import { createPetScene, type PetSceneHandle } from '../../src/game/petScene.ts'
 import { portraitUrl } from '../../src/game/assets.ts';
 import { findPet, PETS } from '../../src/game/catalog.ts';
 import { buildTheme } from '../../src/ui/theme.ts';
+import { duracionHumana } from '../../game/src/lib/format.ts';
 import manifest from './cdm.json';
 
 const PRODUCT_ID = 'tamagotchiaxolotl.paseo';
@@ -18,6 +19,7 @@ const root = document.querySelector<HTMLElement>('#app')!;
 type Action = 'alimentar' | 'jugar' | 'dormir' | 'banar';
 type Pet = {
   tokenId: bigint; nombre: string; especie: number; nivel: number; etapa: number; viva: boolean;
+  duracion: number;
   hambre: number; sed: number; energia: number; felicidad: number; limpieza: number; vida: number;
 };
 
@@ -37,8 +39,12 @@ shell.innerHTML = `
     <h2 id="pet-name"></h2>
     <div class="product-scene" id="scene"></div>
     <div class="product-stats" id="stats"></div>
+    <div class="product-death" id="pet-death" hidden role="status" aria-live="polite">
+      <h3>Fin de la partida</h3><p id="pet-death-detail"></p>
+      <p>Su récord permanece en la cadena. Puedes verlo en el ranking o adoptar otra mascota.</p>
+    </div>
     <div class="product-actions" id="care"></div>
-    <div class="product-actions"><button id="rename" type="button">Cambiar nombre</button><button id="new-pet" type="button">Adoptar otro ajolote</button></div>
+    <div class="product-actions"><button id="rename" type="button">Cambiar nombre</button><button id="new-pet" type="button">Adoptar otra mascota</button></div>
     <form id="rename-form" hidden><label>Nuevo nombre <input name="name" maxlength="24" required /></label> <button type="submit">Guardar nombre</button></form>
   </section>
   <div class="product-actions"><button id="ranking" type="button">Ver ranking</button></div>
@@ -67,11 +73,15 @@ const petSection = shell.querySelector<HTMLElement>('#pet')!;
 const sceneHost = shell.querySelector<HTMLElement>('#scene')!;
 const statsHost = shell.querySelector<HTMLElement>('#stats')!;
 const careHost = shell.querySelector<HTMLElement>('#care')!;
+const deathPanel = shell.querySelector<HTMLElement>('#pet-death')!;
+const deathDetail = shell.querySelector<HTMLElement>('#pet-death-detail')!;
+const renameButton = shell.querySelector<HTMLButtonElement>('#rename')!;
 const rankingList = shell.querySelector<HTMLOListElement>('#ranking-list')!;
 let scene: PetSceneHandle | null = null;
 let reactionTimer = 0;
 let busy = false;
 let currentPet: Pet | null = null;
+let adoptingNew = false;
 let owner: `0x${string}` | null = null;
 let contract: ReturnType<ContractManager['getContract']> | null = null;
 let signer: ReturnType<SignerAccount['getSigner']> | null = null;
@@ -85,6 +95,7 @@ function petFrom(raw: unknown): Pet {
   return {
     tokenId: BigInt(value.tokenId as bigint), nombre: String(value.nombre), especie: Number(value.especie),
     nivel: Number(value.nivel), etapa: Number(value.etapa), viva: Boolean(value.viva),
+    duracion: Number(value.duracion),
     hambre: Number(value.hambre), sed: Number(value.sed), energia: Number(value.energia),
     felicidad: Number(value.felicidad), limpieza: Number(value.limpieza), vida: Number(value.vida),
   };
@@ -110,12 +121,17 @@ async function operation(label: string, action: () => Promise<void>) {
   finally {
     busy = false;
     shell.querySelectorAll<HTMLButtonElement>('button').forEach((button) => { button.disabled = false; });
+    if (currentPet) {
+      careHost.querySelectorAll<HTMLButtonElement>('button').forEach((button) => { button.disabled = !currentPet!.viva; });
+      renameButton.disabled = !currentPet.viva;
+    }
   }
 }
 function showPet(pet: Pet | null) {
   currentPet = pet;
   petSection.hidden = !pet;
   adoptForm.hidden = !!pet;
+  deathPanel.hidden = !pet || pet.viva;
   if (!pet) return;
   shell.querySelector<HTMLElement>('#pet-name')!.textContent = `${pet.nombre} · NFT #${pet.tokenId}`;
   scene ??= createPetScene(sceneHost, () => {});
@@ -131,7 +147,9 @@ function showPet(pet: Pet | null) {
     meter.min = 0; meter.max = 100; meter.value = value;
     stat.append(meter); statsHost.append(stat);
   }
-  careHost.querySelectorAll<HTMLButtonElement>('button').forEach((button) => { button.disabled = !pet.viva; });
+  deathDetail.textContent = `${pet.nombre} vivió ${duracionHumana(pet.duracion)}.`;
+  careHost.querySelectorAll<HTMLButtonElement>('button').forEach((button) => { button.disabled = busy || !pet.viva; });
+  renameButton.disabled = busy || !pet.viva;
 }
 function reactToCare(anim: 'eat' | 'play' | 'sleep' | 'bath', icon: string) {
   if (!currentPet || !scene) return;
@@ -142,14 +160,11 @@ function reactToCare(anim: 'eat' | 'play' | 'sleep' | 'bath', icon: string) {
   reactionTimer = window.setTimeout(() => showPet(currentPet), 1400);
 }
 async function reloadPet() {
-  if (!owner) return;
+  if (!owner || adoptingNew) return;
   const ids = await query('mascotasDe', owner) as bigint[];
-  const latest = [...ids].reverse();
-  for (const id of latest) {
-    const pet = petFrom(await query('verMascota', id));
-    if (pet.viva) { showPet(pet); return; }
-  }
-  showPet(null);
+  if (ids.length === 0) { showPet(null); return; }
+  // Mantén visible el NFT más reciente incluso después de morir: no ocultes su récord.
+  showPet(petFrom(await query('verMascota', ids[ids.length - 1])));
 }
 
 for (const [label, action, icon] of [
@@ -196,11 +211,15 @@ adoptForm.addEventListener('submit', (event) => {
   if (!findPet(species)) { say('Selecciona una especie válida.'); return; }
   void operation('Adoptando mascota…', async () => {
     await transact('mint', name, species);
+    adoptingNew = false;
     await reloadPet();
     say('Mascota adoptada.');
   });
 });
-shell.querySelector<HTMLButtonElement>('#new-pet')!.addEventListener('click', () => showPet(null));
+shell.querySelector<HTMLButtonElement>('#new-pet')!.addEventListener('click', () => {
+  adoptingNew = true;
+  showPet(null);
+});
 shell.querySelector<HTMLButtonElement>('#rename')!.addEventListener('click', () => {
   renameForm.hidden = !renameForm.hidden;
 });
