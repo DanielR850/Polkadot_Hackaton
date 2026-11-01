@@ -2,6 +2,12 @@
 
 Juego web de mascota virtual. La primera versión será 2D y funcionará en navegador de escritorio y móvil. Más adelante podremos evaluar una habitación 3D o modo WebXR.
 
+# Integrantes del proyecto
+- Ana Lucia Alonso Martínez
+- Daniel Reyna Burnes
+- Santiago Ernesto Diaz Rodriguez
+- Guillermo Daniel Bonilla Morales 
+
 ## Recursos visuales y audio
 
 Los recursos del juego viven en `public/assets/` y se organizan por tipo:
