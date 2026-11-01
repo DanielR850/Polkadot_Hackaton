@@ -10,7 +10,9 @@ import {
   ageMs, bathe, computeStage, computeStats, createPet, detectStageChange, feed, isDead, lowNeeds,
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
-import { createMockRanking } from '../game/ranking.ts';
+import type { RankingSource } from '../game/ranking.ts';
+import { RANKING_ADDRESS } from '../../game/src/contract/config.ts';
+import { createRecordDialog } from '../ui/recordDialog.ts';
 import { loadNft, loadPet, parsePetState, PET_STORAGE_KEY, saveNft, savePet, type PetNft } from '../game/storage.ts';
 import type { MintAccount, MintWallet, NftMinter } from '../polkadot/nftMint.ts';
 import type { NeedKey, PetState, Stage } from '../game/types.ts';
@@ -49,6 +51,8 @@ let lastStage: Stage | null = null;
 let scene: PetSceneHandle | null = null;
 let screen: Screen = 'start';
 let draftName = '';
+/** bornAt de la mascota sin NFT a la que ya se avisó que no puede registrarse. */
+let deathNoticeFor: number | null = null;
 
 const startScreen = createStartScreen((name) => {
   draftName = name;
@@ -71,6 +75,7 @@ function startGame(minted: PetNft | null) {
   nft = minted;
   saveNft(minted);
   showNftNote();
+  setRecordButton();
   lastStage = 'baby';
   showScreen('game');
   gameScreen.say(minted
@@ -195,11 +200,15 @@ const gameScreen = createGameScreen({
   }),
   rename: () => { if (pet) renameDialog.open(pet.name); },
   ranking: () => rankingDialog.open(),
+  record: () => openRecord(false),
   restart: () => {
+    if (recordBusy) return;
+    if (recordDialog.isOpen()) recordDialog.close();
     pet = null;
     savePet(null);
     nft = null;
     saveNft(null);
+    setRecordButton();
     useTheme(null);
     bathing = false;
     action = null;
@@ -217,9 +226,164 @@ const feedMenu = createFeedMenu((itemId) => withPet((p, now) => {
 
 const renameDialog = createRenameDialog((name) => withPet((p, now) => commit(rename(p, name, now, config), `Ahora se llama ${name}.`)));
 
-const rankingDialog = createRankingDialog(createMockRanking(() => pet
-  ? { id: 'me', petName: pet.name, petId: pet.petId, aliveMs: ageMs(pet, Date.now()), isMine: true }
-  : null));
+/* ------------------------------------------------ leaderboard (datos reales) */
+
+/**
+ * Partidas reales de la blockchain: las registradas al morir (PolkaPetsRanking). Mientras ese
+ * contrato no esté desplegado, las mascotas NFT del contrato PolkaPets, como en el primer deploy.
+ */
+const leaderboard: RankingSource = {
+  async getTop() {
+    const m = await getMinter();
+    const me = (m.account()?.address ?? nft?.address ?? '').toLowerCase();
+    const rows = await m.leaderboard();
+    return rows
+      .sort((a, b) => b.duracion - a.duracion || (a.tokenId < b.tokenId ? -1 : 1))
+      .slice(0, 10)
+      .map((r) => ({
+        id: r.tokenId.toString(),
+        petName: r.terminada ? `${r.nombre} 🕊️` : r.nombre,
+        petId: r.especie,
+        aliveMs: r.duracion * 1000,
+        isMine: me !== '' && r.dueno.toLowerCase() === me,
+      }));
+  },
+};
+const rankingDialog = createRankingDialog(leaderboard, undefined, RANKING_ADDRESS
+  ? 'Las 10 partidas que más duraron, registradas en la blockchain por sus dueños.'
+  : 'Las 10 mascotas NFT que más han vivido, según el contrato PolkaPets.');
+
+/* --------------------------------------- registrar la partida al morir */
+
+let recordBusy = false;
+
+const recordDialog = createRecordDialog({
+  accept: () => void startRecord(),
+  decline: () => { if (!recordBusy) recordDialog.close(); },
+  connect: (walletId) => void recordConnect(walletId),
+  retry: () => void recordSearch(),
+  ranking: () => { recordDialog.close(); rankingDialog.open(); },
+});
+
+/** El contrato limita el nombre a 24 bytes: se recorta sin partir letras (nombres de versiones viejas). */
+function nameForContract(name: string): string {
+  let out = '';
+  for (const ch of name) {
+    if (new TextEncoder().encode(out + ch).length > 24) break;
+    out += ch;
+  }
+  return out.trim() || 'Mascota';
+}
+
+function setRecordButton() {
+  const enabled = RANKING_ADDRESS !== null && nft !== null;
+  gameScreen.setRecord(!enabled ? 'hidden' : nft!.recorded ? 'recorded' : 'available');
+}
+
+function markNft(patch: Partial<PetNft>) {
+  if (!nft) return;
+  nft = { ...nft, ...patch };
+  saveNft(nft);
+  setRecordButton();
+}
+
+/** Abre el diálogo. `auto`: al morir, solo si nunca se preguntó. */
+function openRecord(auto: boolean) {
+  if (!pet || pet.diedAt === null) return;
+  if (auto && nft?.asked) return;
+  // Sin contrato de ranking no se interrumpe al jugador; se preguntará cuando esté desplegado.
+  if (auto && nft && !RANKING_ADDRESS) return;
+  if (nft) markNft({ asked: true });
+  recordDialog.open({
+    name: pet.name, petId: pet.petId, duration: formatDuration(ageMs(pet, Date.now())), tokenId: nft?.tokenId ?? '',
+  });
+  recordDialog.showError(null);
+  if (!nft) recordDialog.sync({ step: 'noNft' });
+  else if (nft.recorded) recordDialog.sync({ step: 'already' });
+  else if (!RANKING_ADDRESS) recordDialog.sync({ step: 'unavailable' });
+  else recordDialog.sync({ step: 'ask' });
+}
+
+/** "Sí": si ya hay cuenta conectada de la adopción, va directo a firmar. */
+async function startRecord() {
+  const m = await getMinter();
+  if (m.account()) await recordSign();
+  else await recordSearch();
+}
+
+async function recordSearch() {
+  if (recordBusy) return;
+  recordDialog.showError(null);
+  recordDialog.sync({ step: 'searching' });
+  try {
+    const m = await getMinter();
+    const inHost = await m.inHost();
+    const wallets = inHost ? [] : await m.wallets();
+    lastWallets = wallets;
+    recordDialog.sync({ step: 'choose', inHost, wallets, suggested: m.suggested });
+  } catch (error) {
+    console.error('[polkapets] registrar: buscar cuenta', error);
+    recordDialog.sync({ step: 'choose', inHost: false, wallets: [], suggested: [] });
+    recordDialog.showError('No se pudo cargar la conexión con Polkadot. Revisa tu conexión y reintenta.');
+  }
+}
+
+async function recordConnect(walletId: string | null) {
+  if (recordBusy) return;
+  recordBusy = true;
+  recordDialog.showError(null);
+  recordDialog.sync({ step: 'connecting', inHost: walletId === null });
+  const m = await getMinter();
+  try {
+    mintAccount = await m.connect(walletId);
+    recordBusy = false;
+    await recordSign();
+  } catch (error) {
+    recordBusy = false;
+    console.warn('[polkapets] registrar: conectar', error);
+    await recordSearch();
+    recordDialog.showError(m.explain(error), () => void recordConnect(walletId));
+  }
+}
+
+async function recordSign() {
+  if (recordBusy || !pet || !nft) return;
+  const m = await getMinter();
+  const account = m.account();
+  if (!account) { await recordSearch(); return; }
+  // Antes de firmar: el contrato solo acepta al dueño del NFT.
+  if (account.address.toLowerCase() !== nft.address.toLowerCase()) {
+    recordDialog.sync({ step: 'wrongAccount', connected: account.address, expected: nft.address });
+    return;
+  }
+  const tokenId = BigInt(nft.tokenId);
+  recordBusy = true;
+  recordDialog.showError(null);
+  recordDialog.sync({ step: 'signing', inHost: account.inHost, progress: 'simulando' });
+  try {
+    if (await m.isRecorded(tokenId)) {
+      recordBusy = false;
+      markNft({ recorded: true });
+      recordDialog.sync({ step: 'already' });
+      return;
+    }
+    await m.record(
+      { tokenId, nombre: nameForContract(pet.name), especie: pet.petId, duracionSeg: ageMs(pet, Date.now()) / 1000 },
+      (step) => { if (step !== 'leyendo') recordDialog.sync({ step: 'signing', inHost: account.inHost, progress: step }); },
+    );
+    recordBusy = false;
+    markNft({ recorded: true });
+    recordDialog.sync({ step: 'done' });
+    gameScreen.say(`${pet.name} quedó en el leaderboard.`);
+  } catch (error) {
+    recordBusy = false;
+    console.warn('[polkapets] registrar', error);
+    const message = m.explain(error);
+    if (/ya está registrada/.test(message)) { markNft({ recorded: true }); recordDialog.sync({ step: 'already' }); return; }
+    recordDialog.sync({ step: 'ask' });
+    recordDialog.showError(message, () => void recordSign());
+  }
+}
 
 function withPet(fn: (p: PetState, now: number) => void) {
   if (pet) fn(pet, Date.now());
@@ -278,6 +442,8 @@ function tick() {
     savePet(pet);
     bathing = false;
     gameScreen.say(`${pet.name} no recibió los cuidados que necesitaba.`);
+    // Pregunta si registrar la partida. Sin NFT avisa que no se puede, solo esta vez.
+    if (nft || deathNoticeFor !== pet.bornAt) { deathNoticeFor = pet.bornAt; openRecord(true); }
   }
   const stage = computeStage(pet, now, config);
   const grown = lastStage ? detectStageChange(lastStage, stage) : null;
@@ -326,12 +492,16 @@ if (params.get('outside') === '1') {
   startScreen.reset();
   useTheme(pet?.petId ?? null);
   showNftNote();
+  setRecordButton();
   showScreen(pet ? 'game' : 'start');
+  // Murió en una sesión anterior y nunca se preguntó: se pregunta ahora (solo con NFT).
+  if (pet?.diedAt !== null && pet && nft && !nft.asked) openRecord(true);
   window.addEventListener('storage', (event) => {
     if (event.key !== PET_STORAGE_KEY || !app.contains(startScreen.root)) return;
     pet = parsePetState(event.newValue);
     nft = pet ? loadNft() : null;
     showNftNote();
+    setRecordButton();
     bathing = false;
     bathProgress = 0;
     action = null;

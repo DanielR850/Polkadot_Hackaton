@@ -1,7 +1,7 @@
 // Cliente de red. Lecturas por el ETH-RPC público; escrituras firmadas por la wallet elegida
 // (MetaMask en un navegador normal, o el Host de Polkadot dentro de la Polkadot App/Desktop).
 // Antes de pedir una firma se simula la llamada: si el contrato la rechazaría, no se molesta al usuario.
-import { createPublicClient, createWalletClient, custom, defineChain, http, type Address, type Hex } from "viem";
+import { createPublicClient, createWalletClient, custom, defineChain, http, type Abi, type Address, type Hex } from "viem";
 import {
   CHAIN_ID,
   CHAIN_NAME,
@@ -116,10 +116,18 @@ export async function leerRanking(): Promise<FilaRanking[]> {
 
 // ───────────────────────────────────────────────────────────── escrituras
 
-export type Escritura =
+/** Otro contrato al que se le firma (el ranking). Sin destino, la llamada va a PolkaPets. */
+export interface Destino { address: Address; abi: Abi }
+
+export type Escritura = (
   | { functionName: "mint"; args: [string, number] }
   | { functionName: "cambiarNombre"; args: [bigint, string] }
-  | { functionName: Accion; args: [bigint] };
+  | { functionName: Accion; args: [bigint] }
+  | { functionName: "registrarMuerte"; args: [bigint, string, number, bigint] }
+) & { destino?: Destino };
+
+/** Contrato y argumentos para viem (simular o enviar). */
+const objetivo = ({ destino, ...llamada }: Escritura) => ({ address: destino?.address ?? PETS_ADDRESS, abi: destino?.abi ?? polkaPetsAbi, ...llamada });
 
 /** Paso visible de una escritura, para mostrar el progreso mientras la persona firma. */
 export type PasoTx = "simulando" | "firma" | "confirmando" | "leyendo";
@@ -140,7 +148,7 @@ export function firmanteEvm(nombre: string, provider: Eip1193Provider, cuenta: A
     cuenta,
     async enviar(llamada, onPaso) {
       await asegurarRed(provider);
-      const { request } = await publicClient.simulateContract({ ...contrato, ...llamada, account: cuenta } as never);
+      const { request } = await publicClient.simulateContract({ ...objetivo(llamada), account: cuenta } as never);
       const wallet = createWalletClient({ account: cuenta, chain: polkadotHub, transport: custom(provider) });
       onPaso?.("firma");
       const hash: Hex = await wallet.writeContract(request as never);
@@ -163,9 +171,12 @@ export function firmanteHost(sesion: SesionHost): Firmante {
 /** Simula por ETH-RPC (si el contrato la rechazaría, no se pide firma) y después firma. */
 async function escribir(firmante: Firmante, llamada: Escritura, onPaso?: (p: PasoTx) => void): Promise<void> {
   onPaso?.("simulando");
-  await publicClient.simulateContract({ ...contrato, ...llamada, account: firmante.cuenta } as never);
+  await publicClient.simulateContract({ ...objetivo(llamada), account: firmante.cuenta } as never);
   await firmante.enviar(llamada, onPaso);
 }
+
+/** Igual que escribir, para otros módulos del cliente (ranking). */
+export const escribirLlamada = escribir;
 
 /** Adopta una mascota. Devuelve el tokenId nuevo. */
 export async function adoptar(firmante: Firmante, nombre: string, especie: number, onPaso?: (p: PasoTx) => void): Promise<bigint> {

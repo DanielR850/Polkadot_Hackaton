@@ -36,6 +36,13 @@ export const HOST_ALLOWANCE_TIMEOUT_MS = 90_000;
 /** Cada cuánto se vuelve a leer la mascota de la cadena (entre lecturas la UI simula el tiempo). */
 export const RELECTURA_MS = 20_000;
 
+/**
+ * Contrato PolkaPetsRanking (contrato/contracts/PolkaPetsRanking.sol), donde se registran las
+ * partidas al morir la mascota. null mientras no esté desplegado: el leaderboard muestra entonces
+ * el ranking de PolkaPets y no se ofrece registrar. Pega aquí la dirección que te dé Remix.
+ */
+export const RANKING_ADDRESS: `0x${string}` | null = "0xf675957A89bfF3e02BD8AeB302Ca2E8Ca6f2a5d2";
+
 /** Ranking: filas por página y máximo de mascotas que se leen. */
 export const RANKING_PAGINA = 50;
 export const RANKING_MAX_LEER = 1_000;

@@ -26,7 +26,12 @@ export interface GameIntents {
   rename(): void;
   ranking(): void;
   restart(): void;
+  /** Registrar la partida en el leaderboard (panel de muerte). Opcional. */
+  record?(): void;
 }
+
+/** Botón de registrar en el panel de muerte: oculto, disponible o ya registrado. */
+export type RecordButton = 'hidden' | 'available' | 'recorded';
 
 export interface GameScreenOptions {
   /** Nota al pie de los cuidados. Por defecto, la del juego local. */
@@ -97,8 +102,12 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   restart.addEventListener('click', intents.restart);
   const deathRanking = h('button', { type: 'button', class: 'ghost' }, 'Ver ranking');
   deathRanking.addEventListener('click', intents.ranking);
+  const deathRecord = h('button', { type: 'button', class: 'primary', hidden: true }, '🏆 Registrar partida');
+  deathRecord.addEventListener('click', () => intents.record?.());
+  const deathRecorded = h('p', { class: 'death-recorded', hidden: true }, '✓ Partida registrada en el leaderboard');
   const deathPanel = h('div', { class: 'mode-panel death-panel', hidden: true },
     h('span', { class: 'death-icon', 'aria-hidden': 'true' }, '🕊️'), h('h2', {}, 'Fin de la partida'), deathTime,
+    deathRecorded, deathRecord,
     h('div', { class: 'row' }, deathRanking, restart));
 
   const careControls = h('div', {}, h('div', { class: 'meters' }, ...bars.map((b) => b.row)), actions, bathPanel, feedback);
@@ -155,6 +164,10 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
     },
     say(text: string) { feedback.textContent = text; },
     setNote(text: string, detail: string) { noteText.textContent = text; noteDetail.textContent = detail; },
+    setRecord(state: RecordButton) {
+      deathRecord.hidden = state !== 'available';
+      deathRecorded.hidden = state !== 'recorded';
+    },
     showToast(text: string) {
       toast.textContent = text;
       toast.hidden = false;

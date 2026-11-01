@@ -387,6 +387,15 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   text-align: left; font-size: 20px; background: #f6c9c4; border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
 }
 .mint-error p { flex: 1; margin: 0; }
+/* Registrar partida */
+.record-head { display: flex; gap: 14px; align-items: center; margin-bottom: 6px; }
+.record-frame { width: 96px; flex: none; }
+.record-summary { flex: 1; width: auto; }
+.record-time { font-family: var(--title); font-size: 14px !important; line-height: 1.8; color: var(--accent-dark); }
+.record-title { font-family: var(--title); font-size: 11px; line-height: 1.6; margin: 12px 0 4px; }
+.record-dialog .mint-error { margin-top: 8px; }
+.death-recorded { margin: 0; font-size: 20px; color: var(--good); }
+
 @media (prefers-reduced-motion: reduce) {
   .mint-egg, .mint-stage .pet-frame, .mint-dots i, .mint-steps .mint-step-dot { animation: none !important; }
 }

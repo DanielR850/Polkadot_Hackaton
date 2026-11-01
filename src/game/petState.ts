@@ -71,10 +71,28 @@ export function isDead(state: PetState, now: number, config: GameConfig = DEFAUL
   return stats.health <= 0 || (stats.hunger <= 0 && stats.thirst <= 0);
 }
 
-/** Guarda la muerte en el estado la primera vez que se detecta. */
+/**
+ * Primer instante (ms) en que la mascota ya está muerta, buscado entre el último cuidado y `now`.
+ * Si la app estuvo cerrada, la muerte ocurrió antes de abrirla: así la duración no se infla.
+ * Búsqueda binaria con precisión de 1 s.
+ */
+export function deathTime(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): number {
+  let lo = state.updatedAt;
+  let hi = now;
+  if (isDead({ ...state, diedAt: null }, lo, config)) return lo;
+  while (hi - lo > 1000) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (isDead({ ...state, diedAt: null }, mid, config)) hi = mid;
+    else lo = mid;
+  }
+  return hi;
+}
+
+/** Guarda la muerte en el estado la primera vez que se detecta, con el momento en que ocurrió. */
 export function markDeadIfNeeded(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
   if (state.diedAt !== null || !isDead(state, now, config)) return state;
-  return { ...state, needs: computeNeeds(state, now, config), updatedAt: now, diedAt: now };
+  const at = deathTime(state, now, config);
+  return { ...state, needs: computeNeeds(state, at, config), updatedAt: at, diedAt: at };
 }
 
 export function lowNeeds(stats: Stats, config: GameConfig = DEFAULT_CONFIG): NeedKey[] {

@@ -36,7 +36,14 @@ export function loadPet(): PetState | null {
 }
 
 /** NFT de la partida actual (solo informativo: los cuidados no van a la cadena). */
-export interface PetNft { tokenId: string; address: string }
+export interface PetNft {
+  tokenId: string;
+  address: string;
+  /** Ya se preguntó si registrar la partida al morir (para no preguntar en cada recarga). */
+  asked?: boolean;
+  /** La partida ya quedó registrada en el leaderboard. */
+  recorded?: boolean;
+}
 export const NFT_STORAGE_KEY = 'tamagotchi-polkadot-nft-v1';
 let nftMemory: string | null = null;
 
@@ -45,7 +52,8 @@ export function loadNft(): PetNft | null {
   try { raw = localStorage.getItem(NFT_STORAGE_KEY); } catch { /* sin localStorage */ }
   try {
     const data = raw ? (JSON.parse(raw) as Partial<PetNft>) : null;
-    return data && typeof data.tokenId === 'string' && typeof data.address === 'string' ? { tokenId: data.tokenId, address: data.address } : null;
+    if (!data || typeof data.tokenId !== 'string' || !/^\d+$/.test(data.tokenId) || typeof data.address !== 'string') return null;
+    return { tokenId: data.tokenId, address: data.address, asked: data.asked === true, recorded: data.recorded === true };
   } catch {
     return null;
   }

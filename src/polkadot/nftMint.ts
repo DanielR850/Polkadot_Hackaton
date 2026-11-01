@@ -6,6 +6,9 @@ import { conectarHost, dentroDelHost } from '../../game/src/contract/host.ts';
 import { adoptar, conectar, firmanteEvm, firmanteHost, numEspecies, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
 import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../../game/src/contract/wallets.ts';
 import { mensajeError } from '../../game/src/lib/txErrors.ts';
+import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../../game/src/contract/ranking.ts';
+
+export type { FilaLeaderboard, Partida };
 
 export type MintStep = PasoTx;
 
@@ -31,6 +34,14 @@ export interface NftMinter {
   mint(name: string, petId: number, onStep?: (step: MintStep) => void): Promise<bigint>;
   /** Página del NFT en Blockscout. */
   nftUrl(tokenId: bigint | string): string;
+  /** Cuenta conectada, o null. */
+  account(): MintAccount | null;
+  /** true si hay contrato de ranking: al morir se puede registrar la partida. */
+  rankingEnabled(): boolean;
+  isRecorded(tokenId: bigint): Promise<boolean>;
+  /** Firma el registro de la partida en el leaderboard. */
+  record(partida: Partida, onStep?: (step: MintStep) => void): Promise<void>;
+  leaderboard(): Promise<FilaLeaderboard[]>;
   /** Texto corto en español para cualquier error de wallet, red o contrato. */
   explain(error: unknown): string;
 }
@@ -39,6 +50,7 @@ export function createNftMinter(): NftMinter {
   let found: WalletInfo[] = [];
   let signer: Firmante | null = null;
   let species = 1;
+  let current: MintAccount | null = null;
 
   return {
     inHost: () => dentroDelHost(),
@@ -59,8 +71,18 @@ export function createNftMinter(): NftMinter {
         signer = firmanteEvm(wallet.nombre, wallet.provider, await conectar(wallet.provider));
       }
       species = await numEspecies();
-      return { via: signer.nombre, address: signer.cuenta, inHost: signer.tipo === 'host', species };
+      current = { via: signer.nombre, address: signer.cuenta, inHost: signer.tipo === 'host', species };
+      return current;
     },
+
+    account: () => current,
+    rankingEnabled: () => rankingActivo(),
+    isRecorded: (tokenId) => yaRegistrada(tokenId),
+    async record(partida, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await registrarPartida(signer, partida, onStep);
+    },
+    leaderboard: () => leerLeaderboard(),
 
     async mint(name, petId, onStep) {
       if (!signer) throw new Error('Conecta tu cuenta primero.');
@@ -72,6 +94,6 @@ export function createNftMinter(): NftMinter {
 
     nftUrl: (tokenId) => `${EXPLORER_URL}/token/${PETS_ADDRESS}/instance/${tokenId}`,
 
-    explain: (error) => mensajeError(error),
+    explain: (error) => errorRanking(error) ?? mensajeError(error),
   };
 }

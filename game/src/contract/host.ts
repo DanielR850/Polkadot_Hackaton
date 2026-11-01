@@ -33,6 +33,8 @@ export interface CuentaHost {
 export interface LlamadaHost {
   functionName: string;
   args: readonly unknown[];
+  /** Otro contrato (por ejemplo, el ranking). Sin esto se llama a PolkaPets. */
+  destino?: { address: Address; abi: readonly unknown[] };
 }
 
 export interface SesionHost {
@@ -237,8 +239,8 @@ export async function conectarHost(): Promise<SesionHost> {
 
   let mapeada = false;
 
-  const contrato = (): ContratoSdk =>
-    cadena.contracts.createContract(cadena.runtime, PETS_ADDRESS, abi, {
+  const contrato = (destino?: LlamadaHost["destino"]): ContratoSdk =>
+    cadena.contracts.createContract(cadena.runtime, destino?.address ?? PETS_ADDRESS, (destino?.abi as ContractsSdk.AbiEntry[] | undefined) ?? abi, {
       defaultOrigin: firma.cuenta.address,
       defaultSigner: firma.cuenta.getSigner(),
     }) as unknown as ContratoSdk;
@@ -266,10 +268,10 @@ export async function conectarHost(): Promise<SesionHost> {
     firma = await abrirFirma(productId);
   };
 
-  const intentar = async ({ functionName, args }: LlamadaHost, onPaso?: (p: "firma" | "confirmando") => void) => {
+  const intentar = async ({ functionName, args, destino }: LlamadaHost, onPaso?: (p: "firma" | "confirmando") => void) => {
     onPaso?.("firma");
     await asegurarMapeo();
-    const metodo = contrato()[functionName];
+    const metodo = contrato(destino)[functionName];
     if (!metodo) throw new Error(`El contrato no tiene la función ${functionName}.`);
     // El SDK avisa signing → broadcasting → in-block → finalized.
     const onStatus = (status: unknown) => {
