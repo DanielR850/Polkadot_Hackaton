@@ -52,6 +52,10 @@ export interface Hub {
   buscarWallets(): Promise<void>;
   conectar(wallet: WalletInfo): Promise<void>;
   conectarHost(): Promise<void>;
+  /** NFT de esta partida. Al conectar se muestra ese en vez de la primera mascota viva. No usa la red. */
+  seguir(tokenId?: bigint): void;
+  /** Entra con una cuenta ya conectada (por ejemplo, la del paso de adopción) sin volver a conectar. */
+  entrarCon(firmante: red.Firmante, tokenId?: bigint): Promise<void>;
   elegirNombre(nombre: string): boolean;
   adoptar(especie: number): Promise<void>;
   cuidar(accion: Accion): Promise<boolean>;
@@ -91,6 +95,8 @@ export function createHub(): Hub {
   let desuscribirWallet: (() => void) | null = null;
   /** La sesión del Host se reutiliza: volver a conectar no vuelve a pedir permisos. */
   let sesionHost: SesionHost | null = null;
+  /** NFT que se sigue en esta partida (seguir / entrarCon). null = la primera mascota viva. */
+  let seguido: bigint | null = null;
 
   const set = (patch: Partial<HubState>) => {
     state = { ...state, ...patch };
@@ -156,7 +162,10 @@ export function createHub(): Hub {
     set({ firmante, cuenta: firmante.cuenta, numEspecies });
     void actualizarSaldo();
     const mascotas = await red.cargarMascotas(firmante.cuenta);
-    const viva = mascotas.find((m) => m.viva);
+    // Con un NFT seguido solo cuenta ese, y solo si es de esta cuenta; si no, como antes.
+    const viva = seguido !== null
+      ? mascotas.find((m) => m.tokenId === seguido && m.viva)
+      : mascotas.find((m) => m.viva);
     if (viva) {
       mostrarMascota(viva);
       set({ aviso: `¡Hola de nuevo! ${viva.nombre} te estaba esperando.` });
@@ -214,6 +223,17 @@ export function createHub(): Hub {
         sesionHost ??= await conectarHost();
         await entrar(red.firmanteHost(sesionHost));
       });
+    },
+
+    seguir(tokenId) {
+      seguido = tokenId ?? null;
+    },
+
+    async entrarCon(firmante, tokenId) {
+      if (tokenId !== undefined) seguido = tokenId;
+      const ok = await operar("Cargando tu mascota…", () => entrar(firmante));
+      // Si falla la red, se puede reintentar conectando desde la pantalla de cuenta.
+      if (!ok && state.pantalla === "inicio") set({ pantalla: "conectar" });
     },
 
     elegirNombre(nombre) {
@@ -278,6 +298,7 @@ export function createHub(): Hub {
     },
 
     salir() {
+      seguido = null;
       pararRelectura();
       desuscribirWallet?.();
       desuscribirWallet = null;
