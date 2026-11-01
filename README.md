@@ -37,6 +37,7 @@ Los ajustes visuales y del ranking del commit `1abcef1` no cambiaron Solidity y 
 - [Registro de assets](docs/ASSETS.md)
 - [Mascotas y animaciones](docs/ANIMACIONES.md)
 - [Publicación](docs/PUBLICACION.md)
+- [Experimento de jugabilidad](docs/JUGABILIDAD-EXPERIMENTO.md)
 
 Los commits de las ramas integradas se conservan en `codex/integracion-total`.
 

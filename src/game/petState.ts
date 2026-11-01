@@ -101,8 +101,14 @@ export function feed(state: PetState, itemId: string, now: number, config: GameC
   return careAction(state, now, config, item.effects);
 }
 
-export function play(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
-  return careAction(state, now, config, { happiness: 20, energy: -12, cleanliness: -5, thirst: -5 });
+export function play(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG, catches = 5): PetState {
+  const hits = Number.isFinite(catches) ? Math.max(0, Math.min(5, Math.floor(catches))) : 0;
+  return careAction(state, now, config, {
+    happiness: hits === 0 ? 0 : 5 + hits * 5,
+    energy: -4 - hits * 2,
+    thirst: -2 - hits,
+    cleanliness: -1 - hits,
+  });
 }
 
 /** `scrubPercent` (0–100) es cuánto se frotó en la escena del baño. Se aplica una sola vez al salir. */

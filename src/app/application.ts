@@ -13,6 +13,7 @@ import { createMockRanking } from '../game/ranking.ts';
 import { loadPet, parsePetState, PET_STORAGE_KEY, savePet } from '../game/storage.ts';
 import type { NeedKey, PetState, Stage } from '../game/types.ts';
 import { h } from '../ui/dom.ts';
+import { createBallGame } from '../ui/ballGame.ts';
 import { createFeedMenu } from '../ui/feedMenu.ts';
 import { formatDuration, STAGE_LABEL } from '../ui/format.ts';
 import { createGameScreen, type GameMode } from '../ui/gameScreen.ts';
@@ -77,7 +78,7 @@ function useTheme(petId: number | null) {
 
 const gameScreen = createGameScreen({
   feed: () => feedMenu.open(),
-  play: () => withPet((p, now) => commit(play(p, now, config), '¡Se divirtió muchísimo jugando contigo!', { anim: 'play', icon: '🎾' })),
+  play: () => ballGame.open(),
   sleep: () => withPet((p, now) => commit(sleep(p, now, config), 'Shhh… está durmiendo.')),
   wake: () => withPet((p, now) => commit(wake(p, now, config), '¡Buenos días! Ya despertó.')),
   bath: () => {
@@ -113,6 +114,13 @@ const feedMenu = createFeedMenu((itemId) => withPet((p, now) => {
   const item = findItem(itemId);
   if (!item) return;
   commit(feed(p, itemId, now, config), `¡Qué rico! Le diste ${item.label.toLowerCase()}.`, { anim: 'eat', icon: item.icon });
+}));
+
+const ballGame = createBallGame((catches) => withPet((p, now) => {
+  const message = catches === 5
+    ? '¡Perfecto! Atraparon las 5 pelotas.'
+    : `Atraparon ${catches} de 5 pelotas. ¡Pueden intentarlo otra vez!`;
+  commit(play(p, now, config, catches), message, { anim: 'play', icon: '🎾' });
 }));
 
 const renameDialog = createRenameDialog((name) => withPet((p, now) => commit(rename(p, name, now, config), `Ahora se llama ${name}.`)));
