@@ -121,13 +121,16 @@ export type Escritura =
   | { functionName: "cambiarNombre"; args: [bigint, string] }
   | { functionName: Accion; args: [bigint] };
 
+/** Paso visible de una escritura, para mostrar el progreso mientras la persona firma. */
+export type PasoTx = "simulando" | "firma" | "confirmando" | "leyendo";
+
 /** Quien firma: una wallet EVM del navegador (MetaMask…) o el Host de Polkadot. */
 export interface Firmante {
   tipo: "evm" | "host";
   nombre: string;
   cuenta: Address;
   /** Firma y envía una llamada ya simulada. Resuelve cuando entra en la cadena. */
-  enviar(llamada: Escritura): Promise<void>;
+  enviar(llamada: Escritura, onPaso?: (p: PasoTx) => void): Promise<void>;
 }
 
 export function firmanteEvm(nombre: string, provider: Eip1193Provider, cuenta: Address): Firmante {
@@ -135,11 +138,13 @@ export function firmanteEvm(nombre: string, provider: Eip1193Provider, cuenta: A
     tipo: "evm",
     nombre,
     cuenta,
-    async enviar(llamada) {
+    async enviar(llamada, onPaso) {
       await asegurarRed(provider);
       const { request } = await publicClient.simulateContract({ ...contrato, ...llamada, account: cuenta } as never);
       const wallet = createWalletClient({ account: cuenta, chain: polkadotHub, transport: custom(provider) });
+      onPaso?.("firma");
       const hash: Hex = await wallet.writeContract(request as never);
+      onPaso?.("confirmando");
       const recibo = await publicClient.waitForTransactionReceipt({ hash, timeout: TX_TIMEOUT_MS });
       if (recibo.status !== "success") throw new Error("La transacción se revirtió en la cadena.");
     },
@@ -151,21 +156,23 @@ export function firmanteHost(sesion: SesionHost): Firmante {
     tipo: "host",
     nombre: "Polkadot App",
     cuenta: sesion.cuenta.h160,
-    enviar: (llamada) => sesion.enviar(llamada),
+    enviar: (llamada, onPaso) => sesion.enviar(llamada, onPaso),
   };
 }
 
 /** Simula por ETH-RPC (si el contrato la rechazaría, no se pide firma) y después firma. */
-async function escribir(firmante: Firmante, llamada: Escritura): Promise<void> {
+async function escribir(firmante: Firmante, llamada: Escritura, onPaso?: (p: PasoTx) => void): Promise<void> {
+  onPaso?.("simulando");
   await publicClient.simulateContract({ ...contrato, ...llamada, account: firmante.cuenta } as never);
-  await firmante.enviar(llamada);
+  await firmante.enviar(llamada, onPaso);
 }
 
 /** Adopta una mascota. Devuelve el tokenId nuevo. */
-export async function adoptar(firmante: Firmante, nombre: string, especie: number): Promise<bigint> {
+export async function adoptar(firmante: Firmante, nombre: string, especie: number, onPaso?: (p: PasoTx) => void): Promise<bigint> {
   const cuenta = firmante.cuenta;
   const antes = new Set((await mascotasDe(cuenta)).map(String));
-  await escribir(firmante, { functionName: "mint", args: [nombre.trim(), especie] });
+  await escribir(firmante, { functionName: "mint", args: [nombre.trim(), especie] }, onPaso);
+  onPaso?.("leyendo");
   // El ETH-RPC puede ir un bloque atrás: se relee unas veces antes de rendirse.
   for (let intento = 0; intento < 4; intento++) {
     if (intento > 0) await new Promise((r) => setTimeout(r, 2_000));

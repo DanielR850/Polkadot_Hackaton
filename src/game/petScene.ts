@@ -12,8 +12,11 @@ export interface SceneView { petId: PetId; stage: Stage; anim: PetAnim }
 
 export interface PetSceneHandle {
   show(view: SceneView): void;
-  /** Rebote y un emoji que flota (comer, beber o jugar). */
-  react(icon: string): void;
+  /**
+   * Rebote y un emoji que flota (jugar). Con `kind: 'eat'` el emoji es la comida: la mascota la
+   * sostiene junto a la boca y le da mordidas, como los cuadros del ajolote bebé.
+   */
+  react(icon: string, kind?: 'eat' | 'play'): void;
   /** Reinicia el progreso del baño a 0. */
   resetBath(): void;
   /** Colores de pared de la habitación, para que combinen con el tema de la mascota. */
@@ -38,6 +41,27 @@ const MX = {
   turquoise: 0x00a6a6, blue: 0x1f4fa3, purple: 0x7b2d8e, red: 0xd7263d,
 };
 const INK = 0x302b43;
+
+/**
+ * Posición de la boca en cada ilustración, como fracción del cuadro (0–1), medida a ojo sobre
+ * `public/assets/pets/<especie>/<etapa>.png`. Sirve para que la comida quede en la boca.
+ * El ajolote bebé no aparece: su hoja ya trae los cuadros de comer con la fresa.
+ */
+const MOUTH: Record<number, Partial<Record<Stage, { x: number; y: number }>>> = {
+  0: { teen: { x: 0.37, y: 0.48 }, adult: { x: 0.4, y: 0.46 } },
+  1: { baby: { x: 0.72, y: 0.52 }, teen: { x: 0.75, y: 0.44 }, adult: { x: 0.81, y: 0.33 } },
+  2: { baby: { x: 0.73, y: 0.52 }, teen: { x: 0.77, y: 0.42 }, adult: { x: 0.82, y: 0.31 } },
+  3: { baby: { x: 0.79, y: 0.59 }, teen: { x: 0.81, y: 0.53 }, adult: { x: 0.83, y: 0.47 } },
+  4: { baby: { x: 0.85, y: 0.53 }, teen: { x: 0.88, y: 0.49 }, adult: { x: 0.9, y: 0.45 } },
+};
+/** Color de las migajas según la comida. */
+const CRUMB: Record<string, number[]> = {
+  '🍎': [0xd7263d, 0xfff3d6], '🍓': [0xd7263d, 0x2e9e4f], '🍚': [0xffffff, 0xf2e8d0], '🍰': [0xffd9e6, 0xfff3d6],
+  '💧': [0x7fc8f8, 0xd8f0ff], '🥛': [0xffffff, 0xeef4ff], '🧃': [0xff8c1a, 0xffd23f], '🍵': [0x9bc65a, 0xd8f0c0],
+};
+const DRINKS = new Set(['💧', '🥛', '🧃', '🍵']);
+/** Mordidas dentro de la animación de comer (ms desde que empieza). Dura lo mismo que ACTION_MS. */
+const BITES = [180, 520, 860];
 
 /** La hoja del ajolote bebé trae un fondo granate en cada cuadro. Se elimina
  * al cargarla para que el personaje comparta la habitación con las demás edades. */
@@ -113,6 +137,11 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private scrub = { progress: 0, lastX: 0, lastY: 0, lastT: 0, lastBubble: 0 };
     private roomColors: RoomColors = { wall: 0xc9d3de, stripe: 0xbcc7d4 };
     private roomGfx: Phaser.GameObjects.Graphics | null = null;
+    /** Comida que se va a comer en la próxima animación `eat` (la pone react). */
+    private pendingFood = '🍓';
+    /** Objetos y temporizadores de la animación de comer, para limpiarlos al cambiar de estado. */
+    private eatObjects: Phaser.GameObjects.GameObject[] = [];
+    private eatTimers: Phaser.Time.TimerEvent[] = [];
 
     constructor() { super('room'); }
 
@@ -186,7 +215,13 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (this.ready) this.apply(view);
     }
 
-    react(icon: string) {
+    react(icon: string, kind?: 'eat' | 'play') {
+      if (kind === 'eat') {
+        // La comida aparece en la boca cuando llega el estado `eat` (animateSprite).
+        this.pendingFood = icon;
+        if (this.ready && this.view?.anim === 'eat') { this.drawnKey = ''; this.apply(this.view); }
+        return;
+      }
       if (!this.ready || !this.view) return;
       const s = STAGE_SCALE[this.view.stage];
       this.tweens.add({ targets: this.petRoot, scaleX: s * 1.12, scaleY: s * 1.12, duration: 140, yoyo: true, ease: 'Back.Out' });
@@ -230,10 +265,91 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (spriteAnim) {
         this.sprite.play(spriteAnim.key);
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
-        this.animateSprite(view, (BODY.ry * 3) / spriteAnim.frameHeight);
+        const scale = (BODY.ry * 3) / spriteAnim.frameHeight;
+        this.animateSprite(view, scale);
+        this.clearEat();
+        if (view.anim === 'eat') {
+          const hasFrames = spriteAnim.key === spriteKey(view.petId, view.stage, 'eat');
+          this.playEat(view, scale, hasFrames);
+        }
         return;
       }
+      this.clearEat();
       this.paintPlaceholder(view);
+    }
+
+    private clearEat() {
+      for (const t of this.eatTimers) t.remove(false);
+      for (const o of this.eatObjects) { this.tweens.killTweensOf(o); o.destroy(); }
+      this.eatTimers = [];
+      this.eatObjects = [];
+    }
+
+    /**
+     * Comer, como los cuadros del ajolote bebé: sostiene la comida junto a la boca, le da tres
+     * mordidas (se inclina hacia ella, se aplasta y suelta migajas), la comida se achica y al final
+     * mastica contento. Si la ilustración ya trae cuadros de comer, solo se agregan las migajas.
+     */
+    private playEat(view: SceneView, scale: number, hasFrames: boolean) {
+      const food = this.pendingFood;
+      const drink = DRINKS.has(food);
+      const fw = this.sprite.frame.width * scale;
+      const fh = this.sprite.frame.height * scale;
+      const m = MOUTH[view.petId]?.[view.stage] ?? { x: 0.62, y: 0.45 };
+      const mouth = { x: (m.x - 0.5) * fw, y: (m.y - 0.5) * fh };
+      // Mira a la derecha (x > 0.5): la comida va delante de la boca; si mira al frente, debajo.
+      const front = m.x > 0.55;
+      const hold = { x: mouth.x + (front ? 16 : 6), y: mouth.y + (front ? 6 : 20) };
+      const colors = CRUMB[food] ?? [0xfff3d6, 0xd9873a];
+
+      let item: Phaser.GameObjects.Text | null = null;
+      if (!hasFrames) {
+        item = this.add.text(hold.x, hold.y + 18, food, { fontSize: '30px' }).setOrigin(0.5).setAlpha(0).setScale(0.6);
+        this.bobber.add(item);
+        this.eatObjects.push(item);
+        // Llega a la boca.
+        this.tweens.add({ targets: item, y: hold.y, alpha: 1, scale: 1, duration: 160, ease: 'Back.Out' });
+      }
+
+      const bite = (index: number) => {
+        // Se inclina hacia la comida y se aplasta, como al morder.
+        this.tweens.add({
+          targets: this.sprite, angle: front ? 6 : -4, x: front ? 5 : 0, y: 4,
+          scaleX: scale * 1.05, scaleY: scale * 0.92, duration: 90, yoyo: true, ease: 'Quad.Out',
+        });
+        if (item) {
+          const left = 1 - (index + 1) / BITES.length;
+          this.tweens.add({ targets: item, x: mouth.x + (front ? 6 : 2), duration: 90, yoyo: true, ease: 'Quad.Out' });
+          this.tweens.add({ targets: item, scale: Math.max(left, 0.15) * (drink ? 1 : 0.95) + (drink ? 0.1 : 0), angle: index % 2 ? 8 : -8, duration: 120 });
+          if (left <= 0) this.tweens.add({ targets: item, alpha: 0, scale: 0.1, delay: 120, duration: 140 });
+        }
+        // Migajas (o gotas) que saltan y caen.
+        for (let i = 0; i < (drink ? 2 : 3); i++) {
+          const color = colors[i % colors.length];
+          const crumb = drink
+            ? this.add.circle(mouth.x + 6, mouth.y + 6, 3, color).setStrokeStyle(1, 0x5aa7c9)
+            : this.add.rectangle(mouth.x + 6, mouth.y + 6, 5, 5, color).setStrokeStyle(1, INK);
+          this.bobber.add(crumb);
+          this.eatObjects.push(crumb);
+          const dx = Phaser.Math.Between(front ? 4 : -22, 24);
+          this.tweens.add({
+            targets: crumb, x: crumb.x + dx, y: crumb.y - Phaser.Math.Between(8, 18), duration: 140, ease: 'Quad.Out',
+            onComplete: () => this.tweens.add({ targets: crumb, y: crumb.y + 46, alpha: 0, angle: 90, duration: 420, ease: 'Quad.In' }),
+          });
+        }
+      };
+      BITES.forEach((at, i) => this.eatTimers.push(this.time.delayedCall(at, () => bite(i))));
+
+      // Al terminar: mastica contento con un brillo, como los ojos cerrados del ajolote.
+      this.eatTimers.push(this.time.delayedCall(BITES[BITES.length - 1] + 260, () => {
+        this.tweens.add({ targets: this.sprite, scaleY: scale * 0.96, duration: 110, yoyo: true, repeat: 1, ease: 'Sine.inOut' });
+        const happy = this.add.text(mouth.x - (front ? 34 : 0), mouth.y - fh * 0.32, drink ? '♪' : '✦', {
+          fontFamily: 'system-ui, sans-serif', fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: '#302b43', strokeThickness: 4,
+        }).setOrigin(0.5).setAlpha(0);
+        this.bobber.add(happy);
+        this.eatObjects.push(happy);
+        this.tweens.add({ targets: happy, alpha: 1, y: happy.y - 18, duration: 220, yoyo: true, hold: 120, ease: 'Sine.out' });
+      }));
     }
 
     /** Da movimiento propio a los retratos de un fotograma en cada estado del juego. */
@@ -264,7 +380,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         return;
       }
       if (anim === 'eat') {
-        this.tweens.add({ targets: this.sprite, angle: -7, scaleY: scale * 0.94, duration: 180, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        // Las mordidas las anima playEat; aquí solo se acerca un poco a la comida.
+        this.sprite.setY(2);
         return;
       }
       if (anim === 'bath') {

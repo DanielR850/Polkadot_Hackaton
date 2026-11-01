@@ -7,6 +7,8 @@ import type { GameConfig, NeedKey, Needs, PetId, PetState, Stage, Stats } from '
 
 export const NEED_KEYS: readonly NeedKey[] = ['hunger', 'thirst', 'energy', 'happiness', 'cleanliness'];
 export const NAME_MAX_LENGTH = 16;
+/** Límite del contrato PolkaPets (NOMBRE_MAX): 24 bytes UTF-8. La ñ y los acentos ocupan 2. */
+export const NAME_MAX_BYTES = 24;
 const MINUTE = 60_000;
 const START_VALUE = 80;
 const STAGE_ORDER: readonly Stage[] = ['baby', 'teen', 'adult'];
@@ -19,6 +21,7 @@ export function validateName(raw: string): NameResult {
   const value = raw.trim().replace(/\s+/g, ' ');
   if (value.length === 0) return { ok: false, error: 'Escribe un nombre.' };
   if ([...value].length > NAME_MAX_LENGTH) return { ok: false, error: `Máximo ${NAME_MAX_LENGTH} caracteres.` };
+  if (new TextEncoder().encode(value).length > NAME_MAX_BYTES) return { ok: false, error: 'Muy largo: la ñ, los acentos y los emojis cuentan doble o más.' };
   return { ok: true, value };
 }
 

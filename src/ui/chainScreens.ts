@@ -166,15 +166,19 @@ export function createChainSpeciesScreen(onAdopt: (petId: number) => void, onBac
     const swatch = h('span', { class: 'pet-swatch', style: `--pet:${hex(pet.color)};--pet-belly:${hex(pet.belly)};--pet-line:${hex(pet.outline)}`, 'aria-hidden': 'true' });
     const portrait = h('img', { class: 'pet-portrait', src: portraitUrl(pet.slug), alt: '', draggable: 'false' });
     portrait.addEventListener('error', () => portrait.replaceWith(swatch), { once: true });
+    const note = h('small', { class: 'pet-locked', hidden: true }, 'Aún no en este contrato');
     return h('label', { class: 'pet-option' },
       h('input', { type: 'radio', name: 'nft-pet', value: pet.id, class: 'sr-only', checked: index === 0 }),
       h('span', { class: 'pet-frame' }, portrait),
       h('b', {}, pet.label),
-      h('small', {}, pet.description));
+      h('small', {}, pet.description),
+      note);
   });
   const grid = h('div', { class: 'pet-grid', role: 'radiogroup', 'aria-label': 'Mascotas' }, ...cards);
+  const lockedHint = h('p', { class: 'hint', hidden: true });
   const form = h('form', { class: 'select-form' },
     grid,
+    lockedHint,
     h('div', { class: 'row' }, back, adopt));
   const root = h('section', { class: 'screen select-screen', 'aria-label': 'Elegir mascota' },
     h('span', { class: 'eyebrow' }, 'PASO 3 DE 3'), title,
@@ -188,16 +192,25 @@ export function createChainSpeciesScreen(onAdopt: (petId: number) => void, onBac
 
   return {
     root,
-    /** `available`: especies que admite el contrato desplegado (las demás se ocultan). */
+    /**
+     * Se muestran las cinco especies. `available` es cuántas admite el contrato desplegado
+     * (`NUM_ESPECIES`): las demás se ven, pero no se pueden adoptar todavía.
+     */
     sync(name: string, busy: boolean, available: number) {
       title.textContent = `Elige a ${name || 'tu mascota'}`;
       adopt.disabled = busy;
       back.disabled = busy;
-      cards.forEach((card, index) => { card.hidden = index >= available; });
-      grid.classList.toggle('chain-pet-grid', available <= 1);
-      const checked = form.querySelector<HTMLInputElement>('input:checked');
-      if (!checked || Number(checked.value) >= available) form.querySelector<HTMLInputElement>('input')!.checked = true;
-      for (const input of form.querySelectorAll('input')) input.disabled = busy;
+      const inputs = [...form.querySelectorAll<HTMLInputElement>('input')];
+      cards.forEach((card, index) => {
+        const locked = index >= available;
+        card.classList.toggle('locked', locked);
+        card.querySelector<HTMLElement>('.pet-locked')!.hidden = !locked;
+        inputs[index].disabled = busy || locked;
+      });
+      if (!inputs.some((input) => input.checked && !input.disabled) && inputs[0]) inputs[0].checked = true;
+      const lockedCount = PETS.length - Math.min(available, PETS.length);
+      lockedHint.hidden = lockedCount === 0;
+      lockedHint.textContent = `El contrato actual solo admite ${available === 1 ? 'el ajolote' : `${available} especies`}. Las demás se activan al desplegar el contrato nuevo.`;
     },
   };
 }

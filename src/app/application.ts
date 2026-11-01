@@ -1,5 +1,6 @@
-// Controlador: interpreta las intenciones de la interfaz, aplica las reglas del juego y actualiza
-// la escena y las pantallas. Todo es local; ninguna acción pide firma (ver README).
+﻿// Controlador: interpreta las intenciones de la interfaz, aplica las reglas del juego y actualiza
+// la escena y las pantallas. Flujo: nombre → mascota → adoptar NFT (paso opcional) → habitación.
+// Adoptar es la única firma; los cuidados son locales y gratis (ver README).
 import { pickAnimation, type PetAnim } from '../game/animations.ts';
 import { findItem } from '../game/catalog.ts';
 import { DEFAULT_CONFIG, withSpeed } from '../game/config.ts';
@@ -10,12 +11,16 @@ import {
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
 import { createMockRanking } from '../game/ranking.ts';
-import { loadPet, parsePetState, PET_STORAGE_KEY, savePet } from '../game/storage.ts';
+import { loadNft, loadPet, parsePetState, PET_STORAGE_KEY, saveNft, savePet, type PetNft } from '../game/storage.ts';
+import type { MintAccount, MintWallet, NftMinter } from '../polkadot/nftMint.ts';
 import type { NeedKey, PetState, Stage } from '../game/types.ts';
 import { h } from '../ui/dom.ts';
 import { createFeedMenu } from '../ui/feedMenu.ts';
 import { formatDuration, STAGE_LABEL } from '../ui/format.ts';
 import { createGameScreen, type GameMode } from '../ui/gameScreen.ts';
+import { createMintScreen } from '../ui/mintScreen.ts';
+import { createSoundControl } from '../ui/soundControl.ts';
+import { createMusic, loadSoundPrefs, saveSoundPrefs } from '../infrastructure/audio/music.ts';
 import { createRankingDialog } from '../ui/rankingDialog.ts';
 import { createRenameDialog } from '../ui/renameDialog.ts';
 import { createSelectScreen } from '../ui/selectScreen.ts';
@@ -28,9 +33,15 @@ const config = withSpeed(DEFAULT_CONFIG, Number(params.get('speed') ?? 1));
 const app = document.querySelector<HTMLElement>('#app')!;
 const ACTION_MS = 1200;
 
-type Screen = 'start' | 'select' | 'game';
+type Screen = 'start' | 'select' | 'mint' | 'game';
 
 let pet: PetState | null = loadPet();
+let nft: PetNft | null = pet ? loadNft() : null;
+let draftPetId = 0;
+let minter: NftMinter | null = null;
+let mintBusy = false;
+let mintAccount: MintAccount | null = null;
+let lastWallets: MintWallet[] = [];
 let bathing = false;
 let bathProgress = 0;
 let action: { anim: 'eat' | 'play'; until: number } | null = null;
@@ -43,26 +54,116 @@ const startScreen = createStartScreen((name) => {
   draftName = name;
   selectScreen.reset(name);
   showScreen('select');
-}, () => { void openContractGame(); });
+});
 
 const selectScreen = createSelectScreen((petId) => {
-  pet = createPet(petId, draftName, Date.now());
-  savePet(pet);
+  draftPetId = petId;
   useTheme(petId);
-  lastStage = 'baby';
-  showScreen('game');
-  gameScreen.say(`¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
+  mintScreen.reset(draftName, petId);
+  showScreen('mint');
+  void prepareMint();
 }, () => showScreen('start'), useTheme);
 
-async function openContractGame() {
+/** Crea la partida local y entra a la habitación, con o sin NFT. */
+function startGame(minted: PetNft | null) {
+  pet = createPet(draftPetId, draftName, Date.now());
+  savePet(pet);
+  nft = minted;
+  saveNft(minted);
+  showNftNote();
+  lastStage = 'baby';
+  showScreen('game');
+  gameScreen.say(minted
+    ? `¡${pet.name} ya es tu NFT #${minted.tokenId}! Cuidarla es gratis.`
+    : `¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
+}
+
+/* --------------------------------------------------- paso 3: adoptar NFT */
+
+/** NFT recién adoptado, mientras se muestra la pantalla de adopción completada. */
+let minted: PetNft | null = null;
+
+const mintScreen = createMintScreen({
+  connect: (walletId) => void connectWallet(walletId),
+  retry: () => void prepareMint(),
+  mint: () => void mintNft(),
+  skip: () => { if (!mintBusy) startGame(null); },
+  back: () => { if (!mintBusy) showScreen('select'); },
+  enter: () => { if (minted) startGame(minted); minted = null; },
+});
+
+/** El SDK y viem se cargan solo al llegar a este paso. */
+async function getMinter(): Promise<NftMinter> {
+  minter ??= (await import('../polkadot/nftMint.ts')).createNftMinter();
+  return minter;
+}
+
+async function prepareMint() {
+  mintScreen.showError(null);
+  mintScreen.sync({ step: 'searching' });
   try {
-    // Mismo estilo retro que el juego local; solo cambia de dónde salen los datos (el contrato).
-    const { startChainApp } = await import('./chainApplication.ts');
-    startChainApp(app, () => window.location.reload());
+    const m = await getMinter();
+    const inHost = await m.inHost();
+    const wallets = inHost ? [] : await m.wallets();
+    lastWallets = wallets;
+    if (screen === 'mint' && !mintBusy) mintScreen.sync({ step: 'choose', inHost, wallets, suggested: m.suggested });
   } catch (error) {
-    console.error('No se pudo abrir el juego con contrato:', error);
-    startScreen.say('No se pudo cargar el modo Polkadot. Revisa la conexión e inténtalo de nuevo.');
+    console.error('[polkapets] preparar mint', error);
+    mintScreen.sync({ step: 'choose', inHost: false, wallets: [], suggested: [] });
+    mintScreen.showError('No se pudo cargar la conexión con Polkadot. Reintenta o juega sin NFT.');
   }
+}
+
+async function connectWallet(walletId: string | null) {
+  if (mintBusy) return;
+  mintBusy = true;
+  mintScreen.showError(null);
+  const m = await getMinter();
+  const walletName = walletId === null ? 'Polkadot App' : lastWallets.find((w) => w.id === walletId)?.name ?? 'tu wallet';
+  mintScreen.sync({ step: 'connecting', inHost: walletId === null, via: walletName });
+  try {
+    mintAccount = await m.connect(walletId);
+    mintBusy = false;
+    syncConnected();
+  } catch (error) {
+    mintBusy = false;
+    console.warn('[polkapets] conectar', error);
+    await prepareMint();
+    mintScreen.showError(m.explain(error), () => void connectWallet(walletId));
+  }
+}
+
+function syncConnected() {
+  if (!mintAccount) return;
+  // Cualquier especie se puede adoptar: si el contrato no la admite, el mint usa el comodín (0).
+  mintScreen.sync({ step: 'connected', via: mintAccount.via, address: mintAccount.address, inHost: mintAccount.inHost });
+}
+
+async function mintNft() {
+  if (mintBusy || !minter || !mintAccount) return;
+  const account = mintAccount;
+  mintBusy = true;
+  mintScreen.showError(null);
+  mintScreen.sync({ step: 'minting', inHost: account.inHost, progress: 'simulando' });
+  try {
+    const tokenId = await minter.mint(draftName, draftPetId, (progress) => {
+      mintScreen.sync({ step: 'minting', inHost: account.inHost, progress });
+    });
+    mintBusy = false;
+    minted = { tokenId: tokenId.toString(), address: account.address };
+    mintScreen.sync({ step: 'done', tokenId: minted.tokenId, url: minter.nftUrl(tokenId) });
+  } catch (error) {
+    mintBusy = false;
+    console.warn('[polkapets] mint', error);
+    syncConnected();
+    mintScreen.showError(minter.explain(error), () => void mintNft());
+  }
+}
+
+/** Nota de la habitación: dice si la mascota es NFT. */
+function showNftNote() {
+  if (nft) gameScreen.setNote(`Tu mascota es el NFT #${nft.tokenId} en Polkadot Hub.`, 'Cuidarla es gratis: se guarda en este dispositivo.');
+  else gameScreen.setNote('Tu partida se guarda en este dispositivo.', 'Cuidarla es gratis: no pide firmas.');
 }
 
 /** Aplica el tema de la especie y sincroniza el color de la habitación Phaser. */
@@ -97,6 +198,8 @@ const gameScreen = createGameScreen({
   restart: () => {
     pet = null;
     savePet(null);
+    nft = null;
+    saveNft(null);
     useTheme(null);
     bathing = false;
     action = null;
@@ -116,7 +219,7 @@ const renameDialog = createRenameDialog((name) => withPet((p, now) => commit(ren
 
 const rankingDialog = createRankingDialog(createMockRanking(() => pet
   ? { id: 'me', petName: pet.name, petId: pet.petId, aliveMs: ageMs(pet, Date.now()), isMine: true }
-  : null), () => { void openContractGame(); });
+  : null));
 
 function withPet(fn: (p: PetState, now: number) => void) {
   if (pet) fn(pet, Date.now());
@@ -129,7 +232,7 @@ function commit(next: PetState, message: string, reaction?: { anim: 'eat' | 'pla
   savePet(pet);
   if (reaction) {
     action = { anim: reaction.anim, until: Date.now() + ACTION_MS };
-    scene?.react(reaction.icon);
+    scene?.react(reaction.icon, reaction.anim);
     // Reactiva los botones justo al terminar la animación, sin esperar al siguiente segundo.
     window.setTimeout(render, ACTION_MS + 20);
   }
@@ -188,6 +291,7 @@ function showScreen(next: Screen) {
   screen = next;
   startScreen.root.hidden = next !== 'start';
   selectScreen.root.hidden = next !== 'select';
+  mintScreen.root.hidden = next !== 'mint';
   gameScreen.root.hidden = next !== 'game';
   if (next === 'start') startScreen.focus();
   if (next === 'game') {
@@ -205,13 +309,29 @@ if (params.get('outside') === '1') {
     h('span', { class: 'eyebrow' }, 'POLKADOT'), h('h1', { class: 'title' }, 'Esta vista de Polkadot Desktop aún no está conectada'),
     h('p', { class: 'hint' }, 'El juego local funciona en el navegador. La integración con el Host todavía está pendiente.')));
 } else {
-  app.append(startScreen.root, selectScreen.root, gameScreen.root);
+  app.append(startScreen.root, selectScreen.root, mintScreen.root, gameScreen.root);
+
+  // Música de fondo: empieza con el primer toque, clic o tecla (los navegadores no dejan antes).
+  const prefs = loadSoundPrefs();
+  const music = createMusic(prefs);
+  const sound = createSoundControl(prefs, (next) => {
+    saveSoundPrefs(next);
+    music.setVolume(next.volume);
+    music.setMuted(next.muted);
+  });
+  document.body.append(sound.root);
+  const unlock = () => music.unlock();
+  document.addEventListener('pointerdown', unlock, { once: true });
+  document.addEventListener('keydown', unlock, { once: true });
   startScreen.reset();
   useTheme(pet?.petId ?? null);
+  showNftNote();
   showScreen(pet ? 'game' : 'start');
   window.addEventListener('storage', (event) => {
     if (event.key !== PET_STORAGE_KEY || !app.contains(startScreen.root)) return;
     pet = parsePetState(event.newValue);
+    nft = pet ? loadNft() : null;
+    showNftNote();
     bathing = false;
     bathProgress = 0;
     action = null;

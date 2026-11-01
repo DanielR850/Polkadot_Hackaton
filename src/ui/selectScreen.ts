@@ -26,7 +26,7 @@ export function createSelectScreen(onConfirm: (petId: PetId) => void, onBack: ()
     h('div', { class: 'pet-grid', role: 'radiogroup', 'aria-label': 'Mascotas' }, ...cards),
     h('div', { class: 'row' }, back, confirm));
   const root = h('section', { class: 'screen select-screen', 'aria-label': 'Elegir mascota' },
-    h('span', { class: 'eyebrow' }, 'PASO 2 DE 2'), h('h1', { class: 'title' }, 'Elige tu mascota'), greeting, form);
+    h('span', { class: 'eyebrow' }, 'PASO 2 DE 3'), h('h1', { class: 'title' }, 'Elige tu mascota'), greeting, form);
 
   form.addEventListener('change', () => {
     const checked = form.querySelector<HTMLInputElement>('input:checked');

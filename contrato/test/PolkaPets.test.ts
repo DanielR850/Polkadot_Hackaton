@@ -1,4 +1,4 @@
-import { expect } from "chai";
+﻿import { expect } from "chai";
 import hre from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
 
@@ -6,11 +6,12 @@ const { ethers } = hre;
 
 const AJOLOTE = 0;
 
-// Con todo al máximo, sin cuidados:
-//  - la sed llega a 0 a los 100*45 = 4500 s y el hambre a los 100*60 = 6000 s;
-//  - la vida (100 * 30 = 3000 segundos en cero) se agota a los 6750 s:
-//    1500 s de sed sola (4500→6000) + 750 s de sed y hambre a la vez (2 por segundo).
-const MUERTE_SIN_CUIDADOS = 6750;
+// Con todo al máximo, sin cuidados (necesidades de 100 a 0: sed 4 h, hambre 5 h, felicidad 6 h,
+// energía 7 h, limpieza 8 h):
+//  - la vida (100 * 1080 = 108 000 segundos en cero) se agota a las 12 h (43 200 s):
+//    a las 8 h ya suman 36 000 (3600 + 7200 + 10 800 + 14 400) y faltan 72 000 con las cinco
+//    en 0 a la vez (5 por segundo): 14 400 s más.
+const MUERTE_SIN_CUIDADOS = 43_200;
 
 describe("PolkaPets", () => {
   async function desplegar() {
@@ -60,24 +61,24 @@ describe("PolkaPets", () => {
 
   it("cada necesidad baja a su ritmo", async () => {
     const { pets, nacimiento } = await adoptar();
-    await time.increaseTo(nacimiento + 900n);
+    await time.increaseTo(nacimiento + 3600n);
     const m = await pets.verMascota(1);
-    expect(m.hambre).to.equal(100 - 15); // 900/60
-    expect(m.sed).to.equal(100 - 20); // 900/45
-    expect(m.energia).to.equal(100 - 7); // 900/120
-    expect(m.felicidad).to.equal(100 - 10); // 900/90
-    expect(m.limpieza).to.equal(100 - 6); // 900/150
+    expect(m.hambre).to.equal(100 - 20); // 3600/180
+    expect(m.sed).to.equal(100 - 25); // 3600/144
+    expect(m.energia).to.equal(100 - 14); // 3600/252
+    expect(m.felicidad).to.equal(100 - 16); // 3600/216
+    expect(m.limpieza).to.equal(100 - 12); // 3600/288
     expect(m.vida).to.equal(100);
-    expect(m.duracion).to.equal(900);
+    expect(m.duracion).to.equal(3600);
   });
 
   it("alimentar sube hambre y sed", async () => {
     const { pets, nacimiento } = await adoptar();
-    await time.setNextBlockTimestamp(nacimiento + 1800n); // hambre 70, sed 60
+    await time.setNextBlockTimestamp(nacimiento + 1800n); // hambre 90, sed 88
     await pets.alimentar(1);
     const m = await pets.verMascota(1);
-    expect(m.hambre).to.equal(100); // 70 + 40, tope 100
-    expect(m.sed).to.equal(100); // 60 + 40
+    expect(m.hambre).to.equal(100); // 90 + 40, tope 100
+    expect(m.sed).to.equal(100); // 88 + 40, tope 100
     expect(m.xp).to.equal(10);
   });
 
@@ -105,10 +106,10 @@ describe("PolkaPets", () => {
   it("pierde vida mientras una necesidad está en 0 y muere en el segundo exacto", async () => {
     const { pets, nacimiento } = await adoptar();
 
-    await time.increaseTo(nacimiento + 5100n); // sed en 0 desde 4500: 600 s → -20 de vida
+    await time.increaseTo(nacimiento + 16_560n); // sed en 0 desde 14 400: 2160 s → -2 de vida
     let m = await pets.verMascota(1);
     expect(m.sed).to.equal(0);
-    expect(m.vida).to.equal(80);
+    expect(m.vida).to.equal(98);
     expect(m.etapa).to.equal(3); // Enferma
     expect(m.viva).to.equal(true);
 
@@ -132,10 +133,10 @@ describe("PolkaPets", () => {
 
   it("cuidar recupera vida si ninguna necesidad queda en 0", async () => {
     const { pets, nacimiento } = await adoptar();
-    await time.setNextBlockTimestamp(nacimiento + 5100n); // vida 80, sed 0
-    await pets.alimentar(1); // sed 40, hambre 55 → +5 vida
+    await time.setNextBlockTimestamp(nacimiento + 16_560n); // vida 98, sed 0
+    await pets.alimentar(1); // sed 40, hambre 48 → ninguna en 0 → +5 vida (tope 100)
     const m = await pets.verMascota(1);
-    expect(m.vida).to.equal(85);
+    expect(m.vida).to.equal(100);
     expect(m.etapa).to.equal(0);
   });
 
@@ -167,7 +168,7 @@ describe("PolkaPets", () => {
     const nacimiento = (await pets.verMascota(1)).nacimiento;
     await time.setNextBlockTimestamp(nacimiento + 100n);
     await pets.connect(otro).mint("Nueva", AJOLOTE);
-    await time.increaseTo(nacimiento + 10_000n); // la primera ya murió (a los 6750 s)
+    await time.increaseTo(nacimiento + 50_000n); // las dos ya murieron (a las 12 h de nacer)
 
     expect(await pets.totalMascotas()).to.equal(2);
     const filas = await pets.ranking(0, 50);

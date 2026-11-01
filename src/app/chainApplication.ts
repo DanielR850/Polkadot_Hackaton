@@ -1,4 +1,4 @@
-// Modo NFT con la misma interfaz retro del juego local: habitación Phaser, barras, botones,
+﻿// Modo NFT con la misma interfaz retro del juego local: habitación Phaser, barras, botones,
 // menú de comida, baño con esponja, ranking y cambio de nombre. Cada cuidado es una transacción
 // que firma la persona (Polkadot App dentro del Host, o MetaMask en un navegador normal).
 // El estado y las firmas viven en el hub de game/src/hub; aquí solo se compone y se traduce.
@@ -9,6 +9,7 @@ import { WALLETS_SUGERIDAS } from '../../game/src/contract/wallets.ts';
 import { ordenarRanking } from '../../game/src/engine/ranking.ts';
 import { diagnosticar } from '../../game/src/engine/salud.ts';
 import { mascotaAhora } from '../../game/src/engine/tiempo.ts';
+import type { Firmante } from '../../game/src/contract/pets.ts';
 import { createHub, leerRanking, type HubState } from '../../game/src/hub/hub.ts';
 import { acortarDireccion } from '../../game/src/lib/format.ts';
 import type { PetAnim } from '../game/animations.ts';
@@ -40,12 +41,34 @@ function growthStage(m: Mascota): Stage {
   return growth === Etapa.Adulta ? 'adult' : growth === Etapa.Joven ? 'teen' : 'baby';
 }
 
-export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): void {
-  const hub = createHub();
-  const theme = buildTheme(findPet(0)?.theme ?? DEFAULT_THEME_COLOR);
-  applyTheme(theme);
+export interface ChainAppOptions {
+  /** "← Juego local": vuelve a la pantalla de inicio sin borrar el NFT. */
+  onExit(): void;
+  /** La mascota murió o se eligió otra: vuelve al flujo nombre → mascota → adoptar. */
+  onNewGame(): void;
+  /** Cuenta ya conectada en el paso de adopción: entra sin volver a conectar. */
+  firmante?: Firmante;
+  /** NFT que se sigue en esta partida. */
+  tokenId?: bigint;
+  /** Animal elegido para un NFT (el contrato puede guardarlo como especie 0, el comodín). */
+  speciesOf?(tokenId: bigint): number | undefined;
+}
 
+export function startChainApp(app: HTMLElement, options: ChainAppOptions): void {
+  const hub = createHub();
+  const petIdOf = (m: Pick<Mascota, 'tokenId' | 'especie'>) => options.speciesOf?.(m.tokenId) ?? m.especie;
+  let theme = buildTheme(findPet(0)?.theme ?? DEFAULT_THEME_COLOR);
+  let themePetId = -1;
+  /** Tema del animal de la mascota, como en el juego local. */
+  const useTheme = (petId: number) => {
+    if (petId === themePetId) return;
+    themePetId = petId;
+    theme = buildTheme(findPet(petId)?.theme ?? DEFAULT_THEME_COLOR);
+    applyTheme(theme);
+    scene?.setRoomColors(theme.room);
+  };
   let scene: PetSceneHandle | null = null;
+  useTheme(options.speciesOf && options.tokenId !== undefined ? options.speciesOf(options.tokenId) ?? 0 : 0);
   let bathing = false;
   let bathProgress = 0;
   let action: { anim: 'eat' | 'play' | 'sleep'; until: number } | null = null;
@@ -54,7 +77,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
 
   /* ------------------------------------------------------------ piezas */
 
-  const chainBar = createChainBar(() => { hub.salir(); onReturnToLocal(); }, () => hub.limpiarMensajes(), FAUCET_URL);
+  const chainBar = createChainBar(() => { hub.salir(); options.onExit(); }, () => hub.limpiarMensajes(), FAUCET_URL);
 
   const connect = createConnectScreen({
     host: () => void hub.conectarHost(),
@@ -63,7 +86,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
       if (wallet) void hub.conectar(wallet);
     },
     retry: () => void hub.buscarWallets(),
-    back: () => { hub.salir(); onReturnToLocal(); },
+    back: () => { hub.salir(); options.onExit(); },
   });
   const nameScreen = createChainNameScreen((name) => { hub.elegirNombre(name); }, () => hub.volver(), validateChainName);
   const species = createChainSpeciesScreen((petId) => void hub.adoptar(petId), () => hub.volver());
@@ -71,7 +94,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
   /** Lanza la animación breve de un cuidado que ya entró en la cadena. */
   const react = (anim: 'eat' | 'play' | 'sleep', icon: string) => {
     action = { anim, until: Date.now() + ACTION_MS };
-    scene?.react(icon);
+    scene?.react(icon, anim === 'eat' ? 'eat' : 'play');
     window.setTimeout(render, ACTION_MS + 20);
     render();
   };
@@ -104,7 +127,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
     },
     rename: () => { const m = hub.getState().mascota; if (m) renameDialog.open(m.nombre); },
     ranking: () => rankingDialog.open(),
-    restart: () => hub.nuevaPartida(),
+    restart: () => { hub.salir(); options.onNewGame(); },
   }, { note: { text: 'Tu mascota es un NFT en Polkadot Hub.', detail: 'Cada cuidado es una transacción que tú firmas.' } });
 
   const feedMenu = createFeedMenu((itemId) => {
@@ -123,7 +146,7 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
       return rows.map((row) => ({
         id: String(row.tokenId),
         petName: row.viva ? row.nombre : `${row.nombre} 🕊️`,
-        petId: row.especie,
+        petId: petIdOf(row),
         aliveMs: row.duracion * 1000,
         isMine: row.mia,
       }));
@@ -139,12 +162,13 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
   function renderGame(s: HubState) {
     if (!s.mascota) return;
     scene ??= createPetScene(game.gameHost, (progress) => { bathProgress = progress; render(); });
-    scene.setRoomColors(theme.room);
     const m = mascotaAhora(s.mascota, (performance.now() - s.leidaEn) / 1000);
     const now = Date.now();
     if (action && now >= action.until) action = null;
     if (!m.viva) bathing = false;
 
+    useTheme(petIdOf(m));
+    scene.setRoomColors(theme.room);
     const stage = growthStage(m);
     if (lastToken !== m.tokenId) { lastToken = m.tokenId; lastStage = stage; }
     const grown = lastStage ? detectStageChange(lastStage, stage) : null;
@@ -172,12 +196,15 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
       mood,
       busy: s.ocupado !== null || action !== null,
     });
-    scene.show({ petId: m.especie, stage, anim });
+    scene.show({ petId: petIdOf(m), stage, anim });
   }
 
   function render(s: HubState = hub.getState()) {
-    // La pantalla de inicio del modo NFT no se usa: se entra directo a vincular la cuenta.
-    if (s.pantalla === 'inicio') { hub.empezar(); return; }
+    // La pantalla de inicio del modo NFT no se usa: se entra directo a vincular la cuenta
+    // (salvo que el paso de adopción ya trajo la cuenta conectada).
+    if (s.pantalla === 'inicio') { if (!entering) hub.empezar(); return; }
+    // Sin mascota que seguir (o se pidió otra): el nombre y el animal se eligen en el flujo normal.
+    if (s.pantalla === 'nombre' || s.pantalla === 'especie') { options.onNewGame(); return; }
     for (const [name, root] of Object.entries(screens)) root.hidden = name !== s.pantalla;
 
     const evm = s.firmante?.tipo === 'evm';
@@ -203,6 +230,8 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
     if (s.pantalla === 'juego') renderGame(s);
   }
 
+  hub.seguir(options.tokenId);
+  let entering = options.firmante !== undefined;
   let lastScreen: HubState['pantalla'] | null = null;
   hub.subscribe((s) => {
     if (s.pantalla === 'nombre' && lastScreen !== 'nombre') nameScreen.focus(s.nombreNuevo);
@@ -211,4 +240,5 @@ export function startChainApp(app: HTMLElement, onReturnToLocal: () => void): vo
     render(s);
   });
   window.setInterval(() => { if (hub.getState().pantalla === 'juego') render(); }, 1000);
+  if (options.firmante) void hub.entrarCon(options.firmante, options.tokenId).finally(() => { entering = false; });
 }

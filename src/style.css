@@ -306,7 +306,97 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .chain-wallet:disabled { cursor: not-allowed; filter: grayscale(.6); }
 .chain-links { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .chain-row { justify-content: center; }
-.chain-pet-grid { grid-template-columns: minmax(0, 200px); justify-content: center; }
+/* ===== Música: botón flotante con panel de volumen ===== */
+.sound-control {
+  position: fixed; z-index: 20; right: max(14px, env(safe-area-inset-right)); bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
+}
+.sound-toggle {
+  width: 52px; height: 52px; font-size: 24px; line-height: 1; cursor: pointer;
+  background: var(--accent); border: var(--px) solid var(--ink);
+  box-shadow: inset -4px -4px 0 var(--accent-dark), inset 4px 4px 0 var(--accent-light), 4px 4px 0 var(--ink);
+}
+.sound-toggle:active { transform: translate(3px, 3px); box-shadow: inset 4px 4px 0 #0003; }
+.sound-panel {
+  display: grid; gap: 10px; width: 230px; padding: 12px; background: var(--panel);
+  border: var(--px) solid var(--ink); box-shadow: 4px 4px 0 var(--accent), 7px 7px 0 var(--ink);
+}
+.sound-row { display: flex; align-items: center; gap: 8px; }
+.sound-step { width: 34px; padding: 4px 0; font-size: 14px; }
+.sound-mute { font-size: 9px; padding: 10px 8px; }
+.sound-level { font-size: 18px; color: var(--muted); text-align: center; }
+/* Barra de volumen pixel: pista segmentada y perilla cuadrada. */
+.sound-slider { flex: 1; min-width: 0; height: 22px; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; cursor: pointer; }
+.sound-slider::-webkit-slider-runnable-track { height: 12px; background: var(--accent-dark); border: 3px solid var(--ink); }
+.sound-slider::-moz-range-track { height: 6px; background: var(--accent-dark); border: 3px solid var(--ink); }
+.sound-slider::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 22px; margin-top: -8px; background: var(--accent); border: 3px solid var(--ink); }
+.sound-slider::-moz-range-thumb { width: 12px; height: 18px; border-radius: 0; background: var(--accent); border: 3px solid var(--ink); }
+.sound-slider:focus-visible { outline: 3px dashed var(--accent); outline-offset: 3px; }
+@media (max-width: 560px) {
+  .sound-toggle { width: 44px; height: 44px; font-size: 20px; }
+}
+
+/* ===== Paso 3: adoptar como NFT ===== */
+.mint-stage { position: relative; width: min(180px, 46vw); margin: 0 auto 12px; }
+.mint-frame { width: 100%; }
+/* El huevo cubre el retrato mientras se firma y se rompe al terminar. */
+.mint-egg {
+  position: absolute; right: -14px; bottom: -10px; font-size: 52px; line-height: 1;
+  filter: drop-shadow(3px 3px 0 var(--ink)); transform-origin: 50% 90%;
+}
+.mint-stage[data-egg="wobble"] .pet-frame { filter: brightness(.55) saturate(.4); }
+.mint-stage[data-egg="wobble"] .mint-egg { inset: 0; display: grid; place-items: center; font-size: 96px; animation: egg-wobble .9s steps(4) infinite; }
+.mint-stage[data-egg="hatched"] .mint-egg { animation: egg-pop .6s steps(4) forwards; }
+.mint-stage[data-egg="hatched"] .pet-frame { animation: pet-reveal .6s steps(4); outline: var(--px) solid var(--accent); outline-offset: 3px; }
+@keyframes egg-wobble { 0%, 100% { transform: rotate(0); } 25% { transform: rotate(-12deg); } 75% { transform: rotate(12deg); } }
+@keyframes egg-pop { to { transform: translateY(-40px) scale(1.4); opacity: 0; } }
+@keyframes pet-reveal { from { transform: scale(.6); } }
+.mint-body { display: flex; flex-direction: column; align-items: center; gap: 14px; margin: 10px 0 4px; }
+.mint-card {
+  width: min(440px, 100%); padding: 12px 14px; text-align: left; font-size: 20px;
+  background: var(--light); border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+}
+.mint-card b { display: block; font-weight: 400; font-size: 22px; }
+.mint-card small { color: var(--muted); font-size: 16px; }
+.mint-perms, .mint-howto { margin: 8px 0 0; padding-left: 0; list-style: none; display: grid; gap: 6px; }
+.mint-howto { list-style: decimal; padding-left: 22px; }
+.mint-perms li { display: flex; gap: 10px; align-items: center; }
+.mint-howto + .chain-links { margin-top: 10px; justify-content: flex-start; }
+.mint-account { display: flex; align-items: center; gap: 12px; }
+.mint-nft { text-align: center; background: var(--accent-soft); }
+.mint-token { font-family: var(--title); font-size: 26px !important; line-height: 1.6; color: var(--accent-dark); text-shadow: 2px 2px 0 var(--light); }
+.mint-loader { display: flex; align-items: center; gap: 12px; font-size: 22px; color: var(--muted); }
+.mint-dots { display: inline-flex; gap: 5px; }
+.mint-dots i { width: 10px; height: 10px; background: var(--accent); box-shadow: 0 0 0 3px var(--ink); animation: dot 1s steps(2) infinite; }
+.mint-dots i:nth-child(2) { animation-delay: .2s; }
+.mint-dots i:nth-child(3) { animation-delay: .4s; }
+@keyframes dot { 50% { transform: translateY(-6px); } }
+.mint-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; width: min(440px, 100%); text-align: left; }
+.mint-steps li { display: flex; align-items: center; gap: 10px; font-size: 20px; color: var(--muted); }
+.mint-steps li[data-state="now"] { color: var(--ink); }
+.mint-steps li[data-state="done"] { color: var(--good); }
+.mint-step-dot {
+  display: grid; place-items: center; width: 28px; height: 28px; flex: none; font-family: var(--title); font-size: 10px;
+  background: var(--panel-2); border: 3px solid var(--ink);
+}
+.mint-steps li[data-state="now"] .mint-step-dot { background: var(--accent); animation: blink 1s steps(2) infinite; }
+.mint-steps li[data-state="done"] .mint-step-dot { background: var(--good); color: var(--light); }
+.mint-elapsed { font-family: var(--title); font-size: 9px; }
+.mint-error {
+  display: flex; align-items: center; gap: 12px; width: min(480px, 100%); margin: 12px auto 0; padding: 10px 12px;
+  text-align: left; font-size: 20px; background: #f6c9c4; border: 3px solid var(--ink); box-shadow: 4px 4px 0 var(--ink);
+}
+.mint-error p { flex: 1; margin: 0; }
+@media (prefers-reduced-motion: reduce) {
+  .mint-egg, .mint-stage .pet-frame, .mint-dots i, .mint-steps .mint-step-dot { animation: none !important; }
+}
+@media (max-width: 560px) {
+  .mint-error { flex-wrap: wrap; }
+  .mint-stage[data-egg="wobble"] .mint-egg { font-size: 72px; }
+}
+.pet-option.locked { cursor: not-allowed; }
+.pet-option.locked .pet-frame { filter: grayscale(1); opacity: .55; }
+.pet-option .pet-locked { display: block; font-family: var(--title); font-size: 7px; line-height: 1.5; color: var(--bad); }
 
 /* ===== Responsivo =====
    Las reglas dependen del tamaño de la ventana, no del dispositivo: una ventana de escritorio

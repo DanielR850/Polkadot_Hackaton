@@ -38,7 +38,7 @@ export interface LlamadaHost {
 export interface SesionHost {
   cuenta: CuentaHost;
   /** Firma y envía la llamada; resuelve cuando la transacción se finaliza. Lanza si falla. */
-  enviar(llamada: LlamadaHost): Promise<void>;
+  enviar(llamada: LlamadaHost, onPaso?: (p: "firma" | "confirmando") => void): Promise<void>;
   destruir(): void;
 }
 
@@ -266,11 +266,17 @@ export async function conectarHost(): Promise<SesionHost> {
     firma = await abrirFirma(productId);
   };
 
-  const intentar = async ({ functionName, args }: LlamadaHost) => {
+  const intentar = async ({ functionName, args }: LlamadaHost, onPaso?: (p: "firma" | "confirmando") => void) => {
+    onPaso?.("firma");
     await asegurarMapeo();
     const metodo = contrato()[functionName];
     if (!metodo) throw new Error(`El contrato no tiene la función ${functionName}.`);
-    const r = await metodo.tx(...args, { waitFor: "finalized", timeoutMs: HOST_SIGN_TIMEOUT_MS });
+    // El SDK avisa signing → broadcasting → in-block → finalized.
+    const onStatus = (status: unknown) => {
+      const s = typeof status === "string" ? status : String((status as { type?: unknown } | null)?.type ?? "");
+      if (s === "broadcasting" || s === "in-block" || s === "finalized") onPaso?.("confirmando");
+    };
+    const r = await metodo.tx(...args, { waitFor: "finalized", timeoutMs: HOST_SIGN_TIMEOUT_MS, onStatus });
     if (!r.ok) throw r.error;
   };
 
@@ -279,12 +285,12 @@ export async function conectarHost(): Promise<SesionHost> {
   return {
     cuenta: { h160: firma.cuenta.h160Address as Address, ss58: firma.cuenta.address },
 
-    async enviar(llamada) {
+    async enviar(llamada, onPaso) {
       if (enCurso) throw new Error("Espera a que termine la firma en curso.");
       enCurso = true;
       try {
         try {
-          await intentar(llamada);
+          await intentar(llamada, onPaso);
         } catch (e) {
           const t = textoError(e);
           console.warn("[polkapets] tx Host", t);
@@ -296,7 +302,7 @@ export async function conectarHost(): Promise<SesionHost> {
           } else {
             throw e;
           }
-          await intentar(llamada);
+          await intentar(llamada, onPaso);
         }
       } finally {
         enCurso = false;

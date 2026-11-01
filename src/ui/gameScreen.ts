@@ -35,7 +35,9 @@ export interface GameScreenOptions {
 
 /** Pantalla de juego: habitación (canvas), barras y acciones. Solo muestra y devuelve intenciones. */
 export function createGameScreen(intents: GameIntents, options: GameScreenOptions = {}) {
-  const note = options.note ?? { text: 'Tu partida local se guarda en este dispositivo.', detail: 'El modo NFT se abre desde la pantalla inicial.' };
+  const note = options.note ?? { text: 'Tu partida se guarda en este dispositivo.', detail: 'Cuidarla es gratis: no pide firmas.' };
+  const noteText = h('span', {}, note.text);
+  const noteDetail = h('small', {}, note.detail);
   const nameEl = h('h1', {});
   const stageEl = h('span', {});
   const ageEl = h('span', { class: 'age' });
@@ -111,7 +113,7 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
         h('div', { class: 'card-heading' }, h('div', {}, h('span', { class: 'eyebrow' }, 'CUIDADOS'), h('h2', {}, '¿Qué hacemos?')), h('span', { class: 'sparkle' }, '✦')),
         careControls, deathPanel,
         h('div', { class: 'local-note' }, h('span', {}, '☁'),
-          h('p', {}, note.text, h('br'), h('small', {}, note.detail))))));
+          h('p', {}, noteText, h('br'), noteDetail)))));
 
   let currentMode: GameMode = 'normal';
   let toastTimer = 0;
@@ -149,6 +151,7 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
       deathTime.textContent = `${view.name} vivió ${view.ageLabel}. Etapa: ${view.stageLabel.toLowerCase()}.`;
     },
     say(text: string) { feedback.textContent = text; },
+    setNote(text: string, detail: string) { noteText.textContent = text; noteDetail.textContent = detail; },
     showToast(text: string) {
       toast.textContent = text;
       toast.hidden = false;

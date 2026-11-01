@@ -35,6 +35,30 @@ export function loadPet(): PetState | null {
   return parsePetState(raw);
 }
 
+/** NFT de la partida actual (solo informativo: los cuidados no van a la cadena). */
+export interface PetNft { tokenId: string; address: string }
+export const NFT_STORAGE_KEY = 'tamagotchi-polkadot-nft-v1';
+let nftMemory: string | null = null;
+
+export function loadNft(): PetNft | null {
+  let raw = nftMemory;
+  try { raw = localStorage.getItem(NFT_STORAGE_KEY); } catch { /* sin localStorage */ }
+  try {
+    const data = raw ? (JSON.parse(raw) as Partial<PetNft>) : null;
+    return data && typeof data.tokenId === 'string' && typeof data.address === 'string' ? { tokenId: data.tokenId, address: data.address } : null;
+  } catch {
+    return null;
+  }
+}
+
+export function saveNft(nft: PetNft | null): void {
+  nftMemory = nft ? JSON.stringify(nft) : null;
+  try {
+    if (nftMemory) localStorage.setItem(NFT_STORAGE_KEY, nftMemory);
+    else localStorage.removeItem(NFT_STORAGE_KEY);
+  } catch { /* se queda en memoria */ }
+}
+
 export function savePet(state: PetState | null): void {
   memory = state ? JSON.stringify(state) : null;
   try {

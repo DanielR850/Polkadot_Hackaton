@@ -47,3 +47,4 @@ pega el CID nuevo con Resolve.
 | Fecha | CID raíz | Icono | Contenido |
 |---|---|---|---|
 | 2026-10-31 | `bafybeihjop464rvo3ocpej6vixt3dqrv2bgijzcrchtsw3sdgafrmu7ulu` | `bafk2bzacebhbstrmm2asv46ogqimiwehspkbsnomx5hagjkpsquuujuw6p5o4` | Primera versión con firmas por el Host; NFT con estilo morado y solo ajolote |
+| 2026-10-31 | `bafybeighs37itci77vmil4pc453f5iit6vqm5ab66fo3ojout5jearsbme` | `bafk2bzacebhbstrmm2asv46ogqimiwehspkbsnomx5hagjkpsquuujuw6p5o4` | Fusión con GitHub (`a478e1e`): cinco especies en local, modo NFT con la interfaz retro |
