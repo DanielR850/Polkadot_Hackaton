@@ -1,7 +1,54 @@
 # Arquitectura: de la interfaz al smart contract
 
-> **Estado:** guía del diseño propuesto. El prototipo actual todavía no usa Product SDK, Host,
-> wallet ni smart contract. Sus acciones modifican el estado local del navegador.
+## Estado actual
+
+Una sola app web (Vite + TypeScript + Phaser) en la raíz, publicada en `polka-pets.dot`:
+
+- **Juego:** nombre → elegir mascota (5 especies) → adoptar como NFT (opcional) → habitación.
+  Los cuidados son locales y gratis; se guardan en el dispositivo.
+- **Firmas:** solo dos, ambas opcionales: adoptar (`mint` en PolkaPets) y, al morir la mascota,
+  registrar la partida (`registrarMuerte` en PolkaPetsRanking).
+- **Quién firma:** dentro de la Polkadot App o Desktop, el Host (Product SDK 0.39.0); en un
+  navegador normal, una wallet EVM como MetaMask (`viem`).
+- **Contratos** en Polkadot Hub TestNet (chain id 420420417):
+  - PolkaPets `0x758425A3b756079B34FF97cB9C7A764fD44C008a` (`NUM_ESPECIES = 1`: el mint usa la
+    especie 0 como comodín y el juego muestra el animal elegido).
+  - PolkaPetsRanking `0xf675957A89bfF3e02BD8AeB302Ca2E8Ca6f2a5d2` (leaderboard).
+
+`product-app/` y `product-contract/` son otra ruta (PolkaVM en Paseo) que la app no usa.
+
+## Mapa de carpetas
+
+```text
+src/
+├── main.ts, app/bootstrap.ts       # punto de entrada Vite
+├── app/
+│   ├── application.ts              # controlador: pantallas, cuidados, mint, registro y música
+│   └── chainApplication.ts         # modo NFT con firma por cuidado (no se abre hoy)
+├── game/                           # reglas puras (petState, config, catalog, storage) y Phaser (petScene)
+├── ui/                             # pantallas y diálogos: inicio, mascota, mint, juego, registro, ranking
+├── infrastructure/audio/music.ts   # música original con Web Audio
+└── polkadot/nftMint.ts             # adaptador: conectar, mint, registrar y leer el leaderboard
+
+game/src/
+├── contract/                       # config, ABI, pets.ts (viem), host.ts (Product SDK), ranking.ts
+├── hub/, engine/, lib/             # estado y reglas del modo NFT con firma por cuidado (+ tests)
+
+contrato/                           # Hardhat: PolkaPets.sol, PolkaPetsRanking.sol, tests y scripts
+```
+
+```mermaid
+flowchart LR
+    UI[ui / pantallas] --> APP[app / application.ts]
+    APP --> RULES[game / reglas]
+    APP --> SCENE[game / Phaser]
+    APP --> STORE[game / storage local]
+    APP --> PORT[polkadot / nftMint.ts]
+    PORT --> CLIENT[game/src/contract]
+    CLIENT -- MetaMask / viem --> CHAIN[Polkadot Hub TestNet]
+    CLIENT -- Product SDK --> HOST[Polkadot App / Desktop]
+    HOST --> CHAIN
+```
 
 ## Las piezas y su responsabilidad
 
@@ -115,3 +162,7 @@ Podemos organizar **el frontend** con MVC sin convertir el contrato en un “mod
 
 El contrato se organiza y se despliega como componente independiente. El proyecto completo puede
 vivir en un monorepo, pero la web y el contrato tienen compilación, pruebas y despliegues distintos.
+
+
+
+
