@@ -28,6 +28,16 @@ export interface GameIntents {
   restart(): void;
   /** Registrar la partida en el leaderboard (panel de muerte). Opcional. */
   record?(): void;
+  /** Guardar en la cadena el legado de la mascota muerta: tiempo vivido, accesorios y muebles. */
+  legacy?(): void;
+  /** Ver y ponerle accesorios a la mascota. */
+  accessories?(): void;
+  /** Configurar la habitación: pared, piso, muebles y adornos. */
+  space?(): void;
+  /** Comprar accesorios y decoración con pesitos. */
+  shop?(): void;
+  /** Ver los trofeos (logros) de la mascota. */
+  trophies?(): void;
 }
 
 /** Botón de registrar en el panel de muerte: oculto, disponible o ya registrado. */
@@ -89,6 +99,17 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const renameBtn = action('✏️', 'Nombre', intents.rename);
   const rankingBtn = action('🏆', 'Ranking', intents.ranking);
   const actions = h('div', { class: 'actions' }, ...[feedBtn, playBtn, sleepBtn, bathBtn, renameBtn, rankingBtn].map((a) => a.button));
+  // Inventario: accesorios de la mascota y decoración de la habitación.
+  const accessoriesBtn = h('button', { type: 'button', class: 'ghost' }, '🎩 Accesorios');
+  accessoriesBtn.addEventListener('click', () => intents.accessories?.());
+  const spaceBtn = h('button', { type: 'button', class: 'ghost' }, '🏠 Mi espacio');
+  spaceBtn.addEventListener('click', () => intents.space?.());
+  const shopBtn = h('button', { type: 'button', class: 'ghost' }, '🛒 Tienda');
+  shopBtn.addEventListener('click', () => intents.shop?.());
+  const trophiesBtn = h('button', { type: 'button', class: 'ghost' }, '🏆 Trofeos');
+  trophiesBtn.addEventListener('click', () => intents.trophies?.());
+  const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, trophiesBtn);
+  const coinsEl = h('span', { class: 'coin-pill', title: 'Pesitos ganados en los minijuegos' }, '🪙 0');
 
   const bathFill = h('div', { class: 'meter-fill bath-fill' });
   const bathTrack = h('div', { class: 'meter-track', role: 'progressbar', 'aria-label': 'Progreso del baño', 'aria-valuemin': 0, 'aria-valuemax': 100 }, bathFill);
@@ -102,20 +123,26 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   restart.addEventListener('click', intents.restart);
   const deathRanking = h('button', { type: 'button', class: 'ghost' }, 'Ver ranking');
   deathRanking.addEventListener('click', intents.ranking);
+  const deathTrophies = h('button', { type: 'button', class: 'ghost' }, '🏆 Ver trofeos');
+  deathTrophies.addEventListener('click', () => intents.trophies?.());
   const deathRecord = h('button', { type: 'button', class: 'primary', hidden: true }, '🏆 Registrar partida');
   deathRecord.addEventListener('click', () => intents.record?.());
   const deathRecorded = h('p', { class: 'death-recorded', hidden: true }, '✓ Partida registrada en el leaderboard');
+  const deathLegacy = h('button', { type: 'button', class: 'primary', hidden: true }, '📜 Guardar legado');
+  deathLegacy.addEventListener('click', () => intents.legacy?.());
+  const deathLegacySaved = h('p', { class: 'death-recorded', hidden: true }, '✓ Legado guardado en la blockchain');
   const deathPanel = h('div', { class: 'mode-panel death-panel', hidden: true },
     h('span', { class: 'death-icon', 'aria-hidden': 'true' }, '🕊️'), h('h2', {}, 'Fin de la partida'), deathTime,
-    deathRecorded, deathRecord,
+    deathRecorded, deathRecord, deathLegacySaved, deathLegacy,
+    deathTrophies,
     h('div', { class: 'row' }, deathRanking, restart));
 
-  const careControls = h('div', {}, h('div', { class: 'meters' }, ...bars.map((b) => b.row)), actions, bathPanel, feedback);
+  const careControls = h('div', {}, h('div', { class: 'meters' }, ...bars.map((b) => b.row)), actions, extras, bathPanel, feedback);
 
   const root = h('section', { class: 'screen game-screen', 'aria-label': 'Juego' },
     h('header', { class: 'topbar' },
       h('div', {}, h('span', { class: 'eyebrow' }, 'MI PEQUEÑO MUNDO'), nameEl),
-      h('div', { class: 'topbar-tools' }, menuButton,
+      h('div', { class: 'topbar-tools' }, coinsEl, menuButton,
         h('div', { class: 'day-pill' }, h('span', { class: 'live-dot' }), stageEl, ageEl), menu)),
     h('main', { class: 'layout' },
       h('section', { class: 'pet-card', 'aria-label': 'Habitación de la mascota' },
@@ -154,6 +181,7 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
       sleepBtn.button.disabled = view.mode === 'dead' || view.busy;
       renameBtn.button.disabled = view.mode === 'dead';
       actions.hidden = view.mode === 'bath';
+      extras.hidden = view.mode === 'bath';
       bathPanel.hidden = view.mode !== 'bath';
       const bath = Math.round(view.bathProgress);
       bathFill.style.width = `${bath}%`;
@@ -164,9 +192,20 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
     },
     say(text: string) { feedback.textContent = text; },
     setNote(text: string, detail: string) { noteText.textContent = text; noteDetail.textContent = detail; },
+    setCoins(coins: number) { coinsEl.textContent = `🪙 ${coins}`; },
+    /** Solo en modo ranking se muestran los botones del leaderboard. */
+    setRankingVisible(visible: boolean) {
+      rankingBtn.button.hidden = !visible;
+      deathRanking.hidden = !visible;
+    },
     setRecord(state: RecordButton) {
       deathRecord.hidden = state !== 'available';
       deathRecorded.hidden = state !== 'recorded';
+    },
+    /** Botón del legado en el panel de muerte (solo con NFT y contrato de objetos). */
+    setLegacy(state: RecordButton) {
+      deathLegacy.hidden = state !== 'available';
+      deathLegacySaved.hidden = state !== 'recorded';
     },
     showToast(text: string) {
       toast.textContent = text;

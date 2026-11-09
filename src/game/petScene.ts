@@ -4,6 +4,15 @@ import { assetUrl, BACKGROUNDS, backgroundUrl, spriteKey, SPRITES } from './asse
 import { findPet } from './catalog.ts';
 import { scrubProgress, spongeTouchesPet } from './sponge.ts';
 import type { PetId, Stage } from './types.ts';
+import type { RoomDecor } from './inventory.ts';
+
+/** Lugares de los muebles (en el piso) y adornos (en la pared). */
+const FURNITURE_X = [104, 332, 446];
+const DECOR_SPOTS = [{ x: 216, y: 92 }, { x: 300, y: 70 }];
+
+/** Oscurece un color 0xRRGGBB (para las franjas y tablas). */
+const darker = (c: number, f = 0.82) =>
+  (Math.round(((c >> 16) & 255) * f) << 16) | (Math.round(((c >> 8) & 255) * f) << 8) | Math.round((c & 255) * f);
 
 // Escena de la habitación. Solo dibuja y anima; las reglas viven en petState.ts.
 // Si no hay sprite para la mascota, etapa y animación, dibuja el marcador temporal con formas.
@@ -21,6 +30,10 @@ export interface PetSceneHandle {
   resetBath(): void;
   /** Colores de pared de la habitación, para que combinen con el tema de la mascota. */
   setRoomColors(colors: RoomColors): void;
+  /** Decoración del inventario: color de pared y piso, muebles en el piso y adornos en la pared. */
+  setDecor(decor: RoomDecor): void;
+  /** Accesorio que lleva la mascota (por ahora un emoji sobre la cabeza), o null. */
+  setAccessory(icon: string | null): void;
 }
 
 export interface RoomColors { wall: number; stripe: number }
@@ -142,6 +155,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     /** Objetos y temporizadores de la animación de comer, para limpiarlos al cambiar de estado. */
     private eatObjects: Phaser.GameObjects.GameObject[] = [];
     private eatTimers: Phaser.Time.TimerEvent[] = [];
+    private decor: RoomDecor = { wall: null, floor: null, furniture: [], decor: [] };
+    private decorLayer!: Phaser.GameObjects.Container;
+    private accessory!: Phaser.GameObjects.Text;
 
     constructor() { super('room'); }
 
@@ -184,6 +200,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         this.textures.exists('bg-room') ? this.add.image(W / 2, H / 2, 'bg-room').setDisplaySize(W, H) : this.drawRoom(),
         this.drawMaracas(), this.drawGuitar(), this.drawToys(), this.drawPinata(),
       ]);
+      this.decorLayer = this.add.container(0, 0);
+      this.roomLayer.add(this.decorLayer);
       this.bathLayer = this.add.container(0, 0, [this.textures.exists('bg-bath') ? this.add.image(W / 2, H / 2, 'bg-bath').setDisplaySize(W, H) : this.drawBath()]).setVisible(false);
 
       this.body = this.add.ellipse(0, BODY.offsetY, BODY.rx * 2, BODY.ry * 2, 0xffffff);
@@ -193,7 +211,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.face = this.add.graphics();
       this.placeholder = this.add.container(0, 0, [...this.ears, this.body, this.belly, ...this.blush, this.face]);
       this.sprite = this.add.sprite(0, 0, '__DEFAULT').setVisible(false);
-      this.bobber = this.add.container(0, 0, [this.placeholder, this.sprite]);
+      this.accessory = this.add.text(0, -80, '', { fontSize: '40px' }).setOrigin(0.5, 1).setVisible(false);
+      this.bobber = this.add.container(0, 0, [this.placeholder, this.sprite, this.accessory]);
       this.petRoot = this.add.container(ROOM_POS.x, ROOM_POS.y, [this.bobber]);
       this.bob = this.tweens.add({ targets: this.bobber, y: -7, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
@@ -207,7 +226,43 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => this.moveSponge(pointer.worldX, pointer.worldY, true));
 
       this.ready = true;
+      this.drawDecor();
       if (this.view) this.apply(this.view);
+    }
+
+    setDecor(decor: RoomDecor) {
+      this.decor = decor;
+      if (!this.ready) return;
+      if (this.roomGfx) this.paintRoom(this.roomGfx.clear());
+      this.drawDecor();
+    }
+
+    setAccessory(icon: string | null) {
+      if (!this.ready) { this.time?.delayedCall(50, () => this.setAccessory(icon)); return; }
+      this.accessory.setText(icon ?? '').setVisible(icon !== null);
+      this.placeAccessory();
+    }
+
+    /** Muebles en el piso y adornos en la pared, como emojis por ahora. */
+    private drawDecor() {
+      this.decorLayer.removeAll(true);
+      const floorY = Math.round(H * 0.74);
+      this.decor.furniture.forEach((icon, i) => {
+        this.decorLayer.add(this.add.ellipse(FURNITURE_X[i], floorY + 26, 64, 10, 0x000000, 0.18));
+        this.decorLayer.add(this.add.text(FURNITURE_X[i], floorY + 28, icon, { fontSize: '54px' }).setOrigin(0.5, 1));
+      });
+      this.decor.decor.forEach((icon, i) => {
+        const { x, y } = DECOR_SPOTS[i];
+        this.decorLayer.add(this.add.text(x, y, icon, { fontSize: '40px' }).setOrigin(0.5));
+      });
+    }
+
+    /** Pone el accesorio sobre la cabeza: arriba de la ilustración, a la altura de la boca en x. */
+    private placeAccessory() {
+      if (!this.view) return;
+      const m = MOUTH[this.view.petId]?.[this.view.stage] ?? { x: 0.5, y: 0.45 };
+      const width = BODY.ry * 3;
+      this.accessory.setPosition((m.x - 0.5) * width * 0.75, -BODY.ry * 1.25);
     }
 
     show(view: SceneView) {
@@ -258,6 +313,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       const key = `${view.petId}|${view.stage}|${view.anim}`;
       if (key === this.drawnKey) return;
       this.drawnKey = key;
+      // Accesorio: sobre la cabeza; se oculta muerta y durante el baño.
+      this.placeAccessory();
+      this.accessory.setAlpha(view.anim === 'dead' || view.anim === 'bath' ? 0 : 1);
 
       const spriteAnim = this.findSprite(view);
       this.sprite.setVisible(spriteAnim !== null);
@@ -469,9 +527,11 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
 
     private paintRoom(g: Phaser.GameObjects.Graphics) {
       const floorY = Math.round(H * 0.74);
-      // Pared con franjas (color del tema).
-      g.fillStyle(this.roomColors.wall, 1); g.fillRect(0, 0, W, H);
-      g.fillStyle(this.roomColors.stripe, 1);
+      // Pared con franjas: color del tema, o el de la pared elegida en "Mi espacio".
+      const wall = this.decor.wall ?? this.roomColors.wall;
+      const stripe = this.decor.wall === null ? this.roomColors.stripe : darker(this.decor.wall, 0.92);
+      g.fillStyle(wall, 1); g.fillRect(0, 0, W, H);
+      g.fillStyle(stripe, 1);
       for (let x = 0; x < W; x += 40) g.fillRect(x, 0, 20, floorY);
       // Ventana con atardecer.
       const wx = Math.round(W * 0.08), wy = 46;
@@ -485,9 +545,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       const tileY = floorY - 36;
       for (let x = 0; x < W; x += 36) this.talaveraTile(g, x, tileY, 36);
       g.fillStyle(INK, 1); g.fillRect(0, tileY - 4, W, 4); g.fillRect(0, floorY, W, 5);
-      // Piso de tablas.
-      g.fillStyle(0x8e5a3a, 1); g.fillRect(0, floorY + 5, W, H);
-      g.fillStyle(0x6f4329, 1);
+      // Piso de tablas: madera, o el piso elegido en "Mi espacio".
+      const floor = this.decor.floor ?? 0x8e5a3a;
+      g.fillStyle(floor, 1); g.fillRect(0, floorY + 5, W, H);
+      g.fillStyle(darker(floor), 1);
       for (let y = floorY + 25; y < H; y += 22) g.fillRect(0, y, W, 3);
       // Tapete de sarape debajo de la mascota.
       const rx = 150, ry = floorY + 16, rw = 220, rh = 52;
@@ -512,7 +573,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       g.fillStyle(MX.blue, 1); g.fillRect(px, pyTop - 12, 44, 6); g.fillRect(px + 8, pyTop + 2, 6, 6); g.fillRect(px + 30, pyTop + 2, 6, 6);
       g.fillStyle(MX.yellow, 1); g.fillRect(px + 19, pyTop + 2, 6, 6);
       // Papel picado colgado de una cuerda.
-      this.papelPicado(g, this.roomColors.wall);
+      this.papelPicado(g, wall);
       return g;
     }
 
@@ -740,8 +801,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
   });
   return {
     show: (view) => scene.show(view),
-    react: (icon) => scene.react(icon),
+    react: (icon, kind) => scene.react(icon, kind),
     resetBath: () => scene.resetBath(),
     setRoomColors: (colors) => scene.setRoomColors(colors),
+    setDecor: (decor) => scene.setDecor(decor),
+    setAccessory: (icon) => scene.setAccessory(icon),
   };
 }

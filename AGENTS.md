@@ -5,15 +5,16 @@ Consultar `docs/decisions/` si la tarea cambia límites entre módulos, red o SD
 
 ## Límites de código
 
-- `src/domain/`: reglas y tipos puros del juego. No importa Phaser, DOM, almacenamiento ni paquetes
-  Polkadot.
+- `src/game/`: reglas y tipos puros del juego (`petState.ts`, `config.ts`, `catalog.ts`,
+  `storage.ts`) y renderizado Phaser (`petScene.ts`). Las reglas no importan Phaser, DOM ni
+  paquetes Polkadot.
 - `src/ui/`: representa información y devuelve intenciones del usuario. No ejecuta reglas de cadena.
-- `src/game/`: renderizado y animación Phaser.
-- `src/app/`: compone módulos y coordina flujos.
-- `src/infrastructure/`: implementaciones de almacenamiento u otros recursos externos.
-- `src/polkadot/`: adaptadores del Host SDK y del cliente del contrato. No filtra SDK al dominio.
-- `contracts/tamagotchi/`: Solidity y herramientas de contrato; se compila/despliega por separado
-  del bundle web.
+- `src/app/`: compone módulos y coordina flujos (`application.ts`).
+- `src/infrastructure/`: recursos del navegador (música con Web Audio).
+- `src/polkadot/`: adaptador del mint y del leaderboard (`nftMint.ts`). No filtra SDK a las reglas.
+- `game/src/contract/`: cliente de los contratos (viem, Host SDK, ABI y direcciones).
+- `contrato/`: Solidity y Hardhat (`PolkaPets.sol`, `PolkaPetsRanking.sol`); se compila y despliega
+  por separado del bundle web.
 
 ## Reglas de integración
 
@@ -28,4 +29,5 @@ Consultar `docs/decisions/` si la tarea cambia límites entre módulos, red o SD
 
 - `pnpm dev`: prototipo local.
 - `pnpm build`: typecheck y bundle de producción.
-- Las pruebas del contrato se ejecutarán desde `contracts/tamagotchi/` una vez elegida la toolchain.
+- Pruebas del cliente: `pnpm dlx --ignore-scripts vitest@2.1.0 run` desde `game/`.
+- Pruebas del contrato: `npm install` y `npm test` desde `contrato/`.

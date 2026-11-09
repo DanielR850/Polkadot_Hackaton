@@ -62,16 +62,15 @@ vuelve a leer la cadena cada 20 s.
 │   ├── test/PolkaPets.test.ts   # 13 tests
 │   └── hardhat.config.ts        # red polkadotHubTestnet (chainId 420420417)
 │
-└── game/                       # Frontend (Vite + TypeScript + viem, sin framework)
+└── game/                       # Cliente de los contratos (lo usa la app de la raíz)
     └── src/
-        ├── contract/            # config, ABI, tipos, wallets (EIP-6963) y cliente viem
+        ├── contract/            # config, ABI, wallets (EIP-6963), viem, Host SDK y ranking
         ├── engine/              # lógica pura: tiempo, salud, ranking (+ tests)
-        ├── hub/                 # estado de la partida; única pieza que habla con la red
-        ├── components/          # pantallas y modales
-        ├── lib/                 # formato y traducción de errores (+ tests)
-        ├── app.ts               # arma el DOM y conecta todo
-        └── main.ts
+        ├── hub/                 # estado del modo NFT con firma por cuidado
+        └── lib/                 # formato y traducción de errores (+ tests)
 ```
+
+Las pantallas viven en `src/ui/` de la raíz; `game/` ya no tiene frontend propio.
 
 ## Puesta en marcha
 

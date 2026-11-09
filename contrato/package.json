@@ -9,6 +9,8 @@
     "node": "hardhat node",
     "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
     "deploy:testnet": "hardhat run scripts/deploy.ts --network polkadotHubTestnet",
+    "deploy:items:local": "hardhat run scripts/deployItems.ts --network localhost",
+    "deploy:items:testnet": "hardhat run scripts/deployItems.ts --network polkadotHubTestnet",
     "abi": "hardhat run scripts/exportAbi.ts",
     "balance": "hardhat run scripts/balance.ts --network polkadotHubTestnet",
     "probar": "hardhat run scripts/probar.ts --network polkadotHubTestnet"

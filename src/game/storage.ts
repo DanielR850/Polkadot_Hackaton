@@ -43,7 +43,14 @@ export interface PetNft {
   asked?: boolean;
   /** La partida ya quedó registrada en el leaderboard. */
   recorded?: boolean;
+  /** El legado (tiempo vivido, accesorios y muebles) ya quedó guardado en la cadena. */
+  legacy?: boolean;
+  /** Modo elegido al adoptar. Las partidas guardadas antes de existir los modos son 'ranking'. */
+  mode?: NftMode;
 }
+
+/** Con cartera: 'passive' solo juega con su NFT; 'ranking' además entra al leaderboard. */
+export type NftMode = 'passive' | 'ranking';
 export const NFT_STORAGE_KEY = 'tamagotchi-polkadot-nft-v1';
 let nftMemory: string | null = null;
 
@@ -53,7 +60,10 @@ export function loadNft(): PetNft | null {
   try {
     const data = raw ? (JSON.parse(raw) as Partial<PetNft>) : null;
     if (!data || typeof data.tokenId !== 'string' || !/^\d+$/.test(data.tokenId) || typeof data.address !== 'string') return null;
-    return { tokenId: data.tokenId, address: data.address, asked: data.asked === true, recorded: data.recorded === true };
+    return {
+      tokenId: data.tokenId, address: data.address, asked: data.asked === true, recorded: data.recorded === true, legacy: data.legacy === true,
+      mode: data.mode === 'passive' ? 'passive' : 'ranking',
+    };
   } catch {
     return null;
   }

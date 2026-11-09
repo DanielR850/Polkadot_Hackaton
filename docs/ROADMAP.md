@@ -31,7 +31,7 @@ Las fases se hacen en orden porque cada una aclara decisiones que la siguiente n
 
 ## 3. Especificar y construir el contrato
 
-- Cerrar `contracts/tamagotchi/SPEC.md`: propietario, creación, acciones verificables y costo.
+- ~~Definir el contrato: propietario, creación, acciones verificables y costo.~~ Hecho en `contrato/` (PolkaPets y PolkaPetsRanking).
 - Elegir toolchain según la red/VM del taller; escribir Solidity y pruebas independientes.
 - Compilar para obtener ABI/artefactos y desplegar solo en el devnet acordado.
 - Guardar dirección y versión de la ABI en configuración pública, nunca una llave privada.

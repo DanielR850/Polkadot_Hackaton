@@ -13,11 +13,15 @@ export type MintView =
   | { step: 'searching' }
   | { step: 'choose'; inHost: boolean; wallets: readonly MintWalletView[]; suggested: ReadonlyArray<{ name: string; url: string }> }
   | { step: 'connecting'; inHost: boolean; via: string }
-  | { step: 'connected'; via: string; address: string; inHost: boolean }
+  | { step: 'connected'; via: string; address: string; inHost: boolean; mode: PlayMode; rankingAvailable: boolean }
   | { step: 'minting'; inHost: boolean; progress: MintStepView }
   | { step: 'done'; tokenId: string; url: string };
 
+/** Modo con cartera: pasivo (solo NFT) o ranking (NFT + leaderboard). */
+export type PlayMode = 'passive' | 'ranking';
+
 export interface MintIntents {
+  setMode(mode: PlayMode): void;
   /** walletId null = conectar con la Polkadot App (Host). */
   connect(walletId: string | null): void;
   retry(): void;
@@ -48,7 +52,7 @@ export function createMintScreen(intents: MintIntents) {
   const errorRetry = h('button', { type: 'button', class: 'ghost' }, 'Reintentar');
   const error = h('div', { class: 'mint-error', role: 'alert', hidden: true }, h('span', { 'aria-hidden': 'true' }, '⚠️'), errorText, errorRetry);
   const back = h('button', { type: 'button', class: 'ghost' }, '← Cambiar mascota');
-  const skip = h('button', { type: 'button', class: 'ghost' }, 'Jugar sin NFT');
+  const skip = h('button', { type: 'button', class: 'ghost' }, 'Jugar sin cartera');
   const footer = h('div', { class: 'row chain-row' }, back, skip);
   back.addEventListener('click', intents.back);
   skip.addEventListener('click', intents.skip);
@@ -155,19 +159,36 @@ export function createMintScreen(intents: MintIntents) {
         body.replaceChildren(loader(v.inHost ? 'Acepta los permisos en tu teléfono…' : `Conectando con ${v.via}… Revisa tu wallet.`));
       } else if (v.step === 'connected') {
         help.textContent = '';
+        const option = (mode: PlayMode, icon: string, label: string, text: string, disabled = false) => {
+          const b = h('button', { type: 'button', class: 'mint-card mode-option', 'aria-pressed': String(v.mode === mode) },
+            h('span', { class: 'mode-icon', 'aria-hidden': 'true' }, icon),
+            h('span', {}, h('b', {}, label), h('small', {}, text)));
+          b.disabled = disabled;
+          b.addEventListener('click', () => intents.setMode(mode));
+          return b;
+        };
+        const where = v.inHost ? 'en tu teléfono' : 'en tu wallet';
         body.replaceChildren(
           h('div', { class: 'mint-card mint-account' },
             h('span', { class: 'live-dot' }),
             h('div', {}, h('small', {}, 'Cuenta conectada'), h('b', {}, `${v.via} · ${short(v.address)}`))),
+          h('p', { class: 'eyebrow' }, 'ELIGE CÓMO JUGAR'),
+          h('div', { class: 'mode-options', role: 'group', 'aria-label': 'Modo de juego' },
+            option('passive', '🌿', 'Modo pasivo', 'Tu mascota es un NFT y la cuidas a tu ritmo. Sin leaderboard.'),
+            option('ranking', '🏆', 'Modo ranking',
+              v.rankingAvailable ? 'Además compites: al morir guardas cuánto vivió en el leaderboard (una firma más).' : 'El leaderboard no está disponible por ahora.',
+              !v.rankingAvailable)),
           primary('🥚 ADOPTAR NFT', intents.mint),
-          h('p', { class: 'hint' }, `Firmas la adopción ${v.inHost ? 'en tu teléfono' : 'en tu wallet'}. Después, cada cuidado también se firma y queda en la blockchain.`));
+          h('p', { class: 'hint' }, v.mode === 'ranking'
+            ? `Firmas al adoptar y, cuando muera, para guardar tu partida ${where}. Cuidarla es gratis.`
+            : `Firmas una sola vez ${where}, al adoptar. Cuidarla es gratis.`));
       } else if (v.step === 'minting') {
         if (startedAt === 0 || v.progress === 'simulando') startedAt = Date.now();
         help.textContent = '';
         body.replaceChildren(stepper(v.progress, v.inHost));
       } else {
         startedAt = 0;
-        help.textContent = 'Tu mascota ya vive en la blockchain. Sin cuidados aguanta unas 12 horas.';
+        help.textContent = 'Tu mascota ya vive en la blockchain como NFT. Sin cuidados aguanta 11 horas.';
         const link = h('a', { class: 'ghost', href: v.url, target: '_blank', rel: 'noopener noreferrer' }, 'Ver en Blockscout ↗');
         body.replaceChildren(
           h('div', { class: 'mint-card mint-nft' }, h('small', {}, 'TU NFT'), h('b', { class: 'mint-token' }, `#${v.tokenId}`), h('small', {}, 'PolkaPets · Polkadot Hub TestNet')),

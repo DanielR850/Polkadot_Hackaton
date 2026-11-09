@@ -1,53 +1,72 @@
-## Estado real tras unificar las ramas
-
-El árbol contiene dos arquitecturas de ejecución, no una sola app ya conectada de extremo a extremo:
-
-1. **Juego de la raíz:** `src/app/application.ts` coordina selección, cuidado, progreso y almacenamiento local; `src/domain/pet/` conserva reglas puras; `src/game/petScene.ts` dibuja la habitación con Phaser; `src/ui/` implementa pantallas y controles. Las cinco especies y sus tres edades se registran en `src/game/assets.ts`.
-2. **PolkaPets (rama Ana):** `game/` es frontend Vite independiente que usa `viem` y wallets EVM de navegador. `contrato/` contiene Solidity/Hardhat para Polkadot Hub TestNet. Se ejecuta y compila aparte de la raíz.
-
-El inicio local incluye una entrada al frontend EVM de `game/`. Ese frontend comparte la escena Phaser y los sprites del juego local. La dirección TestNet configurada (`0x758425A3b756079B34FF97cB9C7A764fD44C008a`) responde como PolkaPets y limita las especies a una según su función pública `NUM_ESPECIES`. El frontend lee ese límite y desactiva las otras cuatro tarjetas NFT. El Solidity fuente de esta rama ya admite cinco especies, pero necesita un nuevo despliegue y dirección para que las cinco sean NFT en esa red. La conexión EVM se hace con wallets de navegador mediante `viem`; `product-app/` prepara por separado el Host SDK para Paseo.
 # Arquitectura: de la interfaz al smart contract
 
-> **Estado:** guía del diseño propuesto. El prototipo actual todavía no usa Product SDK, Host,
-> wallet ni smart contract. Sus acciones modifican el estado local del navegador.
+## Estado actual
+
+Una sola app web (Vite + TypeScript + Phaser) en la raíz, publicada en `polka-pets.dot`:
+
+- **Juego:** nombre → elegir mascota (5 especies) → adoptar como NFT (opcional) → habitación.
+  Los cuidados son locales y gratis; se guardan en el dispositivo.
+- **Firmas:** solo dos, ambas opcionales: adoptar (`mint` en PolkaPets) y, al morir la mascota,
+  registrar la partida (`registrarMuerte` en PolkaPetsRanking).
+- **Accesorios y muebles (NFT):** con un NFT de mascota y `ITEMS_ADDRESS` configurado
+  (`game/src/contract/config.ts`), comprar en la tienda firma `comprar(mascotaId, articuloId)` en
+  `PolkaPetsItems`. El contrato crea un NFT ligado a esa mascota (no transferible) y los pesitos 🪙,
+  que son locales, solo se descuentan si la firma se confirma. Qué está puesto no es una
+  transacción por cambio: se guarda en el dispositivo y se declara una sola vez al morir con
+  `sellarLegado` (tiempo vivido, objetos comprados y puestos). El contrato valida ahí un accesorio,
+  una pared y un piso a la vez, un mueble o adorno por categoría y el máximo de lugares. Otra
+  mascota nueva no tiene acceso a los objetos de la anterior (en cadena por `mascotaId`; en el
+  cliente se vacía la tienda local al empezar). Sin `ITEMS_ADDRESS` la tienda sigue siendo local.
+- **Trofeos (logros):** `src/game/achievements.ts` define 9 logros por tiempo vivido y por tamaño de
+  la colección (mismos números que `_logro(...)` en el contrato). Con NFT, reclamar uno firma
+  `reclamarLogro`: el contrato comprueba por su cuenta el tiempo desde la adopción y los objetos que
+  esa mascota compró, exige que siga viva y crea un NFT ligado a ella. Sin NFT se ganan solos y se
+  guardan en el dispositivo. `sellarLegado` también guarda los trofeos ganados.
+- **Premios y bonos:** cada trofeo da pesitos 🪙 (locales, los acredita el juego) y algunos, un
+  accesorio exclusivo (`recompensa` en el contrato) que se mintea junto al trofeo y no se puede
+  comprar (`SoloPorLogro`). Los accesorios pueden dar bonos (`bonus` en `src/game/shop.ts`: % de
+  pesitos o de felicidad en los minijuegos), que suma `src/game/bonuses.ts`. Los bonos solo afectan
+  la economía local; no cambian lo que se firma ni lo que valida el contrato.
+- **Quién firma:** dentro de la Polkadot App o Desktop, el Host (Product SDK 0.39.0); en un
+  navegador normal, una wallet EVM como MetaMask (`viem`).
+- **Contratos** en Polkadot Hub TestNet (chain id 420420417):
+  - PolkaPets `0x758425A3b756079B34FF97cB9C7A764fD44C008a` (`NUM_ESPECIES = 1`: el mint usa la
+    especie 0 como comodín y el juego muestra el animal elegido).
+  - PolkaPetsRanking `0xf675957A89bfF3e02BD8AeB302Ca2E8Ca6f2a5d2` (leaderboard).
+
+`product-app/` y `product-contract/` son otra ruta (PolkaVM en Paseo) que la app no usa.
 
 ## Mapa de carpetas
 
 ```text
 src/
-├── main.ts                         # punto de entrada Vite; importa estilos y arranca la app
+├── main.ts, app/bootstrap.ts       # punto de entrada Vite
 ├── app/
-│   ├── bootstrap.ts                # encuentra el root y monta la aplicación
-│   └── petController.ts            # conecta vista, reglas, Phaser y almacenamiento
-├── domain/pet/petState.ts          # tipos, necesidades y reglas del Tamagotchi
-├── game/scenes/petScene.ts         # escena visual y animación de Phaser
-├── ui/petView.ts                   # muestra estado y convierte clicks en acciones
-├── infrastructure/storage/         # interfaz PetStorage y adaptador local actual
-└── polkadot/
-    ├── host/                       # futuro acceso a capacidades del Host
-    └── contracts/                  # futuro adaptador tipado del contrato
+│   ├── application.ts              # controlador: pantallas, cuidados, mint, registro y música
+│   └── chainApplication.ts         # modo NFT con firma por cuidado (no se abre hoy)
+├── game/                           # reglas puras (petState, config, catalog, storage) y Phaser (petScene)
+├── ui/                             # pantallas y diálogos: inicio, mascota, mint, juego, registro, ranking
+├── infrastructure/audio/music.ts   # música original con Web Audio
+└── polkadot/nftMint.ts             # adaptador: conectar, mint, registrar y leer el leaderboard
 
-contracts/tamagotchi/
-├── SPEC.md                         # comportamiento que decidiremos antes de Solidity
-├── src/                            # Solidity (todavía vacío)
-├── test/                           # pruebas del contrato (todavía vacío)
-└── scripts/                        # compilación/despliegue (todavía vacío)
+game/src/
+├── contract/                       # config, ABI, pets.ts (viem), host.ts (Product SDK), ranking.ts
+├── hub/, engine/, lib/             # estado y reglas del modo NFT con firma por cuidado (+ tests)
+
+contrato/                           # Hardhat: PolkaPets.sol, PolkaPetsRanking.sol, tests y scripts
 ```
-
-El repositorio usa un solo lockfile y el proyecto web permanece en la raíz para conservar el
-prototipo actual. El contrato tendrá fuentes, herramientas y despliegue propios dentro de
-`contracts/tamagotchi/`.
 
 ```mermaid
 flowchart LR
-    UI[ui / vista] --> APP[app / controlador]
-    APP --> DOMAIN[domain / reglas]
-    APP --> GAME[game / Phaser]
-    APP --> STORE[infrastructure / PetStorage]
-    APP -. futura llamada .-> PORT[polkadot / adaptadores]
-    PORT -. Host SDK .-> HOST[Polkadot Host]
-    HOST -. firma y cadena .-> CHAIN[Contrato en Polkadot]
-    CONTRACT[contracts / Solidity] --> CHAIN
+    UI[ui / pantallas] --> APP[app / application.ts]
+    APP --> RULES[game / reglas]
+    APP --> SCENE[game / Phaser]
+    APP --> STORE[game / storage local]
+    APP --> PORT[polkadot / nftMint.ts]
+    PORT --> CLIENT[game/src/contract]
+    CLIENT -- MetaMask / viem --> CHAIN[Polkadot Hub TestNet]
+    CLIENT -- Product SDK --> HOST[Polkadot App / Desktop]
+    HOST --> CHAIN
 ```
 
 ## Las piezas y su responsabilidad

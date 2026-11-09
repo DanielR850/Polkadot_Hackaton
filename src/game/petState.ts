@@ -30,18 +30,37 @@ export function createPet(petId: PetId, name: string, now: number): PetState {
   return { version: 2, petId, name, bornAt: now, updatedAt: now, needs, sleeping: false, diedAt: null };
 }
 
-export function computeNeeds(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): Needs {
-  const until = state.diedAt ?? now;
-  const minutes = Math.max(0, until - state.updatedAt) / MINUTE;
-  const factor = state.sleeping ? config.sleepDecayFactor : 1;
+/** Avanza las necesidades `minutes` minutos, dormida o despierta. */
+function advance(base: Needs, minutes: number, sleeping: boolean, config: GameConfig): Needs {
+  const factor = sleeping ? config.sleepDecayFactor : 1;
   const needs = {} as Needs;
   for (const key of NEED_KEYS) {
-    const delta = state.sleeping && key === 'energy'
+    const delta = sleeping && key === 'energy'
       ? config.sleepEnergyPerMinute * minutes
       : -config.decayPerMinute[key] * factor * minutes;
-    needs[key] = clamp(state.needs[key] + delta);
+    needs[key] = clamp(base[key] + delta);
   }
   return needs;
+}
+
+/** Momento (ms) en que una mascota dormida se despierta sola: cuando su energía llega a 100. */
+export function wakeAt(state: PetState, config: GameConfig = DEFAULT_CONFIG): number {
+  const minutes = Math.max(0, 100 - state.needs.energy) / config.sleepEnergyPerMinute;
+  return state.updatedAt + minutes * MINUTE;
+}
+
+/** true si sigue dormida en `now`. Se despierta sola al recuperar toda la energía. */
+export function isAsleep(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): boolean {
+  return state.sleeping && state.diedAt === null && now < wakeAt(state, config);
+}
+
+/** Dormida hasta recuperar toda la energía; desde ese momento, despierta (aunque la app esté cerrada). */
+export function computeNeeds(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): Needs {
+  const until = state.diedAt ?? now;
+  if (!state.sleeping) return advance(state.needs, Math.max(0, until - state.updatedAt) / MINUTE, false, config);
+  const wake = Math.min(until, wakeAt(state, config));
+  const rested = advance(state.needs, Math.max(0, wake - state.updatedAt) / MINUTE, true, config);
+  return advance(rested, Math.max(0, until - wake) / MINUTE, false, config);
 }
 
 export function computeStats(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): Stats {
@@ -92,7 +111,7 @@ export function deathTime(state: PetState, now: number, config: GameConfig = DEF
 export function markDeadIfNeeded(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
   if (state.diedAt !== null || !isDead(state, now, config)) return state;
   const at = deathTime(state, now, config);
-  return { ...state, needs: computeNeeds(state, at, config), updatedAt: at, diedAt: at };
+  return { ...state, needs: computeNeeds(state, at, config), updatedAt: at, diedAt: at, sleeping: false };
 }
 
 export function lowNeeds(stats: Stats, config: GameConfig = DEFAULT_CONFIG): NeedKey[] {
@@ -101,7 +120,7 @@ export function lowNeeds(stats: Stats, config: GameConfig = DEFAULT_CONFIG): Nee
 
 /** Lleva las necesidades al valor actual. Toda acción lo hace antes de aplicar su efecto. */
 function settle(state: PetState, now: number, config: GameConfig): PetState {
-  return { ...state, needs: computeNeeds(state, now, config), updatedAt: now };
+  return { ...state, needs: computeNeeds(state, now, config), updatedAt: now, sleeping: isAsleep(state, now, config) };
 }
 
 function applyEffects(state: PetState, effects: Partial<Needs>): PetState {
@@ -112,8 +131,10 @@ function applyEffects(state: PetState, effects: Partial<Needs>): PetState {
 
 /** Acción con efecto en las necesidades. Muerta o dormida no hace nada. */
 function careAction(state: PetState, now: number, config: GameConfig, effects: Partial<Needs>): PetState {
-  if (isDead(state, now, config) || state.sleeping) return state;
-  return applyEffects(settle(state, now, config), effects);
+  if (isDead(state, now, config)) return state;
+  const settled = settle(state, now, config);
+  if (settled.sleeping) return state;
+  return applyEffects(settled, effects);
 }
 
 export function feed(state: PetState, itemId: string, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
@@ -122,8 +143,9 @@ export function feed(state: PetState, itemId: string, now: number, config: GameC
   return careAction(state, now, config, item.effects);
 }
 
-export function play(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
-  return careAction(state, now, config, { happiness: 20, energy: -12, cleanliness: -5, thirst: -5 });
+/** Jugar: sube la felicidad (en los minijuegos, según el puntaje) y cansa, ensucia y da sed. */
+export function play(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG, happiness = 20): PetState {
+  return careAction(state, now, config, { happiness, energy: -12, cleanliness: -5, thirst: -5 });
 }
 
 /** `scrubPercent` (0–100) es cuánto se frotó en la escena del baño. Se aplica una sola vez al salir. */
@@ -136,9 +158,13 @@ export function bathe(state: PetState, scrubPercent: number, now: number, config
   });
 }
 
+/** Con la energía al máximo no tiene sueño: no se duerme. */
 export function sleep(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
-  if (isDead(state, now, config) || state.sleeping) return state;
-  return { ...settle(state, now, config), sleeping: true };
+  if (isDead(state, now, config)) return state;
+  const settled = settle(state, now, config);
+  // 99.5 o más se muestra como 100 %: con eso ya no tiene sueño.
+  if (settled.sleeping || settled.needs.energy >= 99.5) return state;
+  return { ...settled, sleeping: true };
 }
 
 export function wake(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {

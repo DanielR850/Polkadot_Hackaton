@@ -3,14 +3,17 @@
 // dentro de Polkadot Desktop o la Polkadot App firma el Host; en un navegador, una wallet EVM.
 import { EXPLORER_URL, PETS_ADDRESS } from '../../game/src/contract/config.ts';
 import { conectarHost, dentroDelHost } from '../../game/src/contract/host.ts';
-import { adoptar, conectar, firmanteEvm, firmanteHost, numEspecies, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
+import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
 import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../../game/src/contract/wallets.ts';
 import { mensajeError } from '../../game/src/lib/txErrors.ts';
+import { comprarArticulo, errorItems, itemsActivo, reclamarLogroMascota, sellarLegadoMascota } from '../../game/src/contract/items.ts';
 import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../../game/src/contract/ranking.ts';
 
 export type { FilaLeaderboard, Partida };
 
 export type MintStep = PasoTx;
+/** Funciones de cuidado del contrato PolkaPets. */
+export type CareAction = 'alimentar' | 'jugar' | 'dormir' | 'banar';
 
 export interface MintWallet { id: string; name: string; icon: string | null }
 
@@ -42,6 +45,21 @@ export interface NftMinter {
   /** Firma el registro de la partida en el leaderboard. */
   record(partida: Partida, onStep?: (step: MintStep) => void): Promise<void>;
   leaderboard(): Promise<FilaLeaderboard[]>;
+  /**
+   * Firma un cuidado del NFT. Primero lo simula: si el contrato lo rechazaría, lanza el error sin
+   * abrir la wallet (no se paga nada). Resuelve solo cuando la transacción se confirmó con éxito.
+   */
+  care(tokenId: bigint, action: CareAction, onStep?: (step: MintStep) => void): Promise<void>;
+  /** Igual que care, para cambiar el nombre del NFT. */
+  rename(tokenId: bigint, name: string, onStep?: (step: MintStep) => void): Promise<void>;
+  /** true si hay contrato de objetos: las compras de la tienda son NFT ligados a la mascota. */
+  itemsEnabled(): boolean;
+  /** Firma la compra de un objeto (id del catálogo del contrato) para la mascota 	okenId. */
+  buyItem(tokenId: bigint, articleId: number, onStep?: (step: MintStep) => void): Promise<void>;
+  /** Firma el reclamo de un trofeo (id de logro del contrato) para la mascota `tokenId`. */
+  claimAchievement(tokenId: bigint, achievementId: number, onStep?: (step: MintStep) => void): Promise<void>;
+  /** Firma el legado de la mascota muerta: cuánto vivió y qué tenía puesto (el contrato valida las reglas). */
+  saveLegacy(tokenId: bigint, durationSec: number, equipped: readonly number[], onStep?: (step: MintStep) => void): Promise<void>;
   /** Texto corto en español para cualquier error de wallet, red o contrato. */
   explain(error: unknown): string;
 }
@@ -83,6 +101,27 @@ export function createNftMinter(): NftMinter {
       await registrarPartida(signer, partida, onStep);
     },
     leaderboard: () => leerLeaderboard(),
+    async care(tokenId, action, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await cuidar(signer, action, tokenId, onStep);
+    },
+    itemsEnabled: () => itemsActivo(),
+    async buyItem(tokenId, articleId, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await comprarArticulo(signer, tokenId, articleId, onStep);
+    },
+    async claimAchievement(tokenId, achievementId, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await reclamarLogroMascota(signer, tokenId, achievementId, onStep);
+    },
+    async saveLegacy(tokenId, durationSec, equipped, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await sellarLegadoMascota(signer, tokenId, durationSec, equipped, onStep);
+    },
+    async rename(tokenId, name, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await cambiarNombre(signer, tokenId, name, onStep);
+    },
 
     async mint(name, petId, onStep) {
       if (!signer) throw new Error('Conecta tu cuenta primero.');
@@ -94,6 +133,6 @@ export function createNftMinter(): NftMinter {
 
     nftUrl: (tokenId) => `${EXPLORER_URL}/token/${PETS_ADDRESS}/instance/${tokenId}`,
 
-    explain: (error) => errorRanking(error) ?? mensajeError(error),
+    explain: (error) => errorItems(error) ?? errorRanking(error) ?? mensajeError(error),
   };
 }

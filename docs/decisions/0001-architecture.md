@@ -8,7 +8,7 @@
 
 - Mantener un Product web TypeScript/Vite en la raíz para no romper el prototipo actual.
 - Separar `domain`, `ui`, `app`, `game` e `infrastructure` dentro de `src/`.
-- Mantener el contrato como subproyecto independiente en `contracts/tamagotchi/` dentro del mismo
+- Mantener el contrato como subproyecto independiente (hoy `contrato/`; el esqueleto inicial `contracts/tamagotchi/` se eliminó) dentro del mismo
   repositorio. Compilación y despliegue serán separados del bundle web.
 - Encapsular Host SDK y contratos en adaptadores `src/polkadot/`; el dominio no importa el SDK.
 - Mantener el guardado local como adaptador inicial. Diseñar otro adaptador para el Host cuando se

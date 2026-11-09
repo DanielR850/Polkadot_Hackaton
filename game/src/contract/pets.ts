@@ -124,6 +124,9 @@ export type Escritura = (
   | { functionName: "cambiarNombre"; args: [bigint, string] }
   | { functionName: Accion; args: [bigint] }
   | { functionName: "registrarMuerte"; args: [bigint, string, number, bigint] }
+  | { functionName: "comprar"; args: [bigint, number] }
+  | { functionName: "reclamarLogro"; args: [bigint, number] }
+  | { functionName: "sellarLegado"; args: [bigint, bigint, readonly number[]] }
 ) & { destino?: Destino };
 
 /** Contrato y argumentos para viem (simular o enviar). */
@@ -194,10 +197,10 @@ export async function adoptar(firmante: Firmante, nombre: string, especie: numbe
   throw new Error("La mascota se creó, pero todavía no aparece. Recarga en unos segundos.");
 }
 
-export async function cuidar(firmante: Firmante, accion: Accion, tokenId: bigint): Promise<void> {
-  await escribir(firmante, { functionName: accion, args: [tokenId] });
+export async function cuidar(firmante: Firmante, accion: Accion, tokenId: bigint, onPaso?: (p: PasoTx) => void): Promise<void> {
+  await escribir(firmante, { functionName: accion, args: [tokenId] }, onPaso);
 }
 
-export async function cambiarNombre(firmante: Firmante, tokenId: bigint, nombre: string): Promise<void> {
-  await escribir(firmante, { functionName: "cambiarNombre", args: [tokenId, nombre.trim()] });
+export async function cambiarNombre(firmante: Firmante, tokenId: bigint, nombre: string, onPaso?: (p: PasoTx) => void): Promise<void> {
+  await escribir(firmante, { functionName: "cambiarNombre", args: [tokenId, nombre.trim()] }, onPaso);
 }
