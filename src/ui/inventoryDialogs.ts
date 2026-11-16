@@ -10,7 +10,7 @@ const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
 export interface InventoryIntents {
   /** Elegir uno (accesorio, pared o piso). id null = ninguno / el original. */
-  select(kind: 'accessory' | 'wall' | 'floor', id: string | null): void;
+  select(kind: 'accessory' | 'outfit' | 'wall' | 'floor', id: string | null): void;
   /** Poner o quitar un mueble o adorno. */
   toggle(kind: 'furniture' | 'decor', id: string): void;
   /** Color de la prenda de pixel art puesta (sombrero). */
@@ -50,7 +50,7 @@ export function createAccessoriesDialog(intents: InventoryIntents) {
     colors(wearable: boolean, current: string) {
       colors.hidden = !wearable;
       if (!wearable) return;
-      colors.replaceChildren(h('p', { class: 'eyebrow' }, 'COLOR DEL SOMBRERO'), h('div', { class: 'choice-row' }, ...HAT_PALETTES.map((p) => {
+      colors.replaceChildren(h('p', { class: 'eyebrow' }, 'COLOR DE LA ROPA'), h('div', { class: 'choice-row' }, ...HAT_PALETTES.map((p) => {
         const b = h('button', { type: 'button', class: 'choice', 'aria-pressed': String(p.id === current) },
           h('span', { class: 'choice-swatch', style: `background:${hex(p.body[2])};box-shadow:inset 0 -6px 0 ${hex(p.band[1])}`, 'aria-hidden': 'true' }), p.name);
         b.addEventListener('click', () => intents.palette?.(p.id));
@@ -60,16 +60,24 @@ export function createAccessoriesDialog(intents: InventoryIntents) {
     loading() { status.textContent = 'Cargando tu inventario…'; grid.replaceChildren(); },
     failed() { status.textContent = 'No se pudo cargar tu inventario. Intenta de nuevo.'; grid.replaceChildren(); },
     render(owned: readonly InventoryItem[], equipped: Equipped) {
-      const items = owned.filter((i) => i.kind === 'accessory');
-      if (items.length === 0) {
+      const head = owned.filter((i) => i.kind === 'accessory');
+      const body = owned.filter((i) => i.kind === 'outfit');
+      if (head.length === 0 && body.length === 0) {
         status.textContent = '';
-        grid.replaceChildren(empty('Aún no tienes accesorios.'));
+        grid.replaceChildren(empty('Aún no tienes accesorios ni ropa.'));
         return;
       }
-      status.textContent = 'Toca un accesorio para ponérselo a tu mascota.';
+      status.textContent = 'Puedes llevar un accesorio en la cabeza y una prenda en el cuerpo al mismo tiempo.';
+      const section = (title: string) => h('p', { class: 'eyebrow inv-section' }, title);
       grid.replaceChildren(
-        itemCard(null, equipped.accessory === null, 'Ninguno', () => intents.select('accessory', null)),
-        ...items.map((i) => itemCard(i, equipped.accessory === i.id, i.name, () => intents.select('accessory', i.id))));
+        section('CABEZA Y CARA'),
+        itemCard(null, equipped.accessory === null, 'Nada', () => intents.select('accessory', null)),
+        ...head.map((i) => itemCard(i, equipped.accessory === i.id, i.name, () => intents.select('accessory', i.id))),
+        ...(body.length ? [
+          section('ROPA'),
+          itemCard(null, equipped.outfit === null, 'Nada', () => intents.select('outfit', null)),
+          ...body.map((i) => itemCard(i, equipped.outfit === i.id, i.name, () => intents.select('outfit', i.id))),
+        ] : []));
     },
   };
 }
@@ -81,12 +89,12 @@ export function createSpaceDialog(intents: InventoryIntents) {
   const grid = h('div', { class: 'item-grid inv-grid' });
   body.append(tabs, status, grid);
 
-  let section: Exclude<InventoryKind, 'accessory'> = 'wall';
+  let section: Exclude<InventoryKind, 'accessory' | 'outfit'> = 'wall';
   let owned: readonly InventoryItem[] = [];
   let equipped: Equipped | null = null;
 
   const tabButtons = SPACE_SECTIONS.map((s) => {
-    const b = h('button', { type: 'button', role: 'tab' }, `${s.icon} ${s.label}`);
+    const b = h('button', { type: 'button', role: 'tab' }, s.label);
     b.addEventListener('click', () => { section = s.kind; draw(); });
     tabs.append(b);
     return { kind: s.kind, b };

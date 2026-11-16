@@ -137,3 +137,29 @@ describe('Atrapa la pelota', () => {
     expect(happinessFor({ game: 'ball', score: 0, coins: 0 })).toBe(5);
   });
 });
+
+describe('ropa mexicana', () => {
+  it('cada prenda y talla se genera con contorno, franjas o color, sin salirse de la matriz', async () => {
+    const { buildCloth, clothColor, CLOTH_SLOT } = await import('./clothes.ts');
+    const { HAT_PALETTES } = await import('./wearables.ts');
+    for (const kind of ['charro', 'poncho', 'paliacate', 'rebozo'] as const) {
+      const sizes = (['s', 'm', 'l'] as const).map((size) => buildCloth(kind, size));
+      expect(sizes[2].width).toBeGreaterThan(sizes[0].width);
+      for (const art of sizes) {
+        expect(art.pixels.length).toBe(art.width * art.height);
+        expect(art.pixels.includes(1)).toBe(true); // contorno
+        for (const i of art.pixels) if (i) expect(clothColor(i, HAT_PALETTES[0], 0x2b1d33)).not.toBeNull();
+      }
+    }
+    expect(CLOTH_SLOT.charro).toBe('head');
+    expect(CLOTH_SLOT.poncho).toBe('neck');
+  });
+
+  it('se puede llevar sombrero y una prenda a la vez, pero no dos prendas', async () => {
+    const { sanitize, DEMO_ITEMS, NOTHING_EQUIPPED } = await import('./inventory.ts');
+    const eq = sanitize({ ...NOTHING_EQUIPPED, accessory: 'demo:charro', outfit: 'demo:poncho' }, DEMO_ITEMS);
+    expect(eq.accessory).toBe('demo:charro');
+    expect(eq.outfit).toBe('demo:poncho');
+    expect(sanitize({ ...NOTHING_EQUIPPED, outfit: 'demo:charro' }, DEMO_ITEMS).outfit).toBeNull();
+  });
+});

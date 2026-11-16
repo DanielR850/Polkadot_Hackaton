@@ -27,7 +27,7 @@ describe("PolkaPetsItems: comida, utilidad y drops", () => {
     const s = await items.articulo(SOMBRERO);
     expect(s.utilidad).to.equal(UTIL.Pesitos);
     expect(s.valor).to.equal(5);
-    for (let id = 1; id <= 31; id++) expect((await items.articulo(id)).utilidad).to.not.equal(UTIL.Ninguna);
+    for (let id = 1; id <= 35; id++) expect((await items.articulo(id)).utilidad).to.not.equal(UTIL.Ninguna);
     await items.comprar(1, SOMBRERO);
     const json = JSON.parse(Buffer.from((await items.tokenURI(1)).split(",")[1], "base64").toString("utf8"));
     expect(json.attributes.find((a: { trait_type: string }) => a.trait_type === "Utilidad").value).to.equal("+5% pesitos");
@@ -96,5 +96,17 @@ describe("PolkaPetsItems: comida, utilidad y drops", () => {
     await items.setIntervaloDrop(600);
     await time.increaseTo(nacimiento + 1800n);
     expect(await items.dropsDisponibles(1)).to.equal(3);
+  });
+
+  it("ropa mexicana: una prenda del cuerpo junto a un accesorio, pero no dos prendas", async () => {
+    const { items } = await desplegar(12, 0);
+    for (const id of [32, 33, 34]) await items.comprar(1, id); // charro, poncho, paliacate
+    await items.validarEquipo(1, [32, 33]); // sombrero charro + poncho: válido
+    await expect(items.validarEquipo(1, [33, 34])).to.be.revertedWithCustomError(items, "LugarRepetido");
+    await time.increase(200);
+    await items.sellarLegado(1, 100, [32, 34]);
+    const json = JSON.parse(Buffer.from((await items.tokenURI(2)).split(",")[1], "base64").toString("utf8"));
+    expect(json.name).to.equal("Poncho");
+    expect(json.attributes.find((a: { trait_type: string }) => a.trait_type === "Tipo").value).to.equal("Ropa");
   });
 });

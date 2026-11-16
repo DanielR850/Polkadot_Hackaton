@@ -534,7 +534,8 @@ function applyInventory() {
   scene?.setDecor(toDecor(equipped, owned));
   // Las prendas de WEARABLE_ITEMS se dibujan como pixel art ajustado a cada especie; el resto, emoji.
   scene?.setAccessory(accessoryIcon(equipped, owned), headWearFor(equipped.accessory, hatPalette), slotOf(equipped.accessory));
-  accessoriesDialog?.colors(isWearable(equipped.accessory), hatPalette);
+  scene?.setOutfit(headWearFor(equipped.outfit, hatPalette));
+  accessoriesDialog?.colors(isWearable(equipped.accessory) || isWearable(equipped.outfit), hatPalette);
 }
 
 /**
@@ -562,7 +563,7 @@ const inventoryIntents = {
     saveHatPalette(id);
     applyInventory();
   },
-  select(kind: 'accessory' | 'wall' | 'floor', id: string | null) {
+  select(kind: 'accessory' | 'outfit' | 'wall' | 'floor', id: string | null) {
     // sanitize garantiza que solo se ponga lo que se tiene, y uno por lugar.
     equipped = sanitize({ ...equipped, [kind]: id }, owned);
     applyInventory();
@@ -642,7 +643,7 @@ const shopDialog = createShopDialog(SHOP_CATALOG, {
     }
     applyInventory();
     shopDialog.close();
-    gameScreen.say(`¡${item.name} ya está en tu ${item.kind === 'accessory' ? 'mascota' : 'habitación'}!`);
+    gameScreen.say(`¡${item.name} ya está en tu ${item.kind === 'accessory' || item.kind === 'outfit' ? 'mascota' : 'habitación'}!`);
   },
 });
 
@@ -655,7 +656,19 @@ async function openInventory(dialog: typeof accessoriesDialog | typeof spaceDial
 
 const gameScreen = createGameScreen({
   feed: () => feedMenu.open(),
+  // Jugar es en la misma habitación: aparece la pelota y se juega ahí, sin abrir ventanas.
   play: () => withPet((p, now) => {
+    if (pendingSign) { gameScreen.say('Espera a que termine la firma en curso.'); return; }
+    if (scene?.isPlaying()) return;
+    const blocked = blockedReason(p, now);
+    if (blocked) { gameScreen.say(blocked); return; }
+    const started = scene?.playInRoom((result) => {
+      gameScreen.say(result.score >= 5 ? '¡Las atrapé todas!' : `Atrapé ${result.score}. ¡Otra vez!`);
+      claimMiniGame(result);
+    });
+    if (started) gameScreen.say('¡Toca la pelota antes de que se acabe el tiempo!');
+  }),
+  moreGames: () => withPet((p, now) => {
     if (pendingSign) { gameScreen.say('Espera a que termine la firma en curso.'); return; }
     miniGameDialog.choose(purse.best, blockedReason(p, now));
   }),

@@ -58,6 +58,31 @@ export function pixelateRgba(src: Uint8ClampedArray, size: number, palette: read
 
 /* ------------------------------------------------------------ navegador */
 
+import { buildCloth, clothColor, type ClothKind } from '../game/clothes.ts';
+import { findPalette, WEARABLE_ITEMS } from '../game/wearables.ts';
+
+/** Ícono de una prenda de ropa (`cloth:<tipo>`): la misma prenda de pixel art, sin escalar. */
+function clothCanvas(kind: ClothKind): HTMLCanvasElement | null {
+  try {
+    const art = buildCloth(kind, 's');
+    const palette = findPalette(Object.values(WEARABLE_ITEMS).find((w) => w.kind === kind)?.palette ?? 'noche');
+    const canvas = document.createElement('canvas');
+    canvas.width = art.width;
+    canvas.height = art.height;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return null;
+    for (let i = 0; i < art.pixels.length; i++) {
+      const color = clothColor(art.pixels[i], palette, OUTLINE);
+      if (color === null) continue;
+      ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+      ctx.fillRect(i % art.width, Math.floor(i / art.width), 1, 1);
+    }
+    return canvas;
+  } catch {
+    return null;
+  }
+}
+
 /** Resolución lógica de los íconos (sin contar el contorno). */
 export const ICON_SIZE = 14;
 const canvases = new Map<string, HTMLCanvasElement | null>();
@@ -68,6 +93,11 @@ const canvases = new Map<string, HTMLCanvasElement | null>();
  */
 export function pixelIconCanvas(emoji: string): HTMLCanvasElement | null {
   if (canvases.has(emoji)) return canvases.get(emoji)!;
+  if (emoji.startsWith('cloth:')) {
+    const canvas = clothCanvas(emoji.slice(6) as ClothKind);
+    canvases.set(emoji, canvas);
+    return canvas;
+  }
   let result: HTMLCanvasElement | null = null;
   try {
     const draw = document.createElement('canvas');
@@ -120,7 +150,7 @@ export function pixelIcon(emoji: string, className = 'px-icon'): HTMLElement {
     img.draggable = false;
     span.append(img);
   } else {
-    span.textContent = emoji;
+    span.textContent = emoji.startsWith('cloth:') ? '' : emoji;
   }
   return span;
 }

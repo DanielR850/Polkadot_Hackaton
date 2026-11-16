@@ -25,6 +25,11 @@ export const SHOP_CATALOG: readonly ShopItem[] = [
   { id: 'shop:lentes', articleId: 3, kind: 'accessory', name: 'Lentes', icon: '🕶️', price: 35, bonus: { coins: 8 } },
   { id: 'shop:flor', articleId: 4, kind: 'accessory', name: 'Flor', icon: '🌺', price: 20, bonus: { happiness: 8 } },
   { id: 'shop:corona', articleId: 5, kind: 'accessory', name: 'Corona', icon: '👑', price: 120, bonus: { coins: 15 } },
+  { id: 'shop:charro', articleId: 32, kind: 'accessory', name: 'Sombrero charro', icon: 'cloth:charro', price: 70, bonus: { coins: 10 } },
+  // Ropa mexicana (cuerpo): una a la vez, se combina con un accesorio de cabeza.
+  { id: 'shop:poncho', articleId: 33, kind: 'outfit', name: 'Poncho', icon: 'cloth:poncho', price: 80, bonus: { happiness: 10 } },
+  { id: 'shop:paliacate', articleId: 34, kind: 'outfit', name: 'Paliacate', icon: 'cloth:paliacate', price: 30, bonus: { coins: 6 } },
+  { id: 'shop:rebozo', articleId: 35, kind: 'outfit', name: 'Rebozo', icon: 'cloth:rebozo', price: 60, bonus: { happiness: 8 } },
   // Exclusivos: no se compran, se ganan con un trofeo (ver achievements.ts).
   { id: 'shop:medalla', articleId: 21, kind: 'accessory', name: 'Medalla', icon: '🏅', price: 0, exclusive: true, bonus: { coins: 10 } },
   { id: 'shop:estrella', articleId: 22, kind: 'accessory', name: 'Estrella', icon: '⭐', price: 0, exclusive: true, bonus: { happiness: 15 } },
@@ -53,7 +58,7 @@ export const SHOP_CATALOG: readonly ShopItem[] = [
 
 /** Ids del catálogo del contrato de lo que está puesto (accesorio, pared, piso, muebles y adornos). */
 export function equippedArticleIds(equipped: Equipped, catalog: readonly ShopItem[] = SHOP_CATALOG): number[] {
-  const ids = [equipped.accessory, equipped.wall, equipped.floor, ...equipped.furniture, ...equipped.decor];
+  const ids = [equipped.accessory, equipped.outfit, equipped.wall, equipped.floor, ...equipped.furniture, ...equipped.decor];
   return ids.flatMap((id) => {
     const item = catalog.find((i) => i.id === id);
     return item ? [item.articleId] : [];

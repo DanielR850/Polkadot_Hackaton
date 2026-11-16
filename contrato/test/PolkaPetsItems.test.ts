@@ -53,7 +53,7 @@ describe("PolkaPetsItems", () => {
 
     it("el catálogo clasifica cada objeto", async () => {
       const { items } = await desplegar();
-      expect(await items.totalArticulos()).to.equal(31);
+      expect(await items.totalArticulos()).to.equal(35);
       expect((await items.articulo(SOMBRERO)).tipo).to.equal(TIPO.Accesorio);
       expect((await items.articulo(PARED_ROSA)).tipo).to.equal(TIPO.Pared);
       expect((await items.articulo(SILLON)).categoria).to.equal((await items.articulo(SILLA)).categoria);

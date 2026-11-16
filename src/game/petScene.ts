@@ -7,6 +7,8 @@ import type { PetId, Stage } from './types.ts';
 import type { RoomDecor } from './inventory.ts';
 import { ICON_SIZE, pixelIconCanvas } from '../ui/pixelArt.ts';
 import { closeEyes, EYES } from './sleepFace.ts';
+import { BALL_SECONDS, BALL_TARGET, type MiniGameResult } from './minigames/rules.ts';
+import { buildCloth, clothColor } from './clothes.ts';
 import { bodyPoints, placeAccessory as placeOnBody, type Slot } from './bodyPoints.ts';
 import { PIXEL_STYLE, toRealPixelArt } from './pixelStyle.ts';
 import { findVariant, recolorPixels, SPECIES_RAMPS, variantOutline } from './variants.ts';
@@ -51,6 +53,17 @@ export interface PetSceneHandle {
    * ajustada a la cabeza de cada especie y edad; si no, el emoji sobre la cabeza.
    */
   setAccessory(icon: string | null, wear?: HeadWear | null, slot?: Slot): void;
+  /** Ropa del cuerpo (poncho, paliacate, rebozo), o null. */
+  setOutfit(wear: HeadWear | null): void;
+  /**
+   * "Atrapa la pelota" en la misma habitación: aparece una pelota, la mascota corre hacia ella y
+   * hay que tocarla 5 veces en 12 s. Devuelve false si ahora no se puede (dormida, baño, etc.).
+   */
+  playInRoom(onEnd: (result: MiniGameResult) => void): boolean;
+  /** ¿Hay una partida en la habitación? */
+  isPlaying(): boolean;
+  /** Al tocar a la mascota (acariciarla) fuera de una partida. */
+  onPet(handler: () => void): void;
 }
 
 export interface RoomColors { wall: number; stripe: number }
@@ -177,6 +190,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private accessory!: Phaser.GameObjects.Image;
     /** Prenda de pixel art sobre la cabeza; sigue cada movimiento de la ilustración (update). */
     private hat!: Phaser.GameObjects.Image;
+    /** Ropa del cuerpo; va entre la ilustración y el sombrero. */
+    private outfit!: Phaser.GameObjects.Image;
+    private outfitWear: HeadWear | null = null;
     private wear: HeadWear | null = null;
     /** Emoji del accesorio; se guarda aunque la escena aún no exista y se aplica en create(). */
     private accessoryIcon: string | null = null;
@@ -242,7 +258,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.sprite = this.add.sprite(0, 0, '__DEFAULT').setVisible(false);
       this.accessory = this.add.image(0, -80, '__DEFAULT').setOrigin(0.5, 1).setVisible(false);
       this.hat = this.add.image(0, 0, '__DEFAULT').setVisible(false);
-      this.bobber = this.add.container(0, 0, [this.placeholder, this.sprite, this.hat, this.accessory]);
+      this.outfit = this.add.image(0, 0, '__DEFAULT').setVisible(false);
+      this.bobber = this.add.container(0, 0, [this.placeholder, this.sprite, this.outfit, this.hat, this.accessory]);
       this.petRoot = this.add.container(ROOM_POS.x, ROOM_POS.y, [this.bobber]);
       this.bob = this.tweens.add({ targets: this.bobber, y: -7, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
@@ -253,7 +270,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.sponge = this.drawSponge().setVisible(false);
 
       this.input.on('pointermove', (pointer: Phaser.Input.Pointer) => this.moveSponge(pointer.worldX, pointer.worldY));
-      this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => this.moveSponge(pointer.worldX, pointer.worldY, true));
+      this.input.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        this.moveSponge(pointer.worldX, pointer.worldY, true);
+        this.touchPet(pointer.worldX, pointer.worldY);
+      });
 
       this.ready = true;
       this.drawDecor();
@@ -292,34 +312,48 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
      * paleta y contorno se genera una sola vez como pixel art (bloques de `block` píxeles de la
      * imagen original), así que se ve con el mismo tamaño de píxel que la ilustración.
      */
-    private dressHat() {
+    /**
+     * Viste una capa (cabeza u cuerpo) con una prenda de pixel art. Cada combinación de forma,
+     * tamaño, paleta y contorno se genera una sola vez con el tamaño de píxel de la ilustración.
+     */
+    private dress(image: Phaser.GameObjects.Image, wear: HeadWear | null) {
       const anchor = this.headAnchor();
-      const hidden = !this.wear || !anchor || this.view?.anim === 'dead' || this.view?.anim === 'bath';
-      this.hat.setVisible(!hidden);
-      if (hidden || !this.wear || !anchor) return;
-      const shape = HAT_SIZES[anchor.size];
+      const hidden = !wear || !anchor || this.view?.anim === 'dead' || this.view?.anim === 'bath';
+      image.setVisible(!hidden);
+      if (hidden || !wear || !anchor) return;
       const block = anchor.block ?? BLOCK;
       // Con una variante de color, el contorno de la prenda es el de esa variante.
       const variant = this.view ? findVariant(this.view.petId, this.view.variant) : null;
       const outline = variant ? variantOutline(variant) : anchor.outline;
-      const key = `${wearKey(this.wear, anchor.size, outline)}-${block}`;
-      const art = buildTopHat(shape);
+      const key = `${wearKey(wear, anchor.size, outline)}-${block}`;
+      const art = wear.kind === 'top-hat' ? buildTopHat(HAT_SIZES[anchor.size]) : buildCloth(wear.kind, anchor.size);
       if (!this.textures.exists(key)) {
         const canvas = document.createElement('canvas');
         canvas.width = art.width * block;
         canvas.height = art.height * block;
         const ctx = canvas.getContext('2d')!;
-        const palette = findPalette(this.wear.palette);
+        const palette = findPalette(wear.palette);
         for (let i = 0; i < art.pixels.length; i++) {
-          const color = colorOf(art.pixels[i], palette, outline);
+          const color = wear.kind === 'top-hat' ? colorOf(art.pixels[i], palette, outline) : clothColor(art.pixels[i], palette, outline);
           if (color === null) continue;
           ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
           ctx.fillRect((i % art.width) * block, Math.floor(i / art.width) * block, block, block);
         }
         this.textures.addCanvas(key, canvas);
       }
-      this.hat.setTexture(key).setOrigin(art.pivot.x / art.width, art.pivot.y / art.height);
+      image.setTexture(key).setOrigin(art.pivot.x / art.width, art.pivot.y / art.height);
+    }
+
+    private dressHat() {
+      this.dress(this.hat, this.wear);
+      this.dress(this.outfit, this.outfitWear);
       this.followHead();
+    }
+
+    /** Ropa del cuerpo (poncho, paliacate, rebozo) o null. */
+    setOutfit(wear: HeadWear | null) {
+      this.outfitWear = wear;
+      if (this.ready) this.dressHat();
     }
 
     /** Copia posición, giro, escala y tinte de la ilustración para que la prenda se mueva con ella. */
@@ -340,10 +374,12 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       };
       const rotation = this.sprite.rotation + Phaser.Math.DegToRad(points.angle);
       const tinted = this.sprite.isTinted;
-      if (this.hat.visible) {
-        const at = toScene(points.head.x, points.head.y);
-        this.hat.setPosition(at.x, at.y).setRotation(rotation).setScale(this.sprite.scaleX, this.sprite.scaleY).setAlpha(this.sprite.alpha);
-        if (tinted) this.hat.setTint(this.sprite.tint); else this.hat.clearTint();
+      for (const [image, point] of [[this.hat, points.head], [this.outfit, points.neck]] as const) {
+        if (!image.visible) continue;
+        // El sombrero charro va en la cabeza aunque esté en la capa de cuerpo y viceversa: decide su lugar.
+        const at = toScene(point.x, point.y);
+        image.setPosition(at.x, at.y).setRotation(rotation).setScale(this.sprite.scaleX, this.sprite.scaleY).setAlpha(this.sprite.alpha);
+        if (tinted) image.setTint(this.sprite.tint); else image.clearTint();
       }
       if (this.accessory.visible) {
         const place = placeOnBody(points, this.accessorySlot);
@@ -356,8 +392,96 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       }
     }
 
-    update() {
-      if (this.ready) this.followHead();
+    update(_t: number, delta: number) {
+      if (!this.ready) return;
+      this.followHead();
+      if (this.roomGame) this.tickGame(delta);
+    }
+
+    /* ------------------------------------------------ jugar en la habitación */
+
+    private roomGame: { ball: Phaser.GameObjects.Image; hud: Phaser.GameObjects.Text; score: number; coins: number; elapsed: number; onEnd: (r: MiniGameResult) => void } | null = null;
+    private petHandler: (() => void) | null = null;
+
+    isPlaying() { return this.roomGame !== null; }
+
+    playInRoom(onEnd: (result: MiniGameResult) => void): boolean {
+      const anim = this.view?.anim;
+      if (!this.ready || !this.view || this.roomGame || anim === 'dead' || anim === 'bath' || anim === 'sleep') return false;
+      const key = this.iconTexture('🎾');
+      const ball = (key ? this.add.image(0, 0, key).setDisplaySize(40, 40) : this.add.image(0, 0, '__WHITE').setDisplaySize(30, 30).setTint(0xd7f542))
+        .setDepth(20).setInteractive({ useHandCursor: true });
+      const hud = this.add.text(W / 2, 16, '', {
+        fontFamily: 'system-ui, sans-serif', fontSize: '18px', fontStyle: 'bold', color: '#fff7e6', backgroundColor: '#302b43cc', padding: { x: 10, y: 4 },
+      }).setOrigin(0.5, 0).setDepth(21);
+      this.roomGame = { ball, hud, score: 0, coins: 0, elapsed: 0, onEnd };
+      ball.on('pointerdown', (_p: Phaser.Input.Pointer, _x: number, _y: number, event: Phaser.Types.Input.EventData) => { event.stopPropagation(); this.hitBall(); });
+      this.moveBall();
+      this.tweens.add({ targets: ball, angle: 360, duration: 900, repeat: -1 });
+      this.drawGameHud();
+      return true;
+    }
+
+    private moveBall() {
+      if (!this.roomGame) return;
+      const x = Phaser.Math.Between(60, W - 60);
+      const y = Phaser.Math.Between(80, 250);
+      this.roomGame.ball.setPosition(x, y);
+      // La mascota corre hacia la pelota (solo de lado a lado, sin salirse del piso).
+      this.tweens.killTweensOf(this.petRoot);
+      this.petRoot.y = ROOM_POS.y;
+      this.tweens.add({ targets: this.petRoot, x: Phaser.Math.Clamp(x, 110, W - 110), duration: 420, ease: 'Sine.inOut' });
+      this.tweens.add({ targets: this.petRoot, y: ROOM_POS.y - 22, duration: 210, yoyo: true, ease: 'Sine.out' });
+    }
+
+    private hitBall() {
+      const g = this.roomGame;
+      if (!g) return;
+      g.score += 1;
+      g.coins += 1;
+      const pop = this.add.text(g.ball.x, g.ball.y - 20, '+1', { fontFamily: 'system-ui, sans-serif', fontSize: '22px', fontStyle: 'bold', color: '#ffd23f', stroke: '#302b43', strokeThickness: 4 }).setOrigin(0.5).setDepth(22);
+      this.tweens.add({ targets: pop, y: pop.y - 40, alpha: 0, duration: 700, onComplete: () => pop.destroy() });
+      if (g.score >= BALL_TARGET) { g.coins += 2; this.endGame(); return; }
+      this.moveBall();
+      this.drawGameHud();
+    }
+
+    private drawGameHud() {
+      const g = this.roomGame;
+      if (!g) return;
+      g.hud.setText(`Atrapa la pelota   ${Math.max(0, Math.ceil(BALL_SECONDS - g.elapsed / 1000))} s   ${g.score}/${BALL_TARGET}`);
+    }
+
+    private tickGame(delta: number) {
+      const g = this.roomGame!;
+      g.elapsed += delta;
+      this.drawGameHud();
+      if (g.elapsed >= BALL_SECONDS * 1000) this.endGame();
+    }
+
+    private endGame() {
+      const g = this.roomGame;
+      if (!g) return;
+      this.roomGame = null;
+      this.tweens.killTweensOf(g.ball);
+      g.ball.destroy();
+      g.hud.destroy();
+      this.tweens.killTweensOf(this.petRoot);
+      this.petRoot.y = ROOM_POS.y;
+      this.tweens.add({ targets: this.petRoot, x: ROOM_POS.x, duration: 500, ease: 'Sine.inOut' });
+      g.onEnd({ game: 'ball', score: g.score, coins: g.coins });
+    }
+
+    onPet(handler: () => void) { this.petHandler = handler; }
+
+    /** Tocar a la mascota en la habitación: se alegra (corazón y saltito). */
+    private touchPet(x: number, y: number) {
+      if (this.roomGame || !this.view || !this.sprite.visible) return;
+      const anim = this.view.anim;
+      if (anim === 'dead' || anim === 'bath' || anim === 'sleep') return;
+      if (!this.sprite.getBounds().contains(x, y)) return;
+      this.react('❤️');
+      this.petHandler?.();
     }
 
     /** Textura de pixel art de un emoji (src/ui/pixelArt.ts), o null si no se pudo dibujar. */
@@ -1002,5 +1126,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     setRoomColors: (colors) => scene.setRoomColors(colors),
     setDecor: (decor) => scene.setDecor(decor),
     setAccessory: (icon, wear, slot) => scene.setAccessory(icon, wear, slot),
+    setOutfit: (wear) => scene.setOutfit(wear),
+    playInRoom: (onEnd) => scene.playInRoom(onEnd),
+    isPlaying: () => scene.isPlaying(),
+    onPet: (handler) => scene.onPet(handler),
   };
 }

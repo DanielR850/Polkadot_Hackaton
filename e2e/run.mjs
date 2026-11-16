@@ -332,19 +332,33 @@ async function main() {
     }
     await page.waitForTimeout(800);
     await shot(page, '09-ajolote-mono');
-    // Minijuego original del equipo.
+    // Ropa mexicana: sombrero charro en la cabeza y poncho en el cuerpo, al mismo tiempo.
+    await page.evaluate(() => {
+      localStorage.setItem('tamagotchi-polkadot-purchases-v1', JSON.stringify(['shop:charro', 'shop:poncho', 'shop:rebozo']));
+      localStorage.setItem('tamagotchi-polkadot-equipped-v1', JSON.stringify({ accessory: null, outfit: null, wall: null, floor: null, furniture: [], decor: [] }));
+    });
+    await page.reload();
+    await page.waitForSelector('.game-screen:not([hidden])');
+    await clickText(page, '.extras button', 'Accesorios');
+    check((await text(page, 'dialog[open]')).includes('ROPA'), 'Accesorios muestra la sección Ropa');
+    await clickText(page, 'dialog[open] .inv-item', 'Sombrero charro');
+    await clickText(page, 'dialog[open] .inv-item', 'Poncho');
+    await page.locator('dialog[open] .dialog-close').click();
+    const worn = JSON.parse(await storage(page, 'tamagotchi-polkadot-equipped-v1'));
+    check(worn.accessory === 'shop:charro' && worn.outfit === 'shop:poncho', 'lleva sombrero charro y poncho a la vez');
+    await page.waitForTimeout(800);
+    await shot(page, '10-charro-y-poncho');
+    // Jugar en la misma habitación, sin ventana.
     await clickText(page, '.actions button', 'Jugar');
-    check(await page.locator('dialog[open] button', { hasText: 'Atrapa la pelota' }).count() === 1, 'Jugar ofrece Atrapa la pelota junto a los de Ana');
-    await clickText(page, 'dialog[open] button', 'Atrapa la pelota');
-    const canvas = page.locator('dialog[open] canvas');
-    await canvas.waitFor();
-    await page.waitForTimeout(1500); // "¡LISTOS!"
-    const box = await canvas.boundingBox();
-    await page.mouse.click(box.x + box.width / 2, box.y + box.height * ((360 / 2 - 40) / 360));
-    await until(async () => /pelota|Récord|pesitos|🪙/i.test(await text(page, 'dialog[open]')) && (await page.locator('dialog[open] canvas').count()) === 0, 'resultado del minijuego', 20_000);
-    const result = await text(page, 'dialog[open]');
-    check(/\+\s?\d+\s?🪙|\d+ 🪙|pesitos/.test(result), `muestra el resultado con pesitos (${result.replace(/\s+/g, ' ').slice(0, 90)})`);
-    await shot(page, '10-atrapa-la-pelota');
+    await page.waitForTimeout(500);
+    check(await page.locator('dialog[open]').count() === 0, 'Jugar no abre ventana: se juega en la habitación');
+    await shot(page, '11-jugar-en-la-habitacion');
+    await until(async () => (JSON.parse((await storage(page, 'tamagotchi-polkadot-purse-v1')) ?? '{}').lastPlayAt ?? 0) > 0, 'la partida en la habitación termina y se cobra', 25_000);
+    // Los demás minijuegos siguen en el Menú.
+    await page.click('.menu-button');
+    await clickText(page, '#game-menu button', 'Más minijuegos');
+    check(await page.locator('dialog[open] button', { hasText: 'Atrapa la pelota' }).count() === 1, 'Más minijuegos ofrece los tres juegos');
+    await page.locator('dialog[open] .dialog-close').click();
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 

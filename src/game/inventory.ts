@@ -5,7 +5,8 @@
 // los NFT basta con crear otra fuente que devuelva `InventoryItem[]` leídos del contrato.
 
 /** Dónde se usa un objeto: en la mascota o en una sección de la habitación. */
-export type InventoryKind = 'accessory' | 'wall' | 'floor' | 'furniture' | 'decor';
+/** `accessory` va en la cabeza o la cara; `outfit` es la ropa del cuerpo (poncho, paliacate, rebozo). */
+export type InventoryKind = 'accessory' | 'outfit' | 'wall' | 'floor' | 'furniture' | 'decor';
 
 /** Bonos en porcentaje que da un objeto puesto: más pesitos o más felicidad al jugar. */
 export interface Bonus {
@@ -41,6 +42,8 @@ export interface InventorySource {
 /** Lo que tiene puesto. Pared y piso: uno o el original (null). Muebles y adornos: varios. */
 export interface Equipped {
   accessory: string | null;
+  /** Ropa del cuerpo (una a la vez; se puede combinar con un accesorio). */
+  outfit: string | null;
   wall: string | null;
   floor: string | null;
   furniture: string[];
@@ -51,7 +54,7 @@ export interface Equipped {
 export const SLOTS = { furniture: 3, decor: 2 } as const;
 
 /** Secciones de "Mi espacio", en el orden en que se muestran. */
-export const SPACE_SECTIONS: ReadonlyArray<{ kind: Exclude<InventoryKind, 'accessory'>; label: string; icon: string }> = [
+export const SPACE_SECTIONS: ReadonlyArray<{ kind: Exclude<InventoryKind, 'accessory' | 'outfit'>; label: string; icon: string }> = [
   { kind: 'wall', label: 'Pared', icon: '🧱' },
   { kind: 'floor', label: 'Piso', icon: '🟫' },
   { kind: 'furniture', label: 'Muebles', icon: '🪑' },
@@ -66,7 +69,7 @@ export interface RoomDecor {
   decor: string[];
 }
 
-export const NOTHING_EQUIPPED: Equipped = { accessory: null, wall: null, floor: null, furniture: [], decor: [] };
+export const NOTHING_EQUIPPED: Equipped = { accessory: null, outfit: null, wall: null, floor: null, furniture: [], decor: [] };
 
 /**
  * Quita lo que ya no está en el inventario y respeta las reglas de lo puesto: un accesorio, una
@@ -91,6 +94,7 @@ export function sanitize(equipped: Equipped, owned: readonly InventoryItem[]): E
   };
   return {
     accessory: has(equipped.accessory, 'accessory'),
+    outfit: has(equipped.outfit ?? null, 'outfit'),
     wall: has(equipped.wall, 'wall'),
     floor: has(equipped.floor, 'floor'),
     furniture: many(equipped.furniture, 'furniture'),
@@ -152,6 +156,10 @@ export const DEMO_ITEMS: readonly InventoryItem[] = [
   { id: 'demo:sombrero', kind: 'accessory', name: 'Sombrero', icon: '🎩' },
   { id: 'demo:corona', kind: 'accessory', name: 'Corona', icon: '👑' },
   { id: 'demo:moño', kind: 'accessory', name: 'Moño', icon: '🎀' },
+  { id: 'demo:charro', kind: 'accessory', name: 'Sombrero charro', icon: 'cloth:charro' },
+  { id: 'demo:poncho', kind: 'outfit', name: 'Poncho', icon: 'cloth:poncho' },
+  { id: 'demo:paliacate', kind: 'outfit', name: 'Paliacate', icon: 'cloth:paliacate' },
+  { id: 'demo:rebozo', kind: 'outfit', name: 'Rebozo', icon: 'cloth:rebozo' },
   { id: 'demo:pared-rosa', kind: 'wall', name: 'Pared rosa', icon: '🟪', color: 0xf3a6c8 },
   { id: 'demo:pared-azul', kind: 'wall', name: 'Pared turquesa', icon: '🟦', color: 0x8fd3d6 },
   { id: 'demo:piso-barro', kind: 'floor', name: 'Piso de barro', icon: '🟧', color: 0xc0643c },
@@ -183,7 +191,7 @@ export function loadEquipped(): Equipped {
     const d = raw ? (JSON.parse(raw) as Partial<Equipped>) : null;
     const id = (v: unknown) => (typeof v === 'string' ? v : null);
     const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
-    return d ? { accessory: id(d.accessory), wall: id(d.wall), floor: id(d.floor), furniture: ids(d.furniture), decor: ids(d.decor) } : { ...NOTHING_EQUIPPED };
+    return d ? { accessory: id(d.accessory), outfit: id(d.outfit), wall: id(d.wall), floor: id(d.floor), furniture: ids(d.furniture), decor: ids(d.decor) } : { ...NOTHING_EQUIPPED };
   } catch {
     return { ...NOTHING_EQUIPPED };
   }

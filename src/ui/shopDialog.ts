@@ -20,7 +20,8 @@ export interface ShopIntents {
 type Section = InventoryKind | 'food';
 
 const SECTIONS: ReadonlyArray<{ kind: Section; label: string; icon: string }> = [
-  { kind: 'accessory', label: 'Ropa', icon: '🎩' },
+  { kind: 'accessory', label: 'Accesorios', icon: '' },
+  { kind: 'outfit', label: 'Ropa', icon: '' },
   ...SPACE_SECTIONS,
   { kind: 'food', label: 'Comida', icon: '🫔' },
 ];
@@ -41,7 +42,7 @@ export function createShopDialog(items: readonly ShopItem[], intents: ShopIntent
   let busy = false;
 
   const tabButtons = SECTIONS.map((s) => {
-    const b = h('button', { type: 'button', role: 'tab' }, `${s.icon} ${s.label}`);
+    const b = h('button', { type: 'button', role: 'tab' }, s.label);
     b.addEventListener('click', () => { if (busy) return; section = s.kind; panel.hidden = true; draw(); });
     tabs.append(b);
     return { kind: s.kind, b };
@@ -140,14 +141,14 @@ export function createShopDialog(items: readonly ShopItem[], intents: ShopIntent
       owned = state.owned;
       busy = false;
       draw();
-      const where = item.kind === 'accessory' ? 'Accesorios' : 'Mi espacio';
+      const where = item.kind === 'accessory' || item.kind === 'outfit' ? 'Accesorios' : 'Mi espacio';
       panel.hidden = false;
       panel.replaceChildren(
         h('div', { class: 'mint-card shop-confirm' }, preview(item),
           h('span', {}, h('b', {}, `¡Compraste ${item.name}!`), h('small', {}, `Lo encuentras en ${where}.`))),
         h('div', { class: 'row chain-row' },
           button('Seguir comprando', 'ghost', () => { panel.hidden = true; }),
-          button(item.kind === 'accessory' ? 'Ponérselo' : 'Colocarlo', 'primary', () => intents.use(item))));
+          button(item.kind === 'accessory' || item.kind === 'outfit' ? 'Ponérselo' : 'Colocarlo', 'primary', () => intents.use(item))));
     },
     failed(message: string) {
       busy = false;

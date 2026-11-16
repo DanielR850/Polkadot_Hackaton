@@ -613,3 +613,5 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .meter-label { align-items: center; }
 .death-icon img { width: 56px; height: 56px; image-rendering: pixelated; margin: 0 auto; display: block; }
 .pet-record .record-time { font-size: 17px; line-height: 1.15; color: var(--mx-green); font-family: var(--body); }
+.inv-grid .inv-section { grid-column: 1 / -1; margin: 6px 0 0; }
+.inv-icon img, .item-icon img, .px-icon img { object-fit: contain; }

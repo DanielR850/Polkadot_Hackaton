@@ -8,7 +8,7 @@ export const NO_BONUS: Readonly<Required<Bonus>> = { coins: 0, happiness: 0 };
 
 /** Suma los bonos de todo lo que está puesto (accesorio, pared, piso, muebles y adornos). */
 export function totalBonus(equipped: Equipped, owned: readonly InventoryItem[]): Required<Bonus> {
-  const ids = [equipped.accessory, equipped.wall, equipped.floor, ...equipped.furniture, ...equipped.decor];
+  const ids = [equipped.accessory, equipped.outfit, equipped.wall, equipped.floor, ...equipped.furniture, ...equipped.decor];
   const total = { ...NO_BONUS };
   for (const id of ids) {
     const bonus = owned.find((i) => i.id === id)?.bonus;

@@ -20,6 +20,8 @@ export interface GameView {
 export interface GameIntents {
   feed(): void;
   play(): void;
+  /** Abre la ventana con todos los minijuegos. */
+  moreGames?(): void;
   sleep(): void;
   wake(): void;
   bath(): void;
@@ -75,10 +77,12 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const styleBtn = h('button', { type: 'button', class: 'ghost' }, 'Dibujo: Original');
   styleBtn.addEventListener('click', () => intents.style?.());
   myPets.addEventListener('click', () => { toggleMenu(false); intents.collection?.(); });
+  const moreGamesBtn = h('button', { type: 'button', class: 'ghost' }, 'Más minijuegos');
+  moreGamesBtn.addEventListener('click', () => { toggleMenu(false); intents.moreGames?.(); });
   const menu = h('div', { id: 'game-menu', class: 'game-menu', hidden: true },
     h('strong', {}, 'MENÚ DE PARTIDA'),
     h('p', {}, 'Si eliges otra, esta se queda guardada en Mis animales.'),
-    menuClose, myPets, styleBtn, chooseAnother);
+    menuClose, moreGamesBtn, myPets, styleBtn, chooseAnother);
   const toggleMenu = (open: boolean) => {
     menu.hidden = !open;
     menuButton.setAttribute('aria-expanded', String(open));

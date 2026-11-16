@@ -46,6 +46,9 @@ const BABY_AXOLOTL: ReadonlyArray<{ hx: number; top: number; ex: number; ey: num
 /** Cuello de las ilustraciones grandes del ajolote (frente): justo debajo de la barbilla. */
 const AXOLOTL_NECK: Partial<Record<Stage, Point>> = { teen: { x: 460, y: 740 }, adult: { x: 470, y: 725 } };
 
+/** Ajuste del cuello por especie (el manatí no tiene cuello: va detrás de la cabeza). */
+const NECK_SHIFT: Partial<Record<PetId, { dx: number; dy: number }>> = { 4: { dx: -170, dy: -30 } };
+
 const center = (boxes: readonly (readonly [number, number, number, number])[]) => {
   const xs = boxes.map((b) => (b[1] + b[3]) / 2);
   const ys = boxes.map((b) => (b[0] + b[2]) / 2);
@@ -72,9 +75,10 @@ export function bodyPoints(petId: PetId, stage: Stage, frame = 0): BodyPoints | 
   }
   const eyes = EYES[petId]?.[stage];
   const c = eyes?.length ? center(eyes) : { x: anchor.x, y: anchor.y + 160, span: 90, eyeH: 60 };
+  const shift = NECK_SHIFT[petId] ?? { dx: 0, dy: 0 };
   const neck = (petId === 0 ? AXOLOTL_NECK[stage] : undefined)
     // De lado (lobo, oso, tlacuache, manatí): el cuello queda abajo y hacia el cuerpo.
-    ?? { x: c.x - c.span * 0.4, y: c.y + c.eyeH * 3.2 };
+    ?? { x: c.x - c.span * 0.4 + shift.dx, y: c.y + c.eyeH * 3.2 + shift.dy };
   return {
     head: { x: anchor.x, y: anchor.y },
     eyes: { x: c.x, y: c.y, span: c.span },

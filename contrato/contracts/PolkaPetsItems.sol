@@ -77,7 +77,8 @@ contract PolkaPetsItems is ERC721, Ownable {
         Piso, // 2
         Mueble, // 3
         Adorno, // 4
-        Comida // 5: consumible
+        Comida, // 5: consumible
+        Ropa // 6: ropa del cuerpo (poncho, paliacate, rebozo); una a la vez, junto a un accesorio
     }
 
     /** Para qué sirve un objeto. Los porcentajes los aplica el juego; Vida y Saciedad, este contrato. */
@@ -244,6 +245,15 @@ contract PolkaPetsItems is ERC721, Ownable {
         _util(18, Utilidad.Felicidad, 3);
         _util(19, Utilidad.Pesitos, 5);
         _util(20, Utilidad.Felicidad, 5);
+        // Ropa mexicana: sombrero charro (accesorio) y prendas del cuerpo.
+        _definir(32, Tipo.Accesorio, 0); // Sombrero charro
+        _definir(33, Tipo.Ropa, 0); // Poncho
+        _definir(34, Tipo.Ropa, 0); // Paliacate
+        _definir(35, Tipo.Ropa, 0); // Rebozo
+        _util(32, Utilidad.Pesitos, 10);
+        _util(33, Utilidad.Felicidad, 10);
+        _util(34, Utilidad.Pesitos, 6);
+        _util(35, Utilidad.Felicidad, 8);
         // Exclusivos: solo se ganan con un logro (`recompensa`).
         _exclusivo(21); // Medalla
         _exclusivo(22); // Estrella
@@ -518,6 +528,7 @@ contract PolkaPetsItems is ERC721, Ownable {
      */
     function _validarEquipo(uint256 mascotaId, uint16[] calldata equipados) private view {
         bool accesorio;
+        bool ropa;
         bool pared;
         bool piso;
         uint8 muebles;
@@ -530,7 +541,10 @@ contract PolkaPetsItems is ERC721, Ownable {
             if (tokenComprado[mascotaId][id] == 0) revert NoComprado(mascotaId, id);
             Articulo memory a = _catalogo[id];
             if (a.tipo == Tipo.Comida) revert NoSePonen(id);
-            if (a.tipo == Tipo.Accesorio) {
+            if (a.tipo == Tipo.Ropa) {
+                if (ropa) revert LugarRepetido(Tipo.Ropa);
+                ropa = true;
+            } else if (a.tipo == Tipo.Accesorio) {
                 if (accesorio) revert LugarRepetido(Tipo.Accesorio);
                 accesorio = true;
             } else if (a.tipo == Tipo.Pared) {
@@ -631,6 +645,10 @@ contract PolkaPetsItems is ERC721, Ownable {
         if (id == 28) return Visual(unicode"Agua de jamaica", unicode"🧃", 0);
         if (id == 29) return Visual(unicode"Chocolate caliente", unicode"☕", 0);
         if (id == 30) return Visual(unicode"Mole de la abuela", unicode"🍛", 0);
+        if (id == 32) return Visual(unicode"Sombrero charro", unicode"👒", 0);
+        if (id == 33) return Visual(unicode"Poncho", unicode"🧥", 0);
+        if (id == 34) return Visual(unicode"Paliacate", unicode"🧣", 0);
+        if (id == 35) return Visual(unicode"Rebozo", unicode"🧣", 0);
         return Visual(unicode"Elixir de ajolote", unicode"🧪", 0);
     }
 
@@ -677,6 +695,7 @@ contract PolkaPetsItems is ERC721, Ownable {
         if (tipo == Tipo.Piso) return "Piso";
         if (tipo == Tipo.Mueble) return "Mueble";
         if (tipo == Tipo.Comida) return "Comida";
+        if (tipo == Tipo.Ropa) return "Ropa";
         return "Adorno";
     }
 

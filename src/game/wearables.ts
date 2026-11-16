@@ -8,6 +8,7 @@
 //  - el tamaño de píxel es el de las ilustraciones (BLOCK), así que la prenda no se ve borrosa ni
 //    con píxeles más gordos que la mascota. Las ilustraciones originales no se modifican.
 import type { PetId, Stage } from './types.ts';
+import type { ClothKind } from './clothes.ts';
 
 /** Píxeles de la imagen original por píxel de la prenda (las ilustraciones miden ~10 px por píxel). */
 export const BLOCK = 10;
@@ -202,13 +203,22 @@ export const HEAD_ANCHORS: Record<PetId, Record<Stage, HeadAnchor>> = {
   },
 };
 
-/** Lo que la mascota lleva puesto en la cabeza: forma y paleta. */
-export interface HeadWear { kind: 'top-hat'; palette: string }
+/** Prenda de pixel art: sombrero de copa o ropa mexicana (clothes.ts), con su paleta. */
+export type WearKind = 'top-hat' | ClothKind;
+export interface HeadWear { kind: WearKind; palette: string }
 
 /** Prendas de la tienda que se dibujan como pixel art (las demás siguen siendo emoji). */
 export const WEARABLE_ITEMS: Readonly<Record<string, HeadWear>> = {
   'shop:sombrero': { kind: 'top-hat', palette: 'noche' },
   'demo:sombrero': { kind: 'top-hat', palette: 'noche' },
+  'shop:charro': { kind: 'charro', palette: 'noche' },
+  'demo:charro': { kind: 'charro', palette: 'noche' },
+  'shop:poncho': { kind: 'poncho', palette: 'rosa' },
+  'demo:poncho': { kind: 'poncho', palette: 'rosa' },
+  'shop:paliacate': { kind: 'paliacate', palette: 'turquesa' },
+  'demo:paliacate': { kind: 'paliacate', palette: 'turquesa' },
+  'shop:rebozo': { kind: 'rebozo', palette: 'cempasuchil' },
+  'demo:rebozo': { kind: 'rebozo', palette: 'cempasuchil' },
 };
 
 export const findPalette = (id: string) => HAT_PALETTES.find((p) => p.id === id) ?? HAT_PALETTES[0];
