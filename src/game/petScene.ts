@@ -7,6 +7,7 @@ import type { PetId, Stage } from './types.ts';
 import type { RoomDecor } from './inventory.ts';
 import { ICON_SIZE, pixelIconCanvas } from '../ui/pixelArt.ts';
 import { closeEyes, EYES } from './sleepFace.ts';
+import { bodyPoints, placeAccessory as placeOnBody, type Slot } from './bodyPoints.ts';
 import { PIXEL_STYLE, toRealPixelArt } from './pixelStyle.ts';
 import { findVariant, recolorPixels, SPECIES_RAMPS, variantOutline } from './variants.ts';
 import { BLOCK, buildTopHat, colorOf, findPalette, HAT_SIZES, HEAD_ANCHORS, type HeadAnchor, type HeadWear, wearKey } from './wearables.ts';
@@ -49,7 +50,7 @@ export interface PetSceneHandle {
    * Accesorio que lleva la mascota, o null. Si `wear` existe se dibuja como prenda de pixel art
    * ajustada a la cabeza de cada especie y edad; si no, el emoji sobre la cabeza.
    */
-  setAccessory(icon: string | null, wear?: HeadWear | null): void;
+  setAccessory(icon: string | null, wear?: HeadWear | null, slot?: Slot): void;
 }
 
 export interface RoomColors { wall: number; stripe: number }
@@ -179,6 +180,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private wear: HeadWear | null = null;
     /** Emoji del accesorio; se guarda aunque la escena aún no exista y se aplica en create(). */
     private accessoryIcon: string | null = null;
+    /** Lugar del cuerpo del accesorio de ícono (cabeza, lado, ojos o cuello). */
+    private accessorySlot: Slot = 'head';
     /** Ilustraciones recoloreadas: una por imagen original y variante (se generan una sola vez). */
     private recolored = new WeakMap<object, Map<string, HTMLCanvasElement>>();
     /** Última posición y escala aplicadas a la mascota (para no reasignarlas cada segundo). */
@@ -254,7 +257,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
 
       this.ready = true;
       this.drawDecor();
-      this.setAccessory(this.accessoryIcon, this.wear);
+      this.setAccessory(this.accessoryIcon, this.wear, this.accessorySlot);
       if (this.view) this.apply(this.view);
     }
 
@@ -265,16 +268,17 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.drawDecor();
     }
 
-    setAccessory(icon: string | null, wear: HeadWear | null = null) {
+    setAccessory(icon: string | null, wear: HeadWear | null = null, slot: Slot = 'head') {
       this.wear = wear;
       this.accessoryIcon = icon;
+      this.accessorySlot = slot;
       // Antes de create() no hay objetos: se aplica al terminar de crear la escena.
       if (!this.ready) return;
       const key = !wear && icon ? this.iconTexture(icon) : null;
-      if (key) this.accessory.setTexture(key).setDisplaySize(ICON_SIZE * 3, ICON_SIZE * 3);
+      if (key) this.accessory.setTexture(key);
       this.accessory.setVisible(key !== null);
-      this.placeAccessory();
       this.dressHat();
+      this.followHead();
     }
 
     /** Ancla de la cabeza para la ilustración visible, o null si no hay ilustración (marcador). */
@@ -321,18 +325,35 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     /** Copia posición, giro, escala y tinte de la ilustración para que la prenda se mueva con ella. */
     private followHead() {
       const anchor = this.headAnchor();
-      if (!anchor || !this.hat.visible) return;
+      if (!anchor || !this.view) return;
       const frame = this.sprite.frame;
-      const lx = (anchor.x - frame.width / 2) * this.sprite.scaleX;
-      const ly = (anchor.y - frame.height / 2) * this.sprite.scaleY;
+      // En la hoja del bebé ajolote cada cuadro tiene su postura: punto del cuerpo por cuadro.
+      const points = bodyPoints(this.view.petId, this.view.stage, Number(frame.name) || 0);
+      if (!points) return;
       const cos = Math.cos(this.sprite.rotation);
       const sin = Math.sin(this.sprite.rotation);
-      this.hat
-        .setPosition(this.sprite.x + lx * cos - ly * sin, this.sprite.y + lx * sin + ly * cos)
-        .setRotation(this.sprite.rotation + Phaser.Math.DegToRad(anchor.angle))
-        .setScale(this.sprite.scaleX, this.sprite.scaleY)
-        .setAlpha(this.sprite.alpha);
-      if (this.sprite.isTinted) this.hat.setTint(this.sprite.tint); else this.hat.clearTint();
+      /** Punto de la imagen original → posición en la escena (con giro y escala de la ilustración). */
+      const toScene = (x: number, y: number) => {
+        const lx = (x - frame.width / 2) * this.sprite.scaleX;
+        const ly = (y - frame.height / 2) * this.sprite.scaleY;
+        return { x: this.sprite.x + lx * cos - ly * sin, y: this.sprite.y + lx * sin + ly * cos };
+      };
+      const rotation = this.sprite.rotation + Phaser.Math.DegToRad(points.angle);
+      const tinted = this.sprite.isTinted;
+      if (this.hat.visible) {
+        const at = toScene(points.head.x, points.head.y);
+        this.hat.setPosition(at.x, at.y).setRotation(rotation).setScale(this.sprite.scaleX, this.sprite.scaleY).setAlpha(this.sprite.alpha);
+        if (tinted) this.hat.setTint(this.sprite.tint); else this.hat.clearTint();
+      }
+      if (this.accessory.visible) {
+        const place = placeOnBody(points, this.accessorySlot);
+        const at = toScene(place.x, place.y);
+        const size = this.accessory.frame.width || ICON_SIZE + 2;
+        const scale = (place.width / size) * this.sprite.scaleX;
+        this.accessory.setOrigin(0.5, place.originY).setPosition(at.x, at.y).setRotation(rotation)
+          .setScale(scale, (place.width / size) * this.sprite.scaleY);
+        if (tinted) this.accessory.setTint(this.sprite.tint); else this.accessory.clearTint();
+      }
     }
 
     update() {
@@ -371,13 +392,6 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     }
 
     /** Pone el accesorio sobre la cabeza: arriba de la ilustración, a la altura de la boca en x. */
-    private placeAccessory() {
-      if (!this.view) return;
-      const m = MOUTH[this.view.petId]?.[this.view.stage] ?? { x: 0.5, y: 0.45 };
-      const width = BODY.ry * 3;
-      this.accessory.setPosition((m.x - 0.5) * width * 0.75, -BODY.ry * 1.25);
-    }
-
     show(view: SceneView) {
       this.view = view;
       if (this.ready) this.apply(view);
@@ -432,8 +446,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       const key = `${view.petId}|${view.stage}|${view.anim}|${view.variant ?? ''}|${view.style ?? ''}`;
       if (key === this.drawnKey) return;
       this.drawnKey = key;
-      // Accesorio: sobre la cabeza; se oculta muerta y durante el baño.
-      this.placeAccessory();
+      // Accesorio: sigue a la mascota en su lugar del cuerpo (followHead); se oculta muerta y en el baño.
       this.accessory.setAlpha(view.anim === 'dead' || view.anim === 'bath' ? 0 : 1);
 
       const spriteAnim = this.findSprite(view);
@@ -988,6 +1001,6 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     resetBath: () => scene.resetBath(),
     setRoomColors: (colors) => scene.setRoomColors(colors),
     setDecor: (decor) => scene.setDecor(decor),
-    setAccessory: (icon, wear) => scene.setAccessory(icon, wear),
+    setAccessory: (icon, wear, slot) => scene.setAccessory(icon, wear, slot),
   };
 }

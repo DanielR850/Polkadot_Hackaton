@@ -1,6 +1,6 @@
 // Reglas de los minijuegos. Lógica pura: recompensas, cuándo se puede jugar y dificultad.
 
-export type MiniGameId = 'catch' | 'pong';
+export type MiniGameId = 'catch' | 'pong' | 'ball';
 
 export interface MiniGameResult {
   game: MiniGameId;
@@ -13,7 +13,12 @@ export interface MiniGameResult {
 export const MINI_GAMES: ReadonlyArray<{ id: MiniGameId; name: string; icon: string; description: string }> = [
   { id: 'catch', name: 'Atrapa la fruta', icon: '🍓', description: '25 segundos. Atrapa frutas y pesitos; esquiva los chiles.' },
   { id: 'pong', name: 'Ping pong', icon: '🏓', description: 'Aguanta la pelota en juego: +1 🪙 cada 5 s. Pierdes con 3 fallos.' },
+  { id: 'ball', name: 'Atrapa la pelota', icon: '🎾', description: '12 segundos. Toca la pelota 5 veces antes de que se acabe el tiempo.' },
 ];
+
+/** Atrapa la pelota (el minijuego original del equipo): tiempo y pelotas por ronda. */
+export const BALL_SECONDS = 12;
+export const BALL_TARGET = 5;
 
 /** Duración de Atrapa la fruta. */
 export const CATCH_SECONDS = 25;
@@ -32,7 +37,7 @@ export const PLAY_COST = { energy: -12, cleanliness: -5, thirst: -5 } as const;
 
 /** Felicidad que da una partida: de 5 a 30 según el puntaje. */
 export function happinessFor(result: MiniGameResult): number {
-  const raw = result.game === 'catch' ? 5 + result.score : 5 + result.score * 4;
+  const raw = result.game === 'catch' ? 5 + result.score : result.game === 'ball' ? 5 + result.score * 5 : 5 + result.score * 4;
   return Math.max(5, Math.min(30, Math.round(raw)));
 }
 

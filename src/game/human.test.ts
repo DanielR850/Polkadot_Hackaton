@@ -3,6 +3,8 @@ import { LINES, say, sayAs } from './voice.ts';
 import { addRecord, HISTORY_MAX, loadHistory, saveHistory, summarize, type PetRecord } from './history.ts';
 import { closeEyes, EYES } from './sleepFace.ts';
 import { buildPalette, toRealPixelArt } from './pixelStyle.ts';
+import { bodyPoints, placeAccessory, slotOf } from './bodyPoints.ts';
+import { happinessFor, MINI_GAMES } from './minigames/rules.ts';
 
 const EMOJI = /\p{Extended_Pictographic}/u;
 
@@ -99,5 +101,39 @@ describe('pixel real', () => {
     expect(buildPalette([], 8)).toEqual([]);
     const samples = Array.from({ length: 50 }, (_, i) => [i * 5, 100, 200 - i] as [number, number, number]);
     expect(buildPalette(samples, 6).length).toBe(6);
+  });
+});
+
+describe('accesorios en su lugar', () => {
+  it('cada especie y edad tiene cabeza, ojos y cuello; el bebé ajolote, por cuadro', () => {
+    for (const id of [0, 1, 2, 3, 4]) for (const st of ['baby', 'teen', 'adult'] as const) expect(bodyPoints(id, st)).not.toBeNull();
+    const f0 = bodyPoints(0, 'baby', 0)!;
+    const f12 = bodyPoints(0, 'baby', 12)!; // acostado: la cabeza baja
+    expect(f12.head.y).toBeGreaterThan(f0.head.y);
+    expect(bodyPoints(0, 'baby', 99)).not.toBeNull(); // cuadro fuera de rango: no falla
+  });
+
+  it('lentes en los ojos, medalla en el cuello y corona arriba', () => {
+    const p = bodyPoints(0, 'adult')!;
+    expect(slotOf('shop:lentes')).toBe('eyes');
+    expect(slotOf('shop:medalla')).toBe('neck');
+    expect(slotOf('shop:corona')).toBe('head');
+    expect(slotOf(null)).toBe('head');
+    const eyes = placeAccessory(p, 'eyes');
+    const neck = placeAccessory(p, 'neck');
+    const head = placeAccessory(p, 'head');
+    expect(eyes.y).toBeCloseTo(p.eyes.y);
+    expect(neck.y).toBeGreaterThan(eyes.y);
+    expect(head.y).toBeLessThan(eyes.y);
+    expect(eyes.width).toBeGreaterThanOrEqual(p.eyes.span);
+  });
+});
+
+describe('Atrapa la pelota', () => {
+  it('está junto a los minijuegos de Ana y da más felicidad con más pelotas', () => {
+    expect(MINI_GAMES.map((g) => g.id)).toEqual(['catch', 'pong', 'ball']);
+    expect(happinessFor({ game: 'ball', score: 5, coins: 7 })).toBe(30);
+    expect(happinessFor({ game: 'ball', score: 1, coins: 1 })).toBe(10);
+    expect(happinessFor({ game: 'ball', score: 0, coins: 0 })).toBe(5);
   });
 });

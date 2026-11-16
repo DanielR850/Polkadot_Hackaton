@@ -58,7 +58,7 @@ export function createMiniGameDialog(intents: MiniGameIntents) {
     /** Paso 2: la partida, dentro de la ventana. */
     play(game: MiniGameId) {
       const host = h('div', { class: 'minigame-stage', 'aria-label': 'Minijuego' });
-      const tip = game === 'catch' ? 'Mueve a tu mascota con el dedo, el mouse o las flechas ← →.' : 'Mueve tu paleta con el dedo, el mouse o las flechas ← →.';
+      const tip = game === 'catch' ? 'Mueve a tu mascota con el dedo, el mouse o las flechas ← →.' : game === 'ball' ? 'Toca la pelota con el dedo o el mouse antes de que se acabe el tiempo.' : 'Mueve tu paleta con el dedo, el mouse o las flechas ← →.';
       content.replaceChildren(host, h('p', { class: 'hint' }, tip));
       intents.start(game, host);
     },

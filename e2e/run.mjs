@@ -311,6 +311,43 @@ async function main() {
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 
+  await scenario('Accesorios puestos y Atrapa la pelota', async () => {
+    const page = await newPage();
+    await page.goto(`${APP}/?demo=1`);
+    const now = Date.now();
+    await page.evaluate(([k, n]) => {
+      localStorage.setItem(k, JSON.stringify({ version: 2, petId: 0, name: 'Bebe', bornAt: n - 600_000, updatedAt: n - 10_000, needs: { hunger: 90, thirst: 90, energy: 90, happiness: 90, cleanliness: 90 }, sleeping: false, diedAt: null, lifeHours: 7, peaceful: true }));
+      localStorage.setItem('tamagotchi-polkadot-purchases-v1', JSON.stringify(['shop:lentes', 'shop:medalla', 'shop:corona', 'shop:mono']));
+      localStorage.setItem('tamagotchi-polkadot-equipped-v1', JSON.stringify({ accessory: 'shop:lentes', wall: null, floor: null, furniture: [], decor: [] }));
+    }, [PET, now]);
+    await page.reload();
+    await page.waitForSelector('.game-screen:not([hidden])');
+    await page.waitForTimeout(1500);
+    await shot(page, '08-ajolote-lentes');
+    for (const item of ['Corona', 'Medalla', 'Moño']) {
+      await clickText(page, '.extras button', 'Accesorios');
+      await clickText(page, 'dialog[open] .inv-item', item);
+      await page.locator('dialog[open] .dialog-close').click();
+      check(JSON.parse(await storage(page, 'tamagotchi-polkadot-equipped-v1')).accessory !== null, `se puede poner ${item}`);
+    }
+    await page.waitForTimeout(800);
+    await shot(page, '09-ajolote-mono');
+    // Minijuego original del equipo.
+    await clickText(page, '.actions button', 'Jugar');
+    check(await page.locator('dialog[open] button', { hasText: 'Atrapa la pelota' }).count() === 1, 'Jugar ofrece Atrapa la pelota junto a los de Ana');
+    await clickText(page, 'dialog[open] button', 'Atrapa la pelota');
+    const canvas = page.locator('dialog[open] canvas');
+    await canvas.waitFor();
+    await page.waitForTimeout(1500); // "¡LISTOS!"
+    const box = await canvas.boundingBox();
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height * ((360 / 2 - 40) / 360));
+    await until(async () => /pelota|Récord|pesitos|🪙/i.test(await text(page, 'dialog[open]')) && (await page.locator('dialog[open] canvas').count()) === 0, 'resultado del minijuego', 20_000);
+    const result = await text(page, 'dialog[open]');
+    check(/\+\s?\d+\s?🪙|\d+ 🪙|pesitos/.test(result), `muestra el resultado con pesitos (${result.replace(/\s+/g, ' ').slice(0, 90)})`);
+    await shot(page, '10-atrapa-la-pelota');
+    check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
+  });
+
   await scenario('Competencia en cadena: temporada, NFT, comida, regalos, muerte y registro', async () => {
     const page = await newPage(0);
     await createPet(page, { name: 'Campeona', pet: 0, color: 'Dorado', hours: 1 });

@@ -6,11 +6,11 @@ export interface Purse {
   coins: number;
   /** Momento (ms) de la última partida cobrada; para el tiempo de espera entre partidas. */
   lastPlayAt: number;
-  best: { catch: number; pong: number };
+  best: { catch: number; pong: number; ball: number };
 }
 
 const KEY = 'tamagotchi-polkadot-purse-v1';
-const EMPTY: Purse = { coins: 0, lastPlayAt: 0, best: { catch: 0, pong: 0 } };
+const EMPTY: Purse = { coins: 0, lastPlayAt: 0, best: { catch: 0, pong: 0, ball: 0 } };
 let memory: string | null = null;
 
 const count = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) && v >= 0 ? Math.floor(v) : 0);
@@ -21,7 +21,7 @@ export function loadPurse(): Purse {
   try {
     const d = raw ? (JSON.parse(raw) as Partial<Purse>) : null;
     if (!d) return { ...EMPTY, best: { ...EMPTY.best } };
-    return { coins: count(d.coins), lastPlayAt: count(d.lastPlayAt), best: { catch: count(d.best?.catch), pong: count(d.best?.pong) } };
+    return { coins: count(d.coins), lastPlayAt: count(d.lastPlayAt), best: { catch: count(d.best?.catch), pong: count(d.best?.pong), ball: count(d.best?.ball) } };
   } catch {
     return { ...EMPTY, best: { ...EMPTY.best } };
   }

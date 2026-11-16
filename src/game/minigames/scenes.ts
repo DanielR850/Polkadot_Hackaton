@@ -4,7 +4,7 @@ import Phaser from 'phaser';
 import { assetUrl, portraitUrl, SPRITES } from '../assets.ts';
 import { findPet } from '../catalog.ts';
 import type { PetId, Stage } from '../types.ts';
-import { CATCH_SECONDS, PONG_COIN_EVERY_MS, PONG_LIVES, PONG_MAX_SECONDS, type MiniGameId, type MiniGameResult } from './rules.ts';
+import { BALL_SECONDS, BALL_TARGET, CATCH_SECONDS, PONG_COIN_EVERY_MS, PONG_LIVES, PONG_MAX_SECONDS, type MiniGameId, type MiniGameResult } from './rules.ts';
 
 const W = 520;
 const H = 360;
@@ -245,8 +245,54 @@ class PongGame extends BaseGame {
 }
 
 /** Crea la partida dentro de `host`. Llamar destroy() al cerrar. */
+/* ---------------------------------------------------- atrapa la pelota */
+
+/** El minijuego original del equipo: la pelota salta por la habitación y hay que tocarla 5 veces. */
+class BallGame extends BaseGame {
+  private ball!: Phaser.GameObjects.Text;
+
+  constructor(opts: MiniGameOptions) { super('ball', opts); }
+
+  create() {
+    this.setup(H - 82, 84);
+    this.ball = this.add.text(W / 2, H / 2 - 40, '🎾', { fontSize: '38px' }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(5);
+    this.ball.on('pointerdown', () => this.hit());
+    this.tweens.add({ targets: this.ball, y: '-=18', duration: 380, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    this.drawHud();
+  }
+
+  private hit() {
+    if (!this.running) return;
+    this.score += 1;
+    this.coins += 1;
+    this.popText(this.ball.x, this.ball.y, '+1');
+    this.tweens.add({ targets: this.pet, scaleY: this.pet.scaleY * 0.9, duration: 70, yoyo: true });
+    if (this.score >= BALL_TARGET) {
+      this.coins += 2; // ronda perfecta
+      this.popText(W / 2, H / 2, '¡LAS 5!', '#7fe0d8');
+      this.drawHud();
+      this.finish();
+      return;
+    }
+    this.ball.setPosition(Phaser.Math.Between(40, W - 40), Phaser.Math.Between(70, H - 150));
+    this.drawHud();
+  }
+
+  private drawHud() {
+    this.hud.setText(`⏱ ${Math.max(0, Math.ceil(BALL_SECONDS - this.elapsed / 1000))}   🎾 ${this.score}/${BALL_TARGET}   🪙 ${this.coins}`);
+  }
+
+  update(_t: number, delta: number) {
+    if (!this.running) return;
+    this.elapsed += delta;
+    this.pet.x = this.steer(this.pet.x, delta, 300, 40);
+    this.drawHud();
+    if (this.elapsed >= BALL_SECONDS * 1000) this.finish();
+  }
+}
+
 export function startMiniGame(host: HTMLElement, opts: MiniGameOptions): MiniGameHandle {
-  const scene = opts.game === 'catch' ? new CatchGame(opts) : new PongGame(opts);
+  const scene = opts.game === 'catch' ? new CatchGame(opts) : opts.game === 'ball' ? new BallGame(opts) : new PongGame(opts);
   const game = new Phaser.Game({
     type: Phaser.AUTO, parent: host, width: W, height: H, backgroundColor: '#302b43',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
