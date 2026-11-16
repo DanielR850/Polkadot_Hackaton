@@ -6,6 +6,8 @@ import { scrubProgress, spongeTouchesPet } from './sponge.ts';
 import type { PetId, Stage } from './types.ts';
 import type { RoomDecor } from './inventory.ts';
 import { ICON_SIZE, pixelIconCanvas } from '../ui/pixelArt.ts';
+import { closeEyes, EYES } from './sleepFace.ts';
+import { PIXEL_STYLE, toRealPixelArt } from './pixelStyle.ts';
 import { findVariant, recolorPixels, SPECIES_RAMPS, variantOutline } from './variants.ts';
 import { BLOCK, buildTopHat, colorOf, findPalette, HAT_SIZES, HEAD_ANCHORS, type HeadAnchor, type HeadWear, wearKey } from './wearables.ts';
 
@@ -26,6 +28,8 @@ export interface SceneView {
   anim: PetAnim;
   /** Variante de color (`variants.ts`); null o desconocida = colores originales. */
   variant?: string | null;
+  /** Estilo de dibujo: la ilustración original o pasada a pixel art real (`pixelStyle.ts`). */
+  style?: 'original' | 'pixel';
 }
 
 export interface PetSceneHandle {
@@ -425,7 +429,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       const pace = view.anim === 'sleep' ? 0.45 : 1;
       if (this.bobPace !== pace) { this.bobPace = pace; this.tweens.add({ targets: this.bob, timeScale: pace, duration: 500, ease: 'Sine.inOut' }); }
 
-      const key = `${view.petId}|${view.stage}|${view.anim}|${view.variant ?? ''}`;
+      const key = `${view.petId}|${view.stage}|${view.anim}|${view.variant ?? ''}|${view.style ?? ''}`;
       if (key === this.drawnKey) return;
       this.drawnKey = key;
       // Accesorio: sobre la cabeza; se oculta muerta y durante el baño.
@@ -589,16 +593,21 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
      */
     private variantAnim(key: string, view: SceneView): string {
       const ramp = SPECIES_RAMPS[view.petId];
-      const variant = findVariant(view.petId, view.variant);
+      const variant = ramp ? findVariant(view.petId, view.variant) : null;
       const sheet = SPRITES.find((s) => spriteKey(s.petId, s.stage, s.anim) === key);
-      if (!ramp || !variant || !sheet) return key;
-      const vkey = `${key}@${variant.id}`;
+      if (!sheet) return key;
+      // Dormida sin cuadros propios de dormir (una sola ilustración): ojos cerrados por código.
+      const eyes = view.anim === 'sleep' && sheet.anim !== 'sleep' ? EYES[view.petId]?.[sheet.stage] : undefined;
+      const real = view.style === 'pixel';
+      if (!variant && !eyes && !real) return key;
+      const vkey = `${key}${variant ? `@${variant.id}` : ''}${eyes ? '~zz' : ''}${real ? '#px' : ''}`;
       if (this.anims.exists(vkey)) return vkey;
       if (!this.textures.exists(vkey)) {
         const source = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
         let bySource = this.recolored.get(source);
         if (!bySource) { bySource = new Map(); this.recolored.set(source, bySource); }
-        let canvas = bySource.get(variant.id);
+        const cacheId = `${variant?.id ?? ''}${eyes ? '~zz' : ''}${real ? '#px' : ''}`;
+        let canvas = bySource.get(cacheId);
         if (!canvas) {
           canvas = document.createElement('canvas');
           canvas.width = source.width;
@@ -606,9 +615,14 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
           const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
           ctx.drawImage(source, 0, 0);
           const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          pixels.data.set(recolorPixels(pixels.data, canvas.width, canvas.height, ramp, variant));
+          let data: Uint8ClampedArray = pixels.data;
+          if (ramp && variant) data = recolorPixels(data, canvas.width, canvas.height, ramp, variant);
+          if (eyes) data = closeEyes(data, canvas.width, canvas.height, eyes);
+          // Píxel real: bloques de 10 en las ilustraciones y de 4 en la hoja del bebé ajolote.
+          if (real) data = toRealPixelArt(data, canvas.width, canvas.height, { ...PIXEL_STYLE, block: sheet.frameWidth < 600 ? 4 : PIXEL_STYLE.block });
+          pixels.data.set(data);
           ctx.putImageData(pixels, 0, 0);
-          bySource.set(variant.id, canvas);
+          bySource.set(cacheId, canvas);
         }
         this.textures.addSpriteSheet(vkey, canvas as unknown as HTMLImageElement, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
       }

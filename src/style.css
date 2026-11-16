@@ -590,8 +590,26 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .shop-confirm .inv-icon img, .pantry-gifts .inv-icon img, .season-banner .inv-icon img { width: 40px; height: 40px; }
 
 /* ---------- Botones extra: cinco sin cortarse y regalos como insignia ---------- */
-.extras button { position: relative; font-size: 9px; padding-inline: 4px; overflow-wrap: anywhere; }
+.extras button { position: relative; font-size: 8px; padding-inline: 3px; overflow-wrap: normal; word-break: keep-all; hyphens: none; }
 .gift-badge {
   position: absolute; top: -10px; right: -6px; padding: 2px 5px; font-family: var(--body); font-size: 15px; line-height: 1;
   background: var(--mx-yellow); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
 }
+
+/* ---------- Mis animales ---------- */
+.collection-link { margin-top: 12px; }
+.record-list { display: grid; gap: 10px; }
+.pet-record { display: grid; grid-template-columns: 84px 1fr; gap: 12px; align-items: center; padding: 8px; background: var(--light); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); }
+.pet-record .pet-frame { width: 84px; height: 84px; }
+.pet-record b { display: block; font-family: var(--title); font-weight: 400; font-size: 11px; line-height: 1.6; }
+.pet-record small { display: block; font-size: 17px; color: var(--muted); line-height: 1.15; }
+.pet-record.now { background: var(--accent-soft); }
+.pet-record.gone .pet-portrait { filter: grayscale(.7); }
+.record-now { display: inline; font-family: var(--body); font-size: 16px; color: var(--mx-green); }
+
+/* ---------- Íconos de pixel art en botones y barras ---------- */
+.action-icon img { width: 30px; height: 30px; image-rendering: pixelated; margin: 0 auto 2px; display: block; }
+.meter-icon img { width: 22px; height: 22px; image-rendering: pixelated; display: block; }
+.meter-label { align-items: center; }
+.death-icon img { width: 56px; height: 56px; image-rendering: pixelated; margin: 0 auto; display: block; }
+.pet-record .record-time { font-size: 17px; line-height: 1.15; color: var(--mx-green); font-family: var(--body); }

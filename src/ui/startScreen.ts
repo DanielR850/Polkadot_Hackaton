@@ -3,7 +3,7 @@ import { h } from './dom.ts';
 
 /** Pantalla inicial: nombre grande y botón JUGAR. Devuelve la intención `onPlay(nombre)`. */
 /** `onChain`: si se pasa, muestra el botón del modo NFT aparte (hoy el NFT se adopta en el paso 3). */
-export function createStartScreen(onPlay: (name: string) => void, onChain?: () => void) {
+export function createStartScreen(onPlay: (name: string) => void, onChain?: () => void, onCollection?: () => void) {
   const input = h('input', {
     id: 'pet-name', class: 'name-input', type: 'text', maxlength: NAME_MAX_LENGTH, autocomplete: 'off',
     placeholder: 'Nombre de tu mascota', 'aria-describedby': 'name-hint',
@@ -12,6 +12,8 @@ export function createStartScreen(onPlay: (name: string) => void, onChain?: () =
   const play = h('button', { type: 'submit', class: 'primary big', disabled: true }, 'JUGAR');
   const chain = onChain ? h('button', { type: 'button', class: 'chain-entry' }, 'JUGAR CON NFT EN POLKADOT') : null;
   chain?.addEventListener('click', onChain!);
+  const collection = onCollection ? h('button', { type: 'button', class: 'ghost collection-link' }, 'Mis animales') : null;
+  collection?.addEventListener('click', onCollection!);
   const form = h('form', { class: 'start-form' },
     h('label', { for: 'pet-name', class: 'eyebrow' }, 'TU TAMAGOTCHI SE LLAMA'), input, hint, play);
   const root = h('section', { class: 'screen start-screen', 'aria-label': 'Inicio' },
@@ -20,7 +22,8 @@ export function createStartScreen(onPlay: (name: string) => void, onChain?: () =
     h('h1', { class: 'title' }, 'Tamagotchi Polkadot'),
     form,
     chain && h('p', { class: 'chain-hint' }, 'O adopta una mascota NFT con tu wallet:'),
-    chain);
+    chain,
+    collection);
 
   const refresh = () => {
     const result = validateName(input.value);

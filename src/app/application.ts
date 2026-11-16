@@ -11,6 +11,9 @@ import {
   removeFromPantry, savePantry, type PantryItem, type SpecialFood,
 } from '../game/pantry.ts';
 import { createPantryDialog } from '../ui/pantryDialog.ts';
+import { say, sayAs, type Moment } from '../game/voice.ts';
+import { createCollectionDialog } from '../ui/collectionDialog.ts';
+import { addRecord, loadHistory, saveHistory, type PetRecord } from '../game/history.ts';
 import { createSeasonDialog, type SeasonRow } from '../ui/seasonDialog.ts';
 import { createAdminScreen, type AdminView } from '../ui/adminScreen.ts';
 import type { ChainVersions, Temporada } from '../polkadot/nftMint.ts';
@@ -67,6 +70,9 @@ const app = document.querySelector<HTMLElement>('#app')!;
 const ACTION_MS = 1200;
 /** Prototipo: `?color=dorado` (silvestre, melanico, cobre) recolorea la mascota. Ver game/variants.ts. */
 const colorVariant = params.get('color');
+/** Estilo de dibujo elegido en el Menú: la ilustración original o pasada a pixel art real. */
+const STYLE_KEY = 'tamagotchi-polkadot-style-v1';
+let drawStyle: 'original' | 'pixel' = (() => { try { return localStorage.getItem(STYLE_KEY) === 'pixel' ? 'pixel' : 'original'; } catch { return 'original'; } })();
 
 type Screen = 'start' | 'select' | 'mint' | 'game';
 
@@ -105,7 +111,32 @@ const startScreen = createStartScreen((name) => {
   draftName = name;
   selectScreen.reset(name);
   showScreen('select');
-});
+}, undefined, () => openCollection());
+
+/* --------------------------------------------------------- mis animales */
+
+const collectionDialog = createCollectionDialog();
+let history = loadHistory();
+
+/** Registro de la mascota actual para "Mis animales". */
+function recordOf(p: PetState, now: number): PetRecord {
+  return {
+    id: `${p.bornAt}-${p.petId}`, name: p.name, petId: p.petId, variant: p.variant ?? null, lifeHours: p.lifeHours,
+    peaceful: p.peaceful === true, bornAt: p.bornAt, endedAt: p.diedAt ?? now, diedAt: p.diedAt, aliveMs: ageMs(p, now),
+    tokenId: nft?.tokenId,
+  };
+}
+
+function openCollection() {
+  collectionDialog.open({ current: pet ? recordOf(pet, Date.now()) : null, history });
+}
+
+/** Guarda la mascota que se va a reemplazar. */
+function archivePet() {
+  if (!pet) return;
+  history = addRecord(history, recordOf(pet, Date.now()));
+  saveHistory(history);
+}
 
 const selectScreen = createSelectScreen((petId, choice) => {
   draftPetId = petId;
@@ -133,9 +164,9 @@ function startGame(minted: PetNft | null) {
   setRecordButton();
   lastStage = 'baby';
   showScreen('game');
-  gameScreen.say(minted
-    ? `¡${pet.name} ya es tu NFT #${minted.tokenId}! ${peaceful ? 'Modo pacífico: no muere.' : `Modo competencia: aguanta ${draftChoice.lifeHours} h sin cuidados.`}`
-    : `¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
+  gameScreen.say(`${sayAs(pet.name, 'hello', Date.now())} ${minted
+    ? peaceful ? `Ya soy tu NFT #${minted.tokenId}. Aquí nadie se muere, pero no me dejes solito.` : `Ya soy tu NFT #${minted.tokenId}. Aguanto ${draftChoice.lifeHours} h sin ti, ¿eh?`
+    : 'Cuídame bonito.'}`);
 }
 
 /* --------------------------------------------------- paso 3: adoptar NFT */
@@ -265,9 +296,9 @@ async function mintNft() {
 /** Nota de la habitación y botones del leaderboard según el modo. */
 function showNftNote() {
   const mode = playMode();
-  if (mode === 'ranking') gameScreen.setNote(`⚔️ Modo competencia · NFT #${nft!.tokenId}`, 'Cada cuidado se firma. Al morir, registra cuánto vivió en la temporada semanal.');
-  else if (mode === 'passive') gameScreen.setNote(`🌿 Modo pacífico · NFT #${nft!.tokenId}`, 'Cada cuidado se firma. No muere: si la descuidas se enferma.');
-  else gameScreen.setNote('🌿 Modo pacífico, sin cartera.', 'Tu mundo: se guarda en este dispositivo, cuidarla es gratis y no muere.');
+  if (mode === 'ranking') gameScreen.setNote(`Competencia · NFT #${nft!.tokenId}`, 'Cada cuidado lleva firma. Si se te muere, registra su tiempo en la temporada.');
+  else if (mode === 'passive') gameScreen.setNote(`Pacífico · NFT #${nft!.tokenId}`, 'Cada cuidado lleva firma. Aquí no se muere: si lo descuidas, se enferma.');
+  else gameScreen.setNote('Pacífico, sin cartera.', 'Tu mundo: se guarda en este aparato, es gratis y no se muere.');
   gameScreen.setRankingVisible(mode === 'ranking');
   gameScreen.setBadge(badgeText());
 }
@@ -275,7 +306,7 @@ function showNftNote() {
 /** "⚔️ Competencia · 7 h · Dorado". */
 function badgeText(): string {
   if (!pet) return '';
-  const mode = pet.peaceful ? '🌿 Pacífico' : '⚔️ Competencia';
+  const mode = pet.peaceful ? 'Pacífico' : 'Competencia';
   const hours = pet.lifeHours ? `${pet.lifeHours} h` : '';
   const color = findVariant(pet.petId, pet.variant)?.name ?? '';
   return [mode, hours, color].filter(Boolean).join(' · ');
@@ -397,7 +428,7 @@ async function signConnect(walletId: string | null) {
 /** true si la acción cambia algo en el juego; si no, se avisa y no se pide firma. */
 function possible(next: PetState, p: PetState): boolean {
   if (next !== p) return true;
-  gameScreen.say('Ahora no puede hacer eso.');
+  gameScreen.say(say('cantNow', Date.now()));
   return false;
 }
 
@@ -632,17 +663,17 @@ const gameScreen = createGameScreen({
   shop: () => shopDialog.open({ coins: purse.coins, owned: purchases, pantry: pantryCount() }),
   trophies: () => openTrophies(),
   sleep: () => withPet((p, now) => {
-    if (computeStats(p, now, config).energy >= 99.5) { gameScreen.say('No tiene sueño: su energía está al máximo.'); return; }
+    if (computeStats(p, now, config).energy >= 99.5) { gameScreen.say(sayAs(p.name, 'notSleepy', now)); return; }
     if (!possible(sleep(p, now, config), p)) return;
     careWithSignature(`Mandar a dormir a ${p.name}`, 'dormir', () => withPet((q, t) =>
-      commit(sleep(q, t, config), 'Shhh… está durmiendo. Se despertará al recuperar toda su energía.')));
+      commit(sleep(q, t, config), sayAs(q.name, 'goSleep', t))));
   }),
-  wake: () => withPet((p, now) => commit(wake(p, now, config), '¡Buenos días! Ya despertó.')),
+  wake: () => withPet((p, now) => commit(wake(p, now, config), sayAs(p.name, 'woke', now))),
   bath: () => {
     bathing = true;
     bathProgress = 0;
     scene?.resetBath();
-    gameScreen.say('¡Hora del baño!');
+    gameScreen.say('A bañarse. Talla con la esponja.');
     render();
   },
   exitBath: () => withPet((p, now) => {
@@ -651,12 +682,19 @@ const gameScreen = createGameScreen({
     bathProgress = 0;
     scene?.resetBath();
     // Sin frotar no hay baño: no se pide firma.
-    if (progress === 0) { gameScreen.say('Salió del baño sin enjabonarse.'); render(); return; }
+    if (progress === 0) { gameScreen.say(sayAs(p.name, 'bathNone', now)); render(); return; }
     if (!possible(bathe(p, progress, now, config), p)) { render(); return; }
-    const message = progress < 50 ? 'Le faltó un poco de jabón.' : '¡Quedó reluciente!';
+    const message = sayAs(p.name, progress < 50 ? 'bathHalf' : 'bathDone', now);
     careWithSignature(`Bañar a ${p.name}`, 'banar', () => withPet((q, t) => commit(bathe(q, progress, t, config), message)));
   }),
   rename: () => { if (pet && !signBusy && !pendingSign) renameDialog.open(pet.name); },
+  collection: () => openCollection(),
+  style: () => {
+    drawStyle = drawStyle === 'pixel' ? 'original' : 'pixel';
+    try { localStorage.setItem(STYLE_KEY, drawStyle); } catch { /* sin localStorage */ }
+    gameScreen.setStyle(drawStyle);
+    render();
+  },
   ranking: () => openRanking(),
   record: () => openRecord(false),
   pantry: () => openPantry(),
@@ -669,6 +707,7 @@ const gameScreen = createGameScreen({
     if (signDialog.isOpen()) { pendingSign = null; signDialog.close(); }
     if (miniGameDialog.isOpen()) { endMiniGame(); miniGameDialog.close(); }
     if (recordDialog.isOpen()) recordDialog.close();
+    archivePet();
     pet = null;
     savePet(null);
     config = configForPet(null, speed);
@@ -688,7 +727,7 @@ const feedMenu = createFeedMenu((itemId) => withPet((p, now) => {
   const item = findItem(itemId);
   if (!item || !possible(feed(p, itemId, now, config), p)) return;
   careWithSignature(`Darle ${item.label.toLowerCase()} a ${p.name}`, 'alimentar', () => withPet((q, t) =>
-    commit(feed(q, itemId, t, config), `¡Qué rico! Le diste ${item.label.toLowerCase()}.`, { anim: 'eat', icon: item.icon })));
+    commit(feed(q, itemId, t, config), sayAs(q.name, item.kind === 'drink' ? 'drank' : 'fed', t), { anim: 'eat', icon: item.icon })));
 }));
 
 const renameDialog = createRenameDialog((name) => withPet((p, now) => {
@@ -975,14 +1014,14 @@ function checkAchievements() {
     claimed = [...claimed, ...fresh.map((d) => d.id)];
     saveClaimed(claimed);
     for (const d of fresh) grantReward(d);
-    gameScreen.showToast(`🏆 ¡Trofeo: ${fresh.map((d) => d.name).join(', ')}!`);
+    gameScreen.showToast(`¡Ganaste un trofeo! ${fresh.map((d) => d.name).join(', ')}`);
     if (achievementsDialog.isOpen()) renderAchievements();
     return;
   }
   const news = fresh.filter((d) => !notified.has(d.id));
   if (news.length === 0) return;
   for (const d of news) notified.add(d.id);
-  gameScreen.showToast(`⭐ Trofeo disponible: ${news.map((d) => d.name).join(', ')}. Reclámalo en 🏆 Trofeos.`);
+  gameScreen.showToast(`Hay trofeo esperándote: ${news.map((d) => d.name).join(', ')}. Pásale a Trofeos.`);
 }
 
 /** Con NFT: firma `reclamarLogro` y solo si se confirma el trofeo queda en la colección. */
@@ -1074,7 +1113,7 @@ async function useFood(item: PantryItem) {
       pantry = removeFromPantry(pantry, item.uid);
       savePantry(pantry);
       pantryDialog.render(pantryView());
-      commit(eatSpecial(q, foodEffects(food), t, config), `¡${food.name}! ${food.utility === 'life' ? 'Recuperó vida.' : 'Quedó satisfecha.'}`, { anim: 'eat', icon: food.icon });
+      commit(eatSpecial(q, foodEffects(food), t, config), sayAs(q.name, 'special', t), { anim: 'eat', icon: food.icon });
     });
     if (foodAsNft() && item.tokenId) {
       pantryDialog.close();
@@ -1088,7 +1127,7 @@ async function useFood(item: PantryItem) {
 async function claimDrop() {
   if (nft) await ensureChainInfo();
   withPet((p, now) => {
-    if (giftsReady(now) === 0) { gameScreen.say('Todavía no hay regalos. Sigue cuidándola.'); return; }
+    if (giftsReady(now) === 0) { gameScreen.say(say('noGift', now)); return; }
     const receive = (food: SpecialFood | undefined, tokenId?: string) => {
       pantry = { ...pantry, dropsTaken: pantry.dropsTaken + 1 };
       if (chainDrops !== null) chainDrops = Math.max(0, chainDrops - 1);
@@ -1097,7 +1136,7 @@ async function claimDrop() {
       savePantry(pantry);
       gameScreen.setGifts(giftsReady(Date.now()));
       pantryDialog.render(pantryView());
-      gameScreen.showToast(food ? `🎁 ¡Te tocó ${food.icon} ${food.name}! ${food.dropOnly ? '(¡no se vende!)' : ''}` : '🎁 Regalo abierto.');
+      gameScreen.showToast(food ? `¡Te tocó ${food.name}!${food.dropOnly ? ' Y esa no se vende.' : ''}` : 'Regalo abierto.');
     };
     if (foodAsNft()) {
       let result: { tokenId: bigint; articulo: number } | null = null;
@@ -1150,7 +1189,7 @@ function withPet(fn: (p: PetState, now: number) => void) {
 
 /** Guarda el estado nuevo de una acción y lanza su animación breve. */
 function commit(next: PetState, message: string, reaction?: { anim: 'eat' | 'play'; icon: string }) {
-  if (next === pet) { gameScreen.say('Ahora no puede hacer eso.'); render(); return; }
+  if (next === pet) { gameScreen.say(say('cantNow', Date.now())); render(); return; }
   pet = next;
   savePet(pet);
   if (reaction) {
@@ -1163,16 +1202,9 @@ function commit(next: PetState, message: string, reaction?: { anim: 'eat' | 'pla
   render();
 }
 
-const MOOD: Partial<Record<PetAnim, { icon: string; text: string }>> = {
-  dead: { icon: '🕊️', text: 'Descansa en paz.' },
-  sleep: { icon: '☾', text: 'Zzz… está soñando.' },
-  bath: { icon: '🫧', text: '¡Burbujas por todas partes!' },
-  eat: { icon: '😋', text: '¡Ñam, ñam!' },
-  play: { icon: '😄', text: '¡Otra vez, otra vez!' },
-};
-const NEED_MOOD: Record<NeedKey, string> = {
-  hunger: 'Tengo hambre…', thirst: 'Tengo sed…', energy: 'Tengo sueño…', happiness: 'Quiero jugar…', cleanliness: 'Necesito un baño…',
-};
+/** Lo que dice la mascota según su estado (src/game/voice.ts). Cambia de frase cada 20 s. */
+const MOOD: Partial<Record<PetAnim, Moment>> = { dead: 'dead', sleep: 'sleeping', bath: 'bath', eat: 'eating', play: 'playing' };
+const NEED_MOOD: Record<NeedKey, Moment> = { hunger: 'hungry', thirst: 'thirsty', energy: 'sleepy', happiness: 'bored', cleanliness: 'dirty' };
 
 function render() {
   if (!pet || screen !== 'game') return;
@@ -1184,13 +1216,14 @@ function render() {
   const asleep = isAsleep(pet, now, config);
   const anim = pickAnimation({ dead, sleeping: asleep, bathing, action, low, now });
   const mode: GameMode = dead ? 'dead' : asleep ? 'sleep' : bathing ? 'bath' : 'normal';
-  const mood = MOOD[anim] ?? (low.length ? { icon: '☹', text: NEED_MOOD[low[0]] } : { icon: '☺', text: '¡Qué bonito día!' });
+  const moment: Moment = MOOD[anim] ?? (low.length ? NEED_MOOD[low[0]] : 'happy');
+  const mood = { icon: '', text: say(moment, Math.floor(now / 20_000) + pet.bornAt) };
   gameScreen.update({
     name: pet.name, stageLabel: STAGE_LABEL[stage], ageLabel: formatDuration(ageMs(pet, now)),
     // Mientras hay una firma pendiente no se puede pedir otro cuidado.
     stats, mode, bathProgress, mood, busy: (action !== null && now < action.until) || pendingSign !== null,
   });
-  scene?.show({ petId: pet.petId, stage, anim, variant: pet.variant ?? colorVariant });
+  scene?.show({ petId: pet.petId, stage, anim, variant: pet.variant ?? colorVariant, style: drawStyle });
 }
 
 /** Cada segundo: detecta muerte y cambio de etapa, y refresca las barras. */
@@ -1202,18 +1235,18 @@ function tick() {
     pet = checked;
     savePet(pet);
     bathing = false;
-    gameScreen.say(`${pet.name} no recibió los cuidados que necesitaba.`);
+    gameScreen.say(sayAs(pet.name, 'starved', now));
     // En modo ranking pide guardar la partida en el leaderboard.
     openRecord(true);
   } else if (pet.sleeping && !isAsleep(pet, now, config)) {
     // Recuperó toda su energía: se despierta sola (también si la app estuvo cerrada).
     pet = wake(pet, now, config);
     savePet(pet);
-    gameScreen.say(`¡${pet.name} recuperó toda su energía y se despertó!`);
+    gameScreen.say(sayAs(pet.name, 'wokeAlone', now));
   }
   const stage = computeStage(pet, now, config);
   const grown = lastStage ? detectStageChange(lastStage, stage) : null;
-  if (grown && pet.diedAt === null) gameScreen.showToast(`¡${pet.name} creció a ${STAGE_LABEL[grown].toLowerCase()}!`);
+  if (grown && pet.diedAt === null) gameScreen.showToast(`${sayAs(pet.name, 'grew', now)} Ya es ${STAGE_LABEL[grown].toLowerCase()}.`);
   lastStage = stage;
   checkAchievements();
   gameScreen.setGifts(giftsReady(now));
@@ -1267,6 +1300,7 @@ if (params.get('admin') === '1') {
   showNftNote();
   setRecordButton();
   gameScreen.setCoins(purse.coins);
+  gameScreen.setStyle(drawStyle);
   showScreen(pet ? 'game' : 'start');
   // Con NFT se averigua en segundo plano qué contratos hay (v1 o v2).
   if (nft) void ensureChainInfo();

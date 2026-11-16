@@ -35,7 +35,7 @@ const DIFFICULTY_TABS: ReadonlyArray<{ hours: number; label: string }> = [
 ];
 
 export function createSeasonDialog(source: SeasonSource) {
-  const { dialog, body } = createDialog('🏆 Competencia', 'ranking-dialog season-dialog');
+  const { dialog, body } = createDialog('Competencia', 'ranking-dialog season-dialog');
   const banner = h('div', { class: 'mint-card season-banner' });
   const tabs = h('div', { class: 'tabs', role: 'tablist' });
   const status = h('p', { class: 'hint', 'aria-live': 'polite' });

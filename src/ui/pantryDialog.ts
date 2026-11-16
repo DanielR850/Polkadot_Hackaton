@@ -23,7 +23,7 @@ export interface PantryView {
 }
 
 export function createPantryDialog(intents: PantryIntents) {
-  const { dialog, body } = createDialog('🧺 Despensa', 'inventory-dialog pantry-dialog');
+  const { dialog, body } = createDialog('Despensa', 'inventory-dialog pantry-dialog');
   const gifts = h('div', { class: 'mint-card pantry-gifts' });
   const status = h('p', { class: 'hint' });
   const grid = h('div', { class: 'item-grid inv-grid' });
@@ -43,7 +43,7 @@ export function createPantryDialog(intents: PantryIntents) {
       claim);
     status.textContent = v.disabledReason ?? (v.items.length
       ? `Toca una comida para dársela.${v.asNft ? ' Usarla quema su NFT y la cura en la blockchain (una firma).' : ''}`
-      : 'Tu despensa está vacía. Compra comida especial en la 🛒 Tienda o abre regalos.');
+      : 'No hay nada en la despensa. Compra algo en la Tienda o abre un regalo.');
     grid.replaceChildren(...v.items.map((item) => {
       const food = findFood(item.foodId);
       if (!food) return h('span');

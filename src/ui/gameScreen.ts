@@ -1,5 +1,6 @@
 import type { Stats } from '../game/types.ts';
 import { h } from './dom.ts';
+import { pixelIcon } from './pixelArt.ts';
 import { BAR_INFO, barLevel } from './format.ts';
 
 export type GameMode = 'normal' | 'sleep' | 'bath' | 'dead';
@@ -40,6 +41,10 @@ export interface GameIntents {
   trophies?(): void;
   /** Despensa: comida especial y regalos (drops). */
   pantry?(): void;
+  /** Mis animales: la mascota de ahora y las anteriores. */
+  collection?(): void;
+  /** Cambiar el estilo de dibujo (original / pixel real). */
+  style?(): void;
 }
 
 /** Botón de registrar en el panel de muerte: oculto, disponible o ya registrado. */
@@ -61,15 +66,19 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const gameHost = h('div', { id: 'game', 'aria-label': 'Mascota animada' });
   const moodIcon = h('span', {});
   const moodText = h('span', {});
-  const feedback = h('p', { class: 'feedback', 'aria-live': 'polite' }, 'Tu mascota te está esperando.');
+  const feedback = h('p', { class: 'feedback', 'aria-live': 'polite' }, '¿Qué hacemos hoy?');
   const toast = h('div', { class: 'toast', role: 'status', hidden: true });
   const menuButton = h('button', { type: 'button', class: 'menu-button', 'aria-expanded': 'false', 'aria-controls': 'game-menu' }, '☰ Menú');
   const menuClose = h('button', { type: 'button', class: 'ghost' }, 'Continuar partida');
   const chooseAnother = h('button', { type: 'button', class: 'ghost' }, 'Elegir otra mascota');
+  const myPets = h('button', { type: 'button', class: 'ghost' }, 'Mis animales');
+  const styleBtn = h('button', { type: 'button', class: 'ghost' }, 'Dibujo: Original');
+  styleBtn.addEventListener('click', () => intents.style?.());
+  myPets.addEventListener('click', () => { toggleMenu(false); intents.collection?.(); });
   const menu = h('div', { id: 'game-menu', class: 'game-menu', hidden: true },
     h('strong', {}, 'MENÚ DE PARTIDA'),
-    h('p', {}, 'Elegir otra mascota reemplaza esta partida guardada en tu dispositivo.'),
-    menuClose, chooseAnother);
+    h('p', {}, 'Si eliges otra, esta se queda guardada en Mis animales.'),
+    menuClose, myPets, styleBtn, chooseAnother);
   const toggleMenu = (open: boolean) => {
     menu.hidden = !open;
     menuButton.setAttribute('aria-expanded', String(open));
@@ -83,13 +92,13 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
     const fill = h('div', { class: 'meter-fill' });
     const track = h('div', { class: 'meter-track', role: 'progressbar', 'aria-label': info.label, 'aria-valuemin': 0, 'aria-valuemax': 100 }, fill);
     const row = h('div', { class: `meter-row${info.key === 'health' ? ' health' : ''}` },
-      h('div', { class: 'meter-label' }, h('span', { 'aria-hidden': 'true' }, info.icon), h('b', {}, info.label), value), track);
+      h('div', { class: 'meter-label' }, pixelIcon(info.icon, 'meter-icon'), h('b', {}, info.label), value), track);
     return { info, row, value, fill, track };
   });
 
   const action = (icon: string, label: string, onClick: () => void) => {
     const text = h('b', {}, label);
-    const iconEl = h('span', { 'aria-hidden': 'true' }, icon);
+    const iconEl = pixelIcon(icon, 'action-icon');
     const button = h('button', { type: 'button' }, iconEl, text);
     button.addEventListener('click', onClick);
     return { button, text, iconEl };
@@ -102,15 +111,15 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const rankingBtn = action('🏆', 'Ranking', intents.ranking);
   const actions = h('div', { class: 'actions' }, ...[feedBtn, playBtn, sleepBtn, bathBtn, renameBtn, rankingBtn].map((a) => a.button));
   // Inventario: accesorios de la mascota y decoración de la habitación.
-  const accessoriesBtn = h('button', { type: 'button', class: 'ghost' }, '🎩 Accesorios');
+  const accessoriesBtn = h('button', { type: 'button', class: 'ghost' }, 'Accesorios');
   accessoriesBtn.addEventListener('click', () => intents.accessories?.());
-  const spaceBtn = h('button', { type: 'button', class: 'ghost' }, '🏠 Mi espacio');
+  const spaceBtn = h('button', { type: 'button', class: 'ghost' }, 'Mi espacio');
   spaceBtn.addEventListener('click', () => intents.space?.());
-  const shopBtn = h('button', { type: 'button', class: 'ghost' }, '🛒 Tienda');
+  const shopBtn = h('button', { type: 'button', class: 'ghost' }, 'Tienda');
   shopBtn.addEventListener('click', () => intents.shop?.());
-  const trophiesBtn = h('button', { type: 'button', class: 'ghost' }, '🏆 Trofeos');
+  const trophiesBtn = h('button', { type: 'button', class: 'ghost' }, 'Trofeos');
   trophiesBtn.addEventListener('click', () => intents.trophies?.());
-  const pantryBtn = h('button', { type: 'button', class: 'ghost' }, '🧺 Despensa');
+  const pantryBtn = h('button', { type: 'button', class: 'ghost' }, 'Despensa');
   pantryBtn.addEventListener('click', () => intents.pantry?.());
   const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, pantryBtn, trophiesBtn);
   /** Modo y dificultad de la partida (p. ej. "⚔️ Competencia · 7 h"). */
@@ -129,16 +138,16 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   restart.addEventListener('click', intents.restart);
   const deathRanking = h('button', { type: 'button', class: 'ghost' }, 'Ver ranking');
   deathRanking.addEventListener('click', intents.ranking);
-  const deathTrophies = h('button', { type: 'button', class: 'ghost' }, '🏆 Ver trofeos');
+  const deathTrophies = h('button', { type: 'button', class: 'ghost' }, 'Ver trofeos');
   deathTrophies.addEventListener('click', () => intents.trophies?.());
-  const deathRecord = h('button', { type: 'button', class: 'primary', hidden: true }, '🏆 Registrar partida');
+  const deathRecord = h('button', { type: 'button', class: 'primary', hidden: true }, 'Registrar partida');
   deathRecord.addEventListener('click', () => intents.record?.());
   const deathRecorded = h('p', { class: 'death-recorded', hidden: true }, '✓ Partida registrada en el leaderboard');
-  const deathLegacy = h('button', { type: 'button', class: 'primary', hidden: true }, '📜 Guardar legado');
+  const deathLegacy = h('button', { type: 'button', class: 'primary', hidden: true }, 'Guardar legado');
   deathLegacy.addEventListener('click', () => intents.legacy?.());
   const deathLegacySaved = h('p', { class: 'death-recorded', hidden: true }, '✓ Legado guardado en la blockchain');
   const deathPanel = h('div', { class: 'mode-panel death-panel', hidden: true },
-    h('span', { class: 'death-icon', 'aria-hidden': 'true' }, '🕊️'), h('h2', {}, 'Fin de la partida'), deathTime,
+    pixelIcon('🕊️', 'death-icon'), h('h2', {}, 'Fin de la partida'), deathTime,
     deathRecorded, deathRecord, deathLegacySaved, deathLegacy,
     deathTrophies,
     h('div', { class: 'row' }, deathRanking, restart));
@@ -182,7 +191,8 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
       }
       const sleeping = view.mode === 'sleep';
       sleepBtn.text.textContent = sleeping ? 'Despertar' : 'Dormir';
-      sleepBtn.iconEl.textContent = sleeping ? '☀️' : '🌙';
+      const wanted = sleeping ? '☀️' : '🌙';
+      if (sleepBtn.iconEl.dataset.icon !== wanted) { sleepBtn.iconEl.dataset.icon = wanted; sleepBtn.iconEl.replaceChildren(...pixelIcon(wanted).childNodes); }
       for (const a of [feedBtn, playBtn, bathBtn]) a.button.disabled = view.mode !== 'normal' || view.busy;
       sleepBtn.button.disabled = view.mode === 'dead' || view.busy;
       renameBtn.button.disabled = view.mode === 'dead';
@@ -200,9 +210,10 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
     setNote(text: string, detail: string) { noteText.textContent = text; noteDetail.textContent = detail; },
     setCoins(coins: number) { coinsEl.textContent = `🪙 ${coins}`; },
     setBadge(text: string) { badge.textContent = text; badge.hidden = !text; },
+    setStyle(style: 'original' | 'pixel') { styleBtn.textContent = style === 'pixel' ? 'Dibujo: Pixel real' : 'Dibujo: Original'; },
     /** Marca el botón de la despensa cuando hay regalos por abrir. */
     setGifts(count: number) {
-      pantryBtn.replaceChildren('🧺 Despensa', ...(count > 0 ? [h('span', { class: 'gift-badge', title: `${count} regalos por abrir` }, `🎁 ${count}`)] : []));
+      pantryBtn.replaceChildren('Despensa', ...(count > 0 ? [h('span', { class: 'gift-badge', title: `${count} regalos por abrir` }, `${count}`)] : []));
     },
     /** Solo en modo ranking se muestran los botones del leaderboard. */
     setRankingVisible(visible: boolean) {

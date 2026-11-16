@@ -195,7 +195,7 @@ async function main() {
     check(portrait?.startsWith('data:image/png'), 'el retrato del paso 3 ya lleva el color elegido');
     await clickText(page, '.mint-screen button', 'Jugar sin cartera');
     await page.waitForSelector('.game-screen:not([hidden])');
-    check((await text(page, '.mode-badge')) === '🌿 Pacífico · 12 h · Ártico', 'insignia: Pacífico · 12 h · Ártico');
+    check((await text(page, '.mode-badge')) === 'Pacífico · 12 h · Ártico', 'insignia: Pacífico · 12 h · Ártico (sin emoji)');
     const saved = JSON.parse(await storage(page, PET));
     check(saved.lifeHours === 12 && saved.peaceful === true && saved.variant === 'artico', 'la partida guarda dificultad, modo y color');
     await page.reload();
@@ -214,8 +214,8 @@ async function main() {
     await ageLocalPet(page, 60 * 3600_000);
     check(await page.locator('.death-panel').isHidden(), 'tras 60 veces su dificultad sigue viva (sin panel de muerte)');
     check((await text(page, '.meter-row.health')).includes('0%'), 'la vida llega a 0 %: está enferma');
-    const gifts = await until(async () => { const t = await text(page, '.extras button:has-text("Despensa")'); return /🎁/.test(t) && t; }, 'contador de regalos');
-    check(/🎁 120/.test(gifts), `120 regalos acumulados en 60 h (${gifts})`);
+    const gifts = await until(async () => { const t = await text(page, '.extras button:has-text("Despensa")'); return /\d/.test(t) && t; }, 'contador de regalos');
+    check(/Despensa\s*120/.test(gifts), `120 regalos acumulados en 60 h (${gifts.replace(/\s+/g, ' ')})`);
     await clickText(page, '.extras button', 'Despensa');
     await clickText(page, 'dialog[open] button', 'Abrir regalo');
     await until(async () => JSON.parse(await storage(page, 'tamagotchi-polkadot-pantry-v1')).items.length === 1, 'regalo en la despensa');
@@ -276,6 +276,41 @@ async function main() {
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 
+  await scenario('Mis animales, dibujo pixel real y sueño', async () => {
+    const page = await newPage();
+    await createPet(page, { name: 'Primero', pet: 3, color: 'Albino', hours: 7 });
+    await clickText(page, '.mint-screen button', 'Jugar sin cartera');
+    await page.waitForSelector('.game-screen:not([hidden])');
+    check(!/\p{Extended_Pictographic}/u.test(await text(page, '.extras')), 'los botones extra no usan emoji');
+    check((await page.locator('.actions .action-icon img').count()) >= 5, 'los botones de cuidado usan íconos de pixel art');
+    await page.click('.menu-button');
+    await clickText(page, '.game-menu button', 'Elegir otra mascota');
+    await page.waitForSelector('.start-screen:not([hidden])');
+    check(JSON.parse(await storage(page, 'tamagotchi-polkadot-history-v1')).length === 1, 'la mascota reemplazada queda en el historial');
+    await createPet(page, { name: 'Segundo', pet: 4, color: 'Lavanda', hours: 1 });
+    await clickText(page, '.mint-screen button', 'Jugar sin cartera');
+    await page.waitForSelector('.game-screen:not([hidden])');
+    await page.click('.menu-button');
+    await clickText(page, '.game-menu button', 'Mis animales');
+    await until(async () => (await page.locator('dialog[open] .pet-record').count()) === 2, 'Mis animales muestra la actual y la anterior');
+    const txt = await text(page, 'dialog[open]');
+    check(txt.includes('Segundo') && txt.includes('ahora') && txt.includes('Primero') && txt.includes('Albino'), 'cada registro muestra nombre, color y cuál es la actual');
+    await shot(page, '06-mis-animales');
+    await page.locator('dialog[open] .dialog-close').click();
+    await page.click('.menu-button');
+    await clickText(page, '.game-menu button', 'Dibujo');
+    check((await storage(page, 'tamagotchi-polkadot-style-v1')) === 'pixel', 'el estilo pixel real se guarda');
+    await page.reload();
+    await page.waitForSelector('.game-screen:not([hidden])');
+    check((await text(page, '.game-menu button:has-text("Dibujo")')) === 'Dibujo: Pixel real', 'al recargar sigue en pixel real');
+    await clickText(page, '.actions button', 'Dormir');
+    await until(async () => (await text(page, '.pet-caption')).includes('Zzz'), 'dormido dice Zzz');
+    await page.waitForTimeout(1500);
+    await shot(page, '07-pixel-real-dormido');
+    check(!/\p{Extended_Pictographic}/u.test(await text(page, '.feedback')), 'la mascota habla sin emoji');
+    check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
+  });
+
   await scenario('Competencia en cadena: temporada, NFT, comida, regalos, muerte y registro', async () => {
     const page = await newPage(0);
     await createPet(page, { name: 'Campeona', pet: 0, color: 'Dorado', hours: 1 });
@@ -296,7 +331,7 @@ async function main() {
     check(m1.horas === 1 && m1.modo === 1 && m1.nombre === 'Campeona', 'el NFT guarda 1 h y modo Competencia en la cadena');
     await clickText(page, '.mint-screen .primary', 'ENTRAR');
     await page.waitForSelector('.game-screen:not([hidden])');
-    check((await text(page, '.mode-badge')) === '⚔️ Competencia · 1 h · Dorado', 'insignia: Competencia · 1 h · Dorado');
+    check((await text(page, '.mode-badge')) === 'Competencia · 1 h · Dorado', 'insignia: Competencia · 1 h · Dorado');
     // Cuidado firmado.
     await page.locator('.actions button').first().click();
     await page.locator('dialog[open] input[value=apple]').check({ force: true });
@@ -337,7 +372,9 @@ async function main() {
     check((await read('pets', 'verMascota', [1n])).viva === false, 'sin cuidados muere en la cadena');
     await ageLocalPet(page, 3 * 3600_000);
     await until(async () => page.locator('.death-panel:not([hidden])').count(), 'panel de muerte');
-    if (await page.locator('dialog[open] button:has-text("REGISTRA")').count() === 0) await clickText(page, '.death-panel button', 'Registrar');
+    // Al morir el juego abre solo el aviso de registro; si no aparece, se usa el botón del panel.
+    const auto = await until(async () => (await page.locator('dialog[open] button:has-text("REGISTRA")').count()) > 0, 'aviso de registro', 4000).catch(() => false);
+    if (!auto) await clickText(page, '.death-panel button', 'Registrar');
     await clickText(page, 'dialog[open] button', 'REGISTRA');
     await clickText(page, 'dialog[open] button', 'Wallet de prueba 0').catch(() => {});
     await until(async () => (await text(page, 'dialog[open]')).includes('registrada'), 'partida registrada');

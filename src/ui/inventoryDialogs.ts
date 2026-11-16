@@ -34,7 +34,7 @@ function empty(text: string) {
   return h('div', { class: 'inv-empty' },
     h('span', { 'aria-hidden': 'true' }, '📦'),
     h('p', {}, text),
-    h('small', {}, 'Consíguelos en la 🛒 Tienda con los pesitos de los minijuegos.'));
+    h('small', {}, 'Los consigues en la Tienda con los pesitos de los minijuegos.'));
 }
 
 export function createAccessoriesDialog(intents: InventoryIntents) {
