@@ -2,6 +2,7 @@
 // reclamar (y firmar, si hay NFT) lo hace el controlador.
 import type { AchievementDef, AchievementState } from '../game/achievements.ts';
 import { createDialog, h } from './dom.ts';
+import { pixelIcon } from './pixelArt.ts';
 
 export interface AchievementRow {
   def: AchievementDef;
@@ -44,7 +45,7 @@ export function createAchievementsDialog(intents: AchievementsIntents) {
       note.textContent = view.note;
       list.replaceChildren(...view.rows.map(({ def, state, reward }) => {
         const item = h('li', { class: `achievement achievement-${state}` },
-          h('span', { class: 'inv-icon', 'aria-hidden': 'true' }, state === 'locked' ? '🔒' : def.icon),
+          pixelIcon(state === 'locked' ? '🔒' : def.icon, 'inv-icon'),
           h('span', {}, h('b', {}, def.name), h('small', {}, def.description), h('small', { class: 'item-bonus' }, `Premio: ${reward}`)),
           h('span', { class: 'achievement-state', role: 'img', 'aria-label': state === 'locked' ? 'Bloqueado' : state === 'claimed' ? 'Conseguido' : 'Disponible' },
             STATE_ICON[state]));

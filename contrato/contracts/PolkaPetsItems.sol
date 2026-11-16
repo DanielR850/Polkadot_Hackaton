@@ -4,11 +4,12 @@ pragma solidity ^0.8.28;
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/utils/Base64.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
-/** Lo que este contrato lee de PolkaPets (mismo orden de campos que PolkaPets.MascotaView). */
+/** Lo que este contrato lee de PolkaPets v2 (mismo orden de campos que PolkaPets.MascotaView). */
 interface IPolkaPetsLectura {
     enum Etapa { Bebe, Joven, Adulta, Enferma, Muerta }
-
+    enum Modo { Pacifico, Competencia }
     struct MascotaView {
         uint256 tokenId;
         string nombre;
@@ -27,10 +28,13 @@ interface IPolkaPetsLectura {
         Etapa etapa;
         uint64 duracion;
         uint64 muerte;
+        uint8 horas;
+        Modo modo;
     }
 
     function ownerOf(uint256 tokenId) external view returns (address);
     function verMascota(uint256 tokenId) external view returns (MascotaView memory);
+    function curar(uint256 tokenId, uint8 vida, uint8 necesidades) external;
 }
 
 /**
@@ -52,8 +56,17 @@ interface IPolkaPetsLectura {
  *          - como máximo UN adorno por categoría (y MAX_ADORNOS en total);
  *          - solo objetos que esa mascota compró.
  *         El precio en pesitos 🪙 es una moneda local del juego: el contrato no la conoce.
+ *
+ *         Versión 2 — colecciones y utilidad:
+ *          - Ropa (accesorios), Hogar (paredes, pisos, muebles y adornos), Comida y Trofeos.
+ *          - Cada objeto tiene una utilidad declarada en la cadena (`utilidad`, `valor`) y visible en
+ *            su `tokenURI`: % de pesitos o % de felicidad mientras está puesto (los aplica el juego),
+ *            o Vida / Saciedad al usar una comida (la aplica este contrato curando en PolkaPets).
+ *          - La comida es consumible: se compra varias veces y `usar` la quema y cura a la mascota.
+ *          - Drops: cada `intervaloDrop` de vida activa la mascota puede reclamar una comida NFT
+ *            (incluidas comidas que no se venden).
  */
-contract PolkaPetsItems is ERC721 {
+contract PolkaPetsItems is ERC721, Ownable {
     // ─────────────────────────────────────────────────────────────────────────
     // Tipos
     // ─────────────────────────────────────────────────────────────────────────
@@ -63,7 +76,17 @@ contract PolkaPetsItems is ERC721 {
         Pared, // 1
         Piso, // 2
         Mueble, // 3
-        Adorno // 4
+        Adorno, // 4
+        Comida // 5: consumible
+    }
+
+    /** Para qué sirve un objeto. Los porcentajes los aplica el juego; Vida y Saciedad, este contrato. */
+    enum Utilidad {
+        Ninguna, // 0
+        Pesitos, // 1: +valor % de pesitos en los minijuegos mientras está puesto
+        Felicidad, // 2: +valor % de felicidad en los minijuegos mientras está puesto
+        Vida, // 3: al usarla, +valor de vida en la cadena
+        Saciedad // 4: al usarla, +valor a las cinco necesidades en la cadena
     }
 
     /** Un objeto del catálogo. `categoria` distingue muebles y adornos que ocupan el mismo lugar. */
@@ -71,7 +94,9 @@ contract PolkaPetsItems is ERC721 {
         bool existe;
         Tipo tipo;
         uint8 categoria;
-        bool exclusivo; // true = no se compra: solo se gana como recompensa de un logro
+        bool exclusivo; // true = no se compra: solo se gana como recompensa de un logro o un drop
+        Utilidad utilidad;
+        uint16 valor;
     }
 
     /** Un logro del catálogo: se gana con tiempo vivido y/o objetos comprados. */
@@ -105,7 +130,8 @@ contract PolkaPetsItems is ERC721 {
 
     uint8 public constant MAX_MUEBLES = 3;
     uint8 public constant MAX_ADORNOS = 2;
-
+    /** Cada cuánto tiempo de vida la mascota gana un drop (lo puede cambiar el dueño). */
+    uint64 public intervaloDrop = 30 minutes;
     // ─────────────────────────────────────────────────────────────────────────
     // Estado
     // ─────────────────────────────────────────────────────────────────────────
@@ -134,12 +160,20 @@ contract PolkaPetsItems is ERC721 {
     mapping(uint256 => mapping(uint16 => uint256)) public tokenLogro;
     mapping(uint256 => uint16[]) private _logrosGanados;
 
+    /** Comida sin usar de cada mascota (tokenIds). */
+    mapping(uint256 => uint256[]) private _despensa;
+    /** Drops ya reclamados por cada mascota. */
+    mapping(uint256 => uint32) public dropsTomados;
+    /** Comidas que pueden salir en un drop. */
+    uint16[] private _poolDrop;
     // ─────────────────────────────────────────────────────────────────────────
     // Eventos y errores
     // ─────────────────────────────────────────────────────────────────────────
 
     event ArticuloComprado(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 articuloId, address indexed dueno);
     event LogroReclamado(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 logroId, address indexed dueno);
+    event ComidaUsada(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 articuloId, Utilidad utilidad, uint16 valor);
+    event DropReclamado(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 articuloId);
     event LegadoSellado(uint256 indexed mascotaId, address indexed dueno, uint64 duracion, uint256 comprados, uint256 equipados);
 
     error NoEresDueno(uint256 mascotaId);
@@ -160,8 +194,10 @@ contract PolkaPetsItems is ERC721 {
     error LogroNoAlcanzado(uint16 logroId);
     error DuracionInvalida();
     error NoTransferible();
-
-    constructor(address polkaPets) ERC721("PolkaPets Items", "PPETI") {
+    error NoEsComida(uint256 tokenId);
+    error SinDrops(uint256 mascotaId);
+    error NoSePonen(uint16 articuloId);
+    constructor(address polkaPets) ERC721("PolkaPets Items", "PPETI") Ownable(msg.sender) {
         pets = IPolkaPetsLectura(polkaPets);
 
         // Debe coincidir con SHOP_CATALOG de src/game/shop.ts. Nombre, emoji y color de cada uno
@@ -187,12 +223,45 @@ contract PolkaPetsItems is ERC721 {
         _definir(19, Tipo.Adorno, 2); // Reloj (repisa)
         _definir(20, Tipo.Adorno, 3); // Calaverita (ofrenda)
 
+        // Utilidad de cada objeto (debe coincidir con `bonus` de SHOP_CATALOG en src/game/shop.ts).
+        _util(1, Utilidad.Pesitos, 5);
+        _util(2, Utilidad.Felicidad, 10);
+        _util(3, Utilidad.Pesitos, 8);
+        _util(4, Utilidad.Felicidad, 8);
+        _util(5, Utilidad.Pesitos, 15);
+        _util(6, Utilidad.Felicidad, 3);
+        _util(7, Utilidad.Felicidad, 3);
+        _util(8, Utilidad.Felicidad, 3);
+        _util(9, Utilidad.Pesitos, 3);
+        _util(10, Utilidad.Pesitos, 3);
+        _util(11, Utilidad.Pesitos, 3);
+        _util(12, Utilidad.Felicidad, 5);
+        _util(13, Utilidad.Pesitos, 3);
+        _util(14, Utilidad.Felicidad, 4);
+        _util(15, Utilidad.Pesitos, 4);
+        _util(16, Utilidad.Pesitos, 5);
+        _util(17, Utilidad.Felicidad, 8);
+        _util(18, Utilidad.Felicidad, 3);
+        _util(19, Utilidad.Pesitos, 5);
+        _util(20, Utilidad.Felicidad, 5);
         // Exclusivos: solo se ganan con un logro (`recompensa`).
         _exclusivo(21); // Medalla
         _exclusivo(22); // Estrella
         _exclusivo(23); // Cinta de campeón
         _exclusivo(24); // Amuleto
-
+        _util(21, Utilidad.Pesitos, 10);
+        _util(22, Utilidad.Felicidad, 15);
+        _util(23, Utilidad.Pesitos, 20);
+        _util(24, Utilidad.Pesitos, 15);
+        // Colección de comida (consumible). Debe coincidir con FOOD_CATALOG de src/game/shop.ts.
+        _comida(25, Utilidad.Vida, 20, false); // Tamal
+        _comida(26, Utilidad.Saciedad, 25, false); // Pan de muerto
+        _comida(27, Utilidad.Saciedad, 15, false); // Elote
+        _comida(28, Utilidad.Saciedad, 20, false); // Agua de jamaica
+        _comida(29, Utilidad.Vida, 30, false); // Chocolate caliente
+        _comida(30, Utilidad.Vida, 50, true); // Mole de la abuela (solo drop)
+        _comida(31, Utilidad.Saciedad, 60, true); // Elixir de ajolote (solo drop)
+        _poolDrop = [25, 26, 27, 28, 29, 30, 31];
         // Debe coincidir con ACHIEVEMENTS de src/game/achievements.ts (id, segundos, objetos, recompensa).
         _logro(1, 10 minutes, 0, 0); // Primeros pasos
         _logro(2, 1 hours, 0, 0); // Adolescente
@@ -219,9 +288,49 @@ contract PolkaPetsItems is ERC721 {
         Articulo memory a = _catalogo[articuloId];
         if (!a.existe) revert ArticuloInvalido(articuloId);
         if (a.exclusivo) revert SoloPorLogro(articuloId);
+        if (a.tipo == Tipo.Comida) return _entregarComida(mascotaId, articuloId, msg.sender);
         if (tokenComprado[mascotaId][articuloId] != 0) revert YaComprado(mascotaId, articuloId);
-
         tokenId = _entregar(mascotaId, articuloId, msg.sender);
+    }
+
+    /**
+     * @notice Usa una comida de la despensa: la quema y cura a su mascota en PolkaPets
+     *         (Vida: +valor de vida; Saciedad: +valor a las cinco necesidades).
+     */
+    function usar(uint256 tokenId) external {
+        uint256 mascotaId = mascotaDe[tokenId];
+        IPolkaPetsLectura.MascotaView memory m = _mascotaDelSender(mascotaId);
+        if (!m.viva) revert MascotaMuerta(mascotaId);
+        Articulo memory a = _catalogo[articuloDe[tokenId]];
+        if (a.tipo != Tipo.Comida || logroDe[tokenId] != 0 || _ownerOf(tokenId) == address(0)) revert NoEsComida(tokenId);
+        _quitarDeDespensa(mascotaId, tokenId);
+        _burn(tokenId);
+        uint8 v = a.valor > 100 ? 100 : uint8(a.valor);
+        if (a.utilidad == Utilidad.Vida) pets.curar(mascotaId, v, 0);
+        else if (a.utilidad == Utilidad.Saciedad) pets.curar(mascotaId, 0, v);
+        emit ComidaUsada(mascotaId, tokenId, articuloDe[tokenId], a.utilidad, a.valor);
+    }
+
+    /**
+     * @notice Reclama un drop: por cada `intervaloDrop` que la mascota lleva viva gana una comida NFT
+     *         al azar del pool (incluye comidas que no se venden). El azar es suficiente para un juego,
+     *         no para premios con valor monetario.
+     */
+    function reclamarDrop(uint256 mascotaId) external returns (uint256 tokenId) {
+        IPolkaPetsLectura.MascotaView memory m = _mascotaDelSender(mascotaId);
+        if (!m.viva) revert MascotaMuerta(mascotaId);
+        if (dropsDisponibles(mascotaId) == 0) revert SinDrops(mascotaId);
+        uint32 n = dropsTomados[mascotaId]++;
+        uint256 azar = uint256(keccak256(abi.encodePacked(blockhash(block.number - 1), mascotaId, n, msg.sender)));
+        uint16 articuloId = _poolDrop[azar % _poolDrop.length];
+        tokenId = _entregarComida(mascotaId, articuloId, msg.sender);
+        emit DropReclamado(mascotaId, tokenId, articuloId);
+    }
+
+    /** @notice Cambia cada cuánto tiempo de vida se gana un drop. Solo el dueño. */
+    function setIntervaloDrop(uint64 segundos) external onlyOwner {
+        if (segundos < 60) revert DuracionInvalida();
+        intervaloDrop = segundos;
     }
 
     /**
@@ -283,6 +392,26 @@ contract PolkaPetsItems is ERC721 {
     // Lectura (view, gratis)
     // ─────────────────────────────────────────────────────────────────────────
 
+    function version() external pure returns (uint8) {
+        return 2;
+    }
+
+    /** @notice Drops que la mascota puede reclamar ahora. */
+    function dropsDisponibles(uint256 mascotaId) public view returns (uint256) {
+        IPolkaPetsLectura.MascotaView memory m = pets.verMascota(mascotaId);
+        if (!m.viva) return 0;
+        uint256 ganados = (block.timestamp - m.nacimiento) / intervaloDrop;
+        uint256 tomados = dropsTomados[mascotaId];
+        return ganados > tomados ? ganados - tomados : 0;
+    }
+
+    /** @notice Comida sin usar de una mascota: tokenIds y su id de catálogo. */
+    function despensaDe(uint256 mascotaId) external view returns (uint256[] memory tokens, uint16[] memory articulos) {
+        tokens = _despensa[mascotaId];
+        articulos = new uint16[](tokens.length);
+        for (uint256 i = 0; i < tokens.length; i++) articulos[i] = articuloDe[tokens[i]];
+    }
+
     /** @notice Datos de un objeto del catálogo. */
     function articulo(uint16 articuloId) external view returns (Articulo memory) {
         return _catalogo[articuloId];
@@ -329,19 +458,51 @@ contract PolkaPetsItems is ERC721 {
         emit ArticuloComprado(mascotaId, tokenId, articuloId, a);
     }
 
+    /** Comida: entra a la despensa de la mascota. Se puede tener varias del mismo tipo. */
+    function _entregarComida(uint256 mascotaId, uint16 articuloId, address a) private returns (uint256 tokenId) {
+        tokenId = _siguienteId++;
+        articuloDe[tokenId] = articuloId;
+        mascotaDe[tokenId] = mascotaId;
+        _despensa[mascotaId].push(tokenId);
+        _safeMint(a, tokenId);
+        emit ArticuloComprado(mascotaId, tokenId, articuloId, a);
+    }
+
+    function _quitarDeDespensa(uint256 mascotaId, uint256 tokenId) private {
+        uint256[] storage d = _despensa[mascotaId];
+        for (uint256 i = 0; i < d.length; i++) {
+            if (d[i] == tokenId) {
+                d[i] = d[d.length - 1];
+                d.pop();
+                return;
+            }
+        }
+        revert NoEsComida(tokenId);
+    }
+
+    function _util(uint16 id, Utilidad u, uint16 valor) private {
+        _catalogo[id].utilidad = u;
+        _catalogo[id].valor = valor;
+    }
+
+    function _comida(uint16 id, Utilidad u, uint16 valor, bool soloDrop) private {
+        _catalogo[id] = Articulo(true, Tipo.Comida, 0, soloDrop, u, valor);
+        totalArticulos += 1;
+    }
+
     function _logro(uint16 id, uint32 minSegundos, uint16 minObjetos, uint16 recompensa) private {
         _catalogoLogros[id] = Logro(true, minSegundos, minObjetos, recompensa);
         totalLogros += 1;
     }
 
     function _definir(uint16 id, Tipo tipo, uint8 categoria) private {
-        _catalogo[id] = Articulo(true, tipo, categoria, false);
+        _catalogo[id] = Articulo(true, tipo, categoria, false, Utilidad.Ninguna, 0);
         totalArticulos += 1;
     }
 
     /** Accesorio exclusivo: no se compra, se gana con un logro. */
     function _exclusivo(uint16 id) private {
-        _catalogo[id] = Articulo(true, Tipo.Accesorio, 0, true);
+        _catalogo[id] = Articulo(true, Tipo.Accesorio, 0, true, Utilidad.Ninguna, 0);
         totalArticulos += 1;
     }
     /** La mascota debe existir y ser de quien llama. */
@@ -368,7 +529,7 @@ contract PolkaPetsItems is ERC721 {
             uint16 id = equipados[i];
             if (tokenComprado[mascotaId][id] == 0) revert NoComprado(mascotaId, id);
             Articulo memory a = _catalogo[id];
-
+            if (a.tipo == Tipo.Comida) revert NoSePonen(id);
             if (a.tipo == Tipo.Accesorio) {
                 if (accesorio) revert LugarRepetido(Tipo.Accesorio);
                 accesorio = true;
@@ -419,13 +580,23 @@ contract PolkaPetsItems is ERC721 {
             '{"name":"', v.nombre, '","description":"', tipo, " de ", mascota, unicode" · mascota #", Strings.toString(mascotaId),
             '","image":"data:image/svg+xml;base64,', Base64.encode(bytes(_svg(v, mascota))), '",'
         );
-        string memory atributos = string.concat(
+        string memory utilidad = esTrofeo ? "Trofeo" : _textoUtilidad(_catalogo[articuloDe[tokenId]]);
+        string memory atributos = _atributos(tipo, mascota, mascotaId, _especie(m.especie), utilidad);
+        return string.concat("data:application/json;base64,", Base64.encode(bytes(string.concat(cabecera, atributos))));
+    }
+
+    function _atributos(string memory tipo, string memory mascota, uint256 mascotaId, string memory especie, string memory utilidad)
+        private
+        pure
+        returns (string memory)
+    {
+        return string.concat(
             '"attributes":[{"trait_type":"Tipo","value":"', tipo,
             '"},{"trait_type":"Mascota","value":"', mascota,
             '"},{"trait_type":"Mascota #","value":"', Strings.toString(mascotaId),
-            '"},{"trait_type":"Especie","value":"', _especie(m.especie), '"}]}'
+            '"},{"trait_type":"Especie","value":"', especie,
+            '"},{"trait_type":"Utilidad","value":"', utilidad, '"}]}'
         );
-        return string.concat("data:application/json;base64,", Base64.encode(bytes(string.concat(cabecera, atributos))));
     }
 
     /** Nombre, emoji y color de cada objeto. Van en el código (no en el almacenamiento). */
@@ -453,7 +624,23 @@ contract PolkaPetsItems is ERC721 {
         if (id == 21) return Visual(unicode"Medalla", unicode"🏅", 0);
         if (id == 22) return Visual(unicode"Estrella", unicode"⭐", 0);
         if (id == 23) return Visual(unicode"Cinta de campeón", unicode"🎗️", 0);
-        return Visual(unicode"Amuleto", unicode"🧿", 0);
+        if (id == 24) return Visual(unicode"Amuleto", unicode"🧿", 0);
+        if (id == 25) return Visual(unicode"Tamal", unicode"🫔", 0);
+        if (id == 26) return Visual(unicode"Pan de muerto", unicode"🍞", 0);
+        if (id == 27) return Visual(unicode"Elote", unicode"🌽", 0);
+        if (id == 28) return Visual(unicode"Agua de jamaica", unicode"🧃", 0);
+        if (id == 29) return Visual(unicode"Chocolate caliente", unicode"☕", 0);
+        if (id == 30) return Visual(unicode"Mole de la abuela", unicode"🍛", 0);
+        return Visual(unicode"Elixir de ajolote", unicode"🧪", 0);
+    }
+
+    function _textoUtilidad(Articulo memory a) private pure returns (string memory) {
+        string memory v = Strings.toString(a.valor);
+        if (a.utilidad == Utilidad.Pesitos) return string.concat("+", v, "% pesitos");
+        if (a.utilidad == Utilidad.Felicidad) return string.concat("+", v, "% felicidad");
+        if (a.utilidad == Utilidad.Vida) return string.concat("+", v, " vida al usarla");
+        if (a.utilidad == Utilidad.Saciedad) return string.concat("+", v, " a todas las necesidades al usarla");
+        return "Decorativo";
     }
 
     function _visualLogro(uint16 id) private pure returns (Visual memory) {
@@ -489,6 +676,7 @@ contract PolkaPetsItems is ERC721 {
         if (tipo == Tipo.Pared) return "Pared";
         if (tipo == Tipo.Piso) return "Piso";
         if (tipo == Tipo.Mueble) return "Mueble";
+        if (tipo == Tipo.Comida) return "Comida";
         return "Adorno";
     }
 
@@ -526,10 +714,10 @@ contract PolkaPetsItems is ERC721 {
         return string(salida);
     }
 
-    /** Los objetos quedan ligados a su mascota: solo se pueden crear, no mover. */
+    /** Los objetos quedan ligados a su mascota: solo se pueden crear o quemar (comida usada), no mover. */
     function _update(address to, uint256 tokenId, address auth) internal override returns (address) {
         address from = _ownerOf(tokenId);
-        if (from != address(0)) revert NoTransferible();
+        if (from != address(0) && to != address(0)) revert NoTransferible();
         return super._update(to, tokenId, auth);
     }
 }

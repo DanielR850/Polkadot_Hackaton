@@ -4,13 +4,19 @@
   "private": true,
   "type": "module",
   "devEngines": {
-    "packageManager": { "name": "pnpm", "version": "12.6.0", "onFail": "download" }
+    "packageManager": {
+      "name": "pnpm",
+      "version": "12.6.0",
+      "onFail": "download"
+    }
   },
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:local": "vite --host 0.0.0.0 --port 5174 --mode hardhat",
     "build": "tsc --noEmit && vite build",
-    "preview": "vite preview --host 0.0.0.0"
+    "preview": "vite preview --host 0.0.0.0",
+    "test": "pnpm dlx --ignore-scripts vitest@2.1.0 run src game/src",
+    "e2e": "node e2e/run.mjs"
   },
   "dependencies": {
     "@parity/product-sdk": "0.39.0",
@@ -20,6 +26,7 @@
     "viem": "2.56.9"
   },
   "devDependencies": {
+    "playwright-core": "1.49.1",
     "typescript": "5.9.3",
     "vite": "8.3.1"
   }

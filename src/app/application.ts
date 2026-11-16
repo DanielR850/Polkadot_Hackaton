@@ -4,11 +4,23 @@
 // se aplica cuando la transacción se confirma.
 import { pickAnimation, type PetAnim } from '../game/animations.ts';
 import { findItem } from '../game/catalog.ts';
-import { DEFAULT_CONFIG, withSpeed } from '../game/config.ts';
+import { headWearFor, isWearable, loadHatPalette, saveHatPalette } from '../game/wearables.ts';
+import { findVariant } from '../game/variants.ts';
+import {
+  addToPantry, clearPantry, DROP_INTERVAL_MS, dropsAvailable, findFood, findFoodByArticle, foodEffects, loadPantry, pickDrop,
+  removeFromPantry, savePantry, type PantryItem, type SpecialFood,
+} from '../game/pantry.ts';
+import { createPantryDialog } from '../ui/pantryDialog.ts';
+import { createSeasonDialog, type SeasonRow } from '../ui/seasonDialog.ts';
+import { createAdminScreen, type AdminView } from '../ui/adminScreen.ts';
+import type { ChainVersions, Temporada } from '../polkadot/nftMint.ts';
+import { calendario } from '../../game/src/contract/temporadas.ts';
+import { CHAIN_NAME, ITEMS_ADDRESS as ITEMS_ADDR, PETS_ADDRESS, TEMPORADAS_ADDRESS } from '../../game/src/contract/config.ts';
+import { configForPet, DIFFICULTIES } from '../game/config.ts';
 import { createPetScene, type PetSceneHandle } from '../game/petScene.ts';
 import { findPet } from '../game/catalog.ts';
 import {
-  ageMs, bathe, computeStage, computeStats, createPet, detectStageChange, feed, isAsleep, isDead, lowNeeds,
+  ageMs, bathe, computeStage, computeStats, createPet, detectStageChange, eatSpecial, feed, isAsleep, isDead, lowNeeds,
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
 import type { RankingSource } from '../game/ranking.ts';
@@ -44,20 +56,30 @@ import { createSoundControl } from '../ui/soundControl.ts';
 import { createMusic, loadSoundPrefs, saveSoundPrefs } from '../infrastructure/audio/music.ts';
 import { createRankingDialog } from '../ui/rankingDialog.ts';
 import { createRenameDialog } from '../ui/renameDialog.ts';
-import { createSelectScreen } from '../ui/selectScreen.ts';
+import { createSelectScreen, recoloredPortrait, type PetChoice } from '../ui/selectScreen.ts';
 import { createStartScreen } from '../ui/startScreen.ts';
 import { applyTheme, buildTheme, DEFAULT_THEME_COLOR } from '../ui/theme.ts';
 
 const params = new URLSearchParams(location.search);
 // `?speed=10` acelera el tiempo para probar etapas y muerte en la demo.
-const config = withSpeed(DEFAULT_CONFIG, Number(params.get('speed') ?? 1));
+const speed = Number(params.get('speed') ?? 1);
 const app = document.querySelector<HTMLElement>('#app')!;
 const ACTION_MS = 1200;
+/** Prototipo: `?color=dorado` (silvestre, melanico, cobre) recolorea la mascota. Ver game/variants.ts. */
+const colorVariant = params.get('color');
 
 type Screen = 'start' | 'select' | 'mint' | 'game';
 
 let pet: PetState | null = loadPet();
 let nft: PetNft | null = pet ? loadNft() : null;
+/** Reglas de la partida: dificultad (horas sin cuidados) y modo (Pacífico no muere). */
+let config = configForPet(pet, speed);
+/** Color, dificultad y modo elegidos para la mascota nueva. */
+let draftChoice: PetChoice = { variant: null, lifeHours: 7 };
+/** Versiones de los contratos desplegados (se leen al conectar). */
+let versions: ChainVersions = { pets: 1, items: ITEMS_ADDRESS ? 1 : 0, seasons: TEMPORADAS_ADDRESS !== null };
+/** Temporada de Competencia (v2) leída de la cadena, o null. */
+let season: Temporada | null = null;
 let draftPetId = 0;
 let minter: NftMinter | null = null;
 let mintBusy = false;
@@ -71,7 +93,9 @@ let scene: PetSceneHandle | null = null;
 let screen: Screen = 'start';
 let draftName = '';
 /** Modo elegido en el paso 3 (con cartera). Por defecto, ranking si el leaderboard existe. */
-let draftMode: NftMode = RANKING_ADDRESS ? 'ranking' : 'passive';
+/** Hay dónde registrar una partida de Competencia: temporadas (v2) o el ranking v1. */
+const recordAvailable = () => RANKING_ADDRESS !== null || TEMPORADAS_ADDRESS !== null;
+let draftMode: NftMode = recordAvailable() ? 'ranking' : 'passive';
 
 /** Modo de la partida: sin cartera es 'local'; con NFT, el que se eligió al adoptar. */
 type PlayMode = 'local' | NftMode;
@@ -83,17 +107,24 @@ const startScreen = createStartScreen((name) => {
   showScreen('select');
 });
 
-const selectScreen = createSelectScreen((petId) => {
+const selectScreen = createSelectScreen((petId, choice) => {
   draftPetId = petId;
+  draftChoice = choice;
   useTheme(petId);
   mintScreen.reset(draftName, petId);
+  // El retrato del paso 3 también lleva el color elegido.
+  const slug = findPet(petId)?.slug;
+  if (choice.variant && slug) void recoloredPortrait(petId, slug, choice.variant).then((url) => { if (url) mintScreen.setPortrait(url); }).catch(() => {});
   showScreen('mint');
   void prepareMint();
 }, () => showScreen('start'), useTheme);
 
 /** Crea la partida local y entra a la habitación, con o sin NFT. */
 function startGame(minted: PetNft | null) {
-  pet = createPet(draftPetId, draftName, Date.now());
+  // Sin cartera es Pacífico ("tu mundo"); con NFT, el modo que se eligió al adoptar.
+  const peaceful = minted ? minted.mode === 'passive' : true;
+  pet = createPet(draftPetId, draftName, Date.now(), { lifeHours: draftChoice.lifeHours, peaceful, variant: draftChoice.variant });
+  config = configForPet(pet, speed);
   savePet(pet);
   resetBelongings();
   nft = minted;
@@ -103,7 +134,7 @@ function startGame(minted: PetNft | null) {
   lastStage = 'baby';
   showScreen('game');
   gameScreen.say(minted
-    ? `¡${pet.name} ya es tu NFT #${minted.tokenId}! Cuidarla es gratis.`
+    ? `¡${pet.name} ya es tu NFT #${minted.tokenId}! ${peaceful ? 'Modo pacífico: no muere.' : `Modo competencia: aguanta ${draftChoice.lifeHours} h sin cuidados.`}`
     : `¡Hola, ${pet.name}! Te toca cuidar de tu nueva mascota.`);
 }
 
@@ -113,7 +144,7 @@ function startGame(minted: PetNft | null) {
 let minted: PetNft | null = null;
 
 const mintScreen = createMintScreen({
-  setMode: (mode) => { if (!mintBusy && (mode === 'passive' || RANKING_ADDRESS)) { draftMode = mode; syncConnected(); } },
+  setMode: (mode) => { if (!mintBusy && (mode === 'passive' || competitionState().available)) { draftMode = mode; syncConnected(); } },
   connect: (walletId) => void connectWallet(walletId),
   retry: () => void prepareMint(),
   mint: () => void mintNft(),
@@ -134,6 +165,7 @@ async function prepareMint() {
   mintScreen.sync({ step: 'searching' });
   try {
     const m = await getMinter();
+    chainInfo = refreshChainInfo();
     const inHost = await m.inHost();
     const wallets = inHost ? [] : await m.wallets();
     lastWallets = wallets;
@@ -164,12 +196,44 @@ async function connectWallet(walletId: string | null) {
   }
 }
 
+/** Lectura de versiones ya hecha (o en curso) para las acciones de la partida. */
+let chainInfo: Promise<void> | null = null;
+/** Antes de decidir si algo es NFT (comida, regalos, registro) hay que saber qué contratos hay. */
+function ensureChainInfo(): Promise<void> {
+  chainInfo ??= refreshChainInfo();
+  return chainInfo;
+}
+
+/** Lee qué contratos hay (v1 o v2) y la temporada de Competencia. Sin red, se queda con lo último. */
+async function refreshChainInfo() {
+  try {
+    const m = await getMinter();
+    versions = await m.versions();
+    season = versions.seasons ? await m.season() : null;
+  } catch (error) {
+    console.warn('[polkapets] versiones y temporada', error);
+  }
+  if (screen === 'mint') syncConnected();
+}
+
+/** Si la Competencia se puede elegir ahora y el texto de la temporada. */
+function competitionState(): { available: boolean; note: string } {
+  if (versions.seasons && season) {
+    if (season.pausada) return { available: false, note: 'La competencia está en pausa por el administrador.' };
+    if (!season.abierta) return { available: false, note: 'La temporada está cerrada: abre el lunes a las 00:00 (hora de México).' };
+    return { available: true, note: `Temporada ${season.semana + 1}: cierra el viernes a las 23:59.` };
+  }
+  return { available: RANKING_ADDRESS !== null, note: '' };
+}
+
 function syncConnected() {
   if (!mintAccount) return;
+  const competition = competitionState();
+  if (!competition.available && draftMode === 'ranking') draftMode = 'passive';
   // Cualquier especie se puede adoptar: si el contrato no la admite, el mint usa el comodín (0).
   mintScreen.sync({
     step: 'connected', via: mintAccount.via, address: mintAccount.address, inHost: mintAccount.inHost,
-    mode: draftMode, rankingAvailable: RANKING_ADDRESS !== null,
+    mode: draftMode, rankingAvailable: competition.available, competitionNote: competition.note,
   });
 }
 
@@ -180,12 +244,16 @@ async function mintNft() {
   mintScreen.showError(null);
   mintScreen.sync({ step: 'minting', inHost: account.inHost, progress: 'simulando' });
   try {
+    // Con PolkaPets v2 la dificultad y el modo quedan en el NFT; con v1 solo nombre y especie.
+    const options = versions.pets >= 2 ? { lifeHours: draftChoice.lifeHours, peaceful: draftMode === 'passive' } : undefined;
     const tokenId = await minter.mint(draftName, draftPetId, (progress) => {
       mintScreen.sync({ step: 'minting', inHost: account.inHost, progress });
-    });
+    }, options);
     mintBusy = false;
     minted = { tokenId: tokenId.toString(), address: account.address, mode: draftMode };
-    mintScreen.sync({ step: 'done', tokenId: minted.tokenId, url: minter.nftUrl(tokenId) });
+    const lifeText = draftMode === 'passive' ? 'Modo pacífico: no muere, se enferma y espera tus cuidados.'
+      : `Modo competencia: sin cuidados aguanta ${draftChoice.lifeHours} h.`;
+    mintScreen.sync({ step: 'done', tokenId: minted.tokenId, url: minter.nftUrl(tokenId), lifeText, network: CHAIN_NAME });
   } catch (error) {
     mintBusy = false;
     console.warn('[polkapets] mint', error);
@@ -197,10 +265,20 @@ async function mintNft() {
 /** Nota de la habitación y botones del leaderboard según el modo. */
 function showNftNote() {
   const mode = playMode();
-  if (mode === 'ranking') gameScreen.setNote(`🏆 Modo ranking · NFT #${nft!.tokenId}`, 'Cada cuidado se firma. Al morir, guarda cuánto vivió en el leaderboard.');
-  else if (mode === 'passive') gameScreen.setNote(`🌿 Modo pasivo · NFT #${nft!.tokenId}`, 'Cada cuidado se firma. No participa en el leaderboard.');
-  else gameScreen.setNote('Modo local, sin cartera.', 'Tu partida se guarda en este dispositivo. Cuidarla es gratis.');
+  if (mode === 'ranking') gameScreen.setNote(`⚔️ Modo competencia · NFT #${nft!.tokenId}`, 'Cada cuidado se firma. Al morir, registra cuánto vivió en la temporada semanal.');
+  else if (mode === 'passive') gameScreen.setNote(`🌿 Modo pacífico · NFT #${nft!.tokenId}`, 'Cada cuidado se firma. No muere: si la descuidas se enferma.');
+  else gameScreen.setNote('🌿 Modo pacífico, sin cartera.', 'Tu mundo: se guarda en este dispositivo, cuidarla es gratis y no muere.');
   gameScreen.setRankingVisible(mode === 'ranking');
+  gameScreen.setBadge(badgeText());
+}
+
+/** "⚔️ Competencia · 7 h · Dorado". */
+function badgeText(): string {
+  if (!pet) return '';
+  const mode = pet.peaceful ? '🌿 Pacífico' : '⚔️ Competencia';
+  const hours = pet.lifeHours ? `${pet.lifeHours} h` : '';
+  const color = findVariant(pet.petId, pet.variant)?.name ?? '';
+  return [mode, hours, color].filter(Boolean).join(' · ');
 }
 
 /** Aplica el tema de la especie y sincroniza el color de la habitación Phaser. */
@@ -394,6 +472,8 @@ function claimMiniGame(result: MiniGameResult) {
 
 // Inventario: lo comprado en la tienda (y con `?demo=1`, objetos de muestra para probar).
 let purchases = loadPurchases();
+/** Despensa: comida especial y regalos ya abiertos (en el dispositivo; con NFT se relee de la cadena). */
+let pantry = loadPantry();
 const inventory = createLocalInventory(params.get('demo') === '1', () => SHOP_CATALOG.filter((i) => purchases.includes(i.id)));
 let owned: InventoryItem[] = [];
 let equipped: Equipped = loadEquipped();
@@ -414,10 +494,15 @@ async function loadInventory(): Promise<boolean> {
   }
 }
 
+/** Color elegido para el sombrero de pixel art. */
+let hatPalette = loadHatPalette();
+
 function applyInventory() {
   saveEquipped(equipped);
   scene?.setDecor(toDecor(equipped, owned));
-  scene?.setAccessory(accessoryIcon(equipped, owned));
+  // Las prendas de WEARABLE_ITEMS se dibujan como pixel art ajustado a cada especie; el resto, emoji.
+  scene?.setAccessory(accessoryIcon(equipped, owned), headWearFor(equipped.accessory, hatPalette));
+  accessoriesDialog?.colors(isWearable(equipped.accessory), hatPalette);
 }
 
 /**
@@ -431,12 +516,20 @@ function resetBelongings() {
   purchases = [];
   clearPurchases();
   clearEquipped();
+  pantry = { items: [], dropsTaken: 0 };
+  chainDrops = null;
+  clearPantry();
   owned = [];
   equipped = { ...NOTHING_EQUIPPED };
   applyInventory();
 }
 
 const inventoryIntents = {
+  palette(id: string) {
+    hatPalette = id;
+    saveHatPalette(id);
+    applyInventory();
+  },
   select(kind: 'accessory' | 'wall' | 'floor', id: string | null) {
     // sanitize garantiza que solo se ponga lo que se tiene, y uno por lugar.
     equipped = sanitize({ ...equipped, [kind]: id }, owned);
@@ -452,7 +545,8 @@ const inventoryIntents = {
     spaceDialog.render(owned, equipped);
   },
 };
-const accessoriesDialog = createAccessoriesDialog(inventoryIntents);
+// `var`: applyInventory puede correr antes de que exista el diálogo.
+var accessoriesDialog = createAccessoriesDialog(inventoryIntents);
 const spaceDialog = createSpaceDialog(inventoryIntents);
 
 /* --------------------------------------------------------------- tienda */
@@ -503,6 +597,7 @@ const shopDialog = createShopDialog(SHOP_CATALOG, {
       shopBusy = false;
     }
   },
+  buyFood(food) { void buyFood(food); },
   use(item) {
     if (item.kind === 'furniture' || item.kind === 'decor') {
       if (!equipped[item.kind].includes(item.id)) {
@@ -534,7 +629,7 @@ const gameScreen = createGameScreen({
   }),
   accessories: () => void openInventory(accessoriesDialog),
   space: () => void openInventory(spaceDialog),
-  shop: () => shopDialog.open({ coins: purse.coins, owned: purchases }),
+  shop: () => shopDialog.open({ coins: purse.coins, owned: purchases, pantry: pantryCount() }),
   trophies: () => openTrophies(),
   sleep: () => withPet((p, now) => {
     if (computeStats(p, now, config).energy >= 99.5) { gameScreen.say('No tiene sueño: su energía está al máximo.'); return; }
@@ -562,8 +657,9 @@ const gameScreen = createGameScreen({
     careWithSignature(`Bañar a ${p.name}`, 'banar', () => withPet((q, t) => commit(bathe(q, progress, t, config), message)));
   }),
   rename: () => { if (pet && !signBusy && !pendingSign) renameDialog.open(pet.name); },
-  ranking: () => rankingDialog.open(),
+  ranking: () => openRanking(),
   record: () => openRecord(false),
+  pantry: () => openPantry(),
   legacy: () => saveLegacy(),
   restart: () => {
     if (recordBusy || signBusy) return;
@@ -575,6 +671,7 @@ const gameScreen = createGameScreen({
     if (recordDialog.isOpen()) recordDialog.close();
     pet = null;
     savePet(null);
+    config = configForPet(null, speed);
     nft = null;
     saveNft(null);
     setRecordButton();
@@ -623,6 +720,38 @@ const leaderboard: RankingSource = {
       }));
   },
 };
+/* ------------------------------------------- competencia por temporadas (v2) */
+
+const seasonDialog = createSeasonDialog({
+  async load() {
+    const m = await getMinter();
+    const s = await m.season();
+    if (!s) throw new Error('Sin temporadas');
+    season = s;
+    const me = (m.account()?.address ?? nft?.address ?? '').toLowerCase();
+    const toRow = (r: { tokenId: bigint; dueno: string; nombre: string; especie: number; horas: number; duracion: number }): SeasonRow => ({
+      id: r.tokenId.toString(), name: r.nombre, petId: r.especie, hours: r.horas, aliveMs: r.duracion * 1000, mine: me !== '' && r.dueno.toLowerCase() === me,
+    });
+    const [rows, champions, admin] = await Promise.all([m.seasonRows(s.semana), m.champions(), m.admin()]);
+    return {
+      week: s.semana, open: s.abierta, paused: s.pausada, opensAt: s.abre, closesAt: s.cierra,
+      rows: rows.map(toRow), champions: champions.map((c) => ({ week: c.semana, podium: c.podio.map(toRow) })),
+      pendingClose: admin.pendingClose,
+    };
+  },
+  async close(week) {
+    const m = await getMinter();
+    if (!m.account()) throw new Error('Conecta tu cuenta para guardar el podio (una firma).');
+    await m.closeSeason(week);
+  },
+});
+
+/** Competencia: con contrato de temporadas abre la temporada; si no, el leaderboard v1. */
+function openRanking() {
+  if (TEMPORADAS_ADDRESS) seasonDialog.open(pet?.lifeHours);
+  else rankingDialog.open();
+}
+
 const rankingDialog = createRankingDialog(leaderboard, undefined, RANKING_ADDRESS
   ? 'Las 10 partidas que más duraron, registradas en la blockchain por sus dueños.'
   : 'Las 10 mascotas NFT que más han vivido, según el contrato PolkaPets.');
@@ -636,7 +765,7 @@ const recordDialog = createRecordDialog({
   decline: () => { if (!recordBusy) recordDialog.close(); },
   connect: (walletId) => void recordConnect(walletId),
   retry: () => void recordSearch(),
-  ranking: () => { recordDialog.close(); rankingDialog.open(); },
+  ranking: () => { recordDialog.close(); openRanking(); },
 });
 
 /** El contrato limita el nombre a 24 bytes: se recorta sin partir letras (nombres de versiones viejas). */
@@ -650,7 +779,7 @@ function nameForContract(name: string): string {
 }
 
 function setRecordButton() {
-  const enabled = RANKING_ADDRESS !== null && playMode() === 'ranking';
+  const enabled = recordAvailable() && playMode() === 'ranking';
   gameScreen.setRecord(!enabled ? 'hidden' : nft!.recorded ? 'recorded' : 'available');
   // El legado vale para cualquier mascota NFT (ranking o pasivo) si el contrato de objetos existe.
   gameScreen.setLegacy(!itemsAsNft() ? 'hidden' : nft!.legacy ? 'recorded' : 'available');
@@ -690,7 +819,7 @@ function openRecord(auto: boolean) {
   if (playMode() !== 'ranking') return;
   if (auto && nft?.asked) return;
   // Sin contrato de ranking no se interrumpe al jugador; se preguntará cuando esté desplegado.
-  if (auto && nft && !RANKING_ADDRESS) return;
+  if (auto && nft && !recordAvailable()) return;
   if (nft) markNft({ asked: true });
   recordDialog.open({
     name: pet.name, petId: pet.petId, duration: formatDuration(ageMs(pet, Date.now())), tokenId: nft?.tokenId ?? '',
@@ -698,12 +827,13 @@ function openRecord(auto: boolean) {
   recordDialog.showError(null);
   if (!nft) recordDialog.sync({ step: 'noNft' });
   else if (nft.recorded) recordDialog.sync({ step: 'already' });
-  else if (!RANKING_ADDRESS) recordDialog.sync({ step: 'unavailable' });
+  else if (!recordAvailable()) recordDialog.sync({ step: 'unavailable' });
   else recordDialog.sync({ step: 'ask' });
 }
 
 /** "Sí": si ya hay cuenta conectada de la adopción, va directo a firmar. */
 async function startRecord() {
+  await ensureChainInfo();
   const m = await getMinter();
   if (m.account()) await recordSign();
   else await recordSearch();
@@ -759,16 +889,19 @@ async function recordSign() {
   recordDialog.showError(null);
   recordDialog.sync({ step: 'signing', inHost: account.inHost, progress: 'simulando' });
   try {
-    if (await m.isRecorded(tokenId)) {
+    const onStep = (step: 'simulando' | 'firma' | 'confirmando' | 'leyendo') => {
+      if (step !== 'leyendo') recordDialog.sync({ step: 'signing', inHost: account.inHost, progress: step });
+    };
+    // v2: la temporada lee la duración exacta de la cadena; v1: el ranking recibe la del juego.
+    const seasons = versions.seasons && versions.pets >= 2;
+    if (seasons ? await m.isSeasonRecorded(tokenId) : await m.isRecorded(tokenId)) {
       recordBusy = false;
       markNft({ recorded: true });
       recordDialog.sync({ step: 'already' });
       return;
     }
-    await m.record(
-      { tokenId, nombre: nameForContract(pet.name), especie: pet.petId, duracionSeg: ageMs(pet, Date.now()) / 1000 },
-      (step) => { if (step !== 'leyendo') recordDialog.sync({ step: 'signing', inHost: account.inHost, progress: step }); },
-    );
+    if (seasons) await m.recordSeason(tokenId, onStep);
+    else await m.record({ tokenId, nombre: nameForContract(pet.name), especie: pet.petId, duracionSeg: ageMs(pet, Date.now()) / 1000 }, onStep);
     recordBusy = false;
     markNft({ recorded: true });
     recordDialog.sync({ step: 'done' });
@@ -867,6 +1000,150 @@ function claimAchievement(id: number) {
   });
 }
 
+/* ------------------------------------------------- despensa y regalos (drops) */
+
+/** Comida y regalos son NFT si hay mascota NFT y PolkaPetsItems v2. */
+const foodAsNft = () => versions.items >= 2 && nft !== null && playMode() !== 'local';
+
+const pantryCount = (): Record<string, number> => {
+  const count: Record<string, number> = {};
+  for (const i of pantry.items) count[i.foodId] = (count[i.foodId] ?? 0) + 1;
+  return count;
+};
+
+/** Regalos según el contrato (con NFT v2); null mientras no se ha leído. */
+let chainDrops: number | null = null;
+
+function giftsReady(now: number): number {
+  if (!pet || pet.diedAt !== null) return 0;
+  if (foodAsNft() && chainDrops !== null) return chainDrops;
+  return dropsAvailable(ageMs(pet, now), pantry.dropsTaken, DROP_INTERVAL_MS / (speed > 0 ? speed : 1));
+}
+
+function pantryView() {
+  const now = Date.now();
+  const interval = DROP_INTERVAL_MS / (speed > 0 ? speed : 1);
+  const alive = pet !== null && pet.diedAt === null;
+  const age = pet ? ageMs(pet, now) : 0;
+  return {
+    items: pantry.items,
+    drops: giftsReady(now),
+    nextDropMs: alive ? interval - (age % interval) : null,
+    asNft: foodAsNft(),
+    disabledReason: !alive ? 'Tu mascota ya no puede comer.' : signBusy || pendingSign ? 'Espera a que termine la firma en curso.' : null,
+  };
+}
+
+const pantryDialog = createPantryDialog({
+  use: (item) => void useFood(item),
+  claimDrop: () => void claimDrop(),
+});
+
+async function openPantry() {
+  pantryDialog.open(pantryView());
+  if (nft) await ensureChainInfo();
+  await syncPantry();
+}
+
+/** Con NFT la despensa verdadera está en la cadena: se relee (tokenIds incluidos). */
+async function syncPantry() {
+  if (!foodAsNft() || !nft) return;
+  try {
+    chainDrops = await (await getMinter()).dropsAvailable(BigInt(nft.tokenId));
+    const chain = await (await getMinter()).pantry(BigInt(nft.tokenId));
+    const items: PantryItem[] = chain.flatMap((c) => {
+      const food = findFoodByArticle(c.articulo);
+      return food ? [{ uid: `nft-${c.tokenId}`, foodId: food.id, tokenId: c.tokenId.toString() }] : [];
+    });
+    // Lo comprado sin NFT (por ejemplo, sin conexión) se conserva junto a lo que está en la cadena.
+    pantry = { ...pantry, items: [...items, ...pantry.items.filter((i) => !i.tokenId)] };
+    savePantry(pantry);
+    pantryDialog.render(pantryView());
+  } catch (error) {
+    console.warn('[polkapets] despensa', error);
+  }
+}
+
+async function useFood(item: PantryItem) {
+  const food = findFood(item.foodId);
+  if (!food) return;
+  if (nft) await ensureChainInfo();
+  withPet((p, now) => {
+    if (p.diedAt !== null || isDead(p, now, config)) { gameScreen.say('Tu mascota ya no puede comer.'); return; }
+    const apply = () => withPet((q, t) => {
+      pantry = removeFromPantry(pantry, item.uid);
+      savePantry(pantry);
+      pantryDialog.render(pantryView());
+      commit(eatSpecial(q, foodEffects(food), t, config), `¡${food.name}! ${food.utility === 'life' ? 'Recuperó vida.' : 'Quedó satisfecha.'}`, { anim: 'eat', icon: food.icon });
+    });
+    if (foodAsNft() && item.tokenId) {
+      pantryDialog.close();
+      signedAction(`Darle ${food.name} a ${p.name}`, (m, _tokenId, onStep) => m.useFood(BigInt(item.tokenId!), onStep), apply);
+    } else {
+      apply();
+    }
+  });
+}
+
+async function claimDrop() {
+  if (nft) await ensureChainInfo();
+  withPet((p, now) => {
+    if (giftsReady(now) === 0) { gameScreen.say('Todavía no hay regalos. Sigue cuidándola.'); return; }
+    const receive = (food: SpecialFood | undefined, tokenId?: string) => {
+      pantry = { ...pantry, dropsTaken: pantry.dropsTaken + 1 };
+      if (chainDrops !== null) chainDrops = Math.max(0, chainDrops - 1);
+      const uid = tokenId ? `nft-${tokenId}` : `local-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+      if (food && !pantry.items.some((i) => i.uid === uid)) pantry = addToPantry(pantry, { uid, foodId: food.id, tokenId });
+      savePantry(pantry);
+      gameScreen.setGifts(giftsReady(Date.now()));
+      pantryDialog.render(pantryView());
+      gameScreen.showToast(food ? `🎁 ¡Te tocó ${food.icon} ${food.name}! ${food.dropOnly ? '(¡no se vende!)' : ''}` : '🎁 Regalo abierto.');
+    };
+    if (foodAsNft()) {
+      let result: { tokenId: bigint; articulo: number } | null = null;
+      pantryDialog.close();
+      signedAction(`Abrir un regalo de ${p.name}`, async (m, tokenId, onStep) => { result = await m.claimDrop(tokenId, onStep); },
+        () => receive(result ? findFoodByArticle(result.articulo) : undefined, result ? String(result.tokenId) : undefined));
+    } else {
+      receive(pickDrop(Math.random()));
+    }
+  });
+}
+
+async function buyFood(food: SpecialFood) {
+  if (shopBusy) return;
+  if (!pet || pet.diedAt !== null) { shopDialog.failed('Tu mascota ya no puede comer.'); return; }
+  if (purse.coins < food.price) { shopDialog.failed(`Te faltan ${food.price - purse.coins} 🪙.`); return; }
+  shopBusy = true;
+  shopDialog.buying(food);
+  if (nft) await ensureChainInfo();
+  const done = async (asNft: boolean) => {
+    purse = { ...purse, coins: purse.coins - food.price };
+    savePurse(purse);
+    gameScreen.setCoins(purse.coins);
+    // Con NFT la comida nueva se lee de la cadena (con su tokenId); sin NFT se guarda aquí.
+    if (asNft) await syncPantry();
+    else pantry = addToPantry(pantry, { uid: `local-${Date.now()}`, foodId: food.id });
+    savePantry(pantry);
+    shopDialog.boughtFood(food, { coins: purse.coins, pantry: pantryCount() });
+  };
+  try {
+    const asNft = foodAsNft();
+    if (asNft && pet) {
+      await new Promise<void>((resolve, reject) => {
+        if (signBusy || pendingSign) { reject(new Error('Espera a que termine la firma en curso.')); return; }
+        signedAction(`Comprar ${food.name} para ${pet!.name}`, (m, tokenId, onStep) => m.buyItem(tokenId, food.articleId, onStep),
+          resolve, () => reject(new Error('Cancelaste la compra: no se firmó nada y no se cobró.')));
+      });
+    }
+    await done(asNft);
+  } catch (error) {
+    shopDialog.failed(error instanceof Error ? error.message : 'No se pudo completar la compra.');
+  } finally {
+    shopBusy = false;
+  }
+}
+
 function withPet(fn: (p: PetState, now: number) => void) {
   if (pet) fn(pet, Date.now());
 }
@@ -913,7 +1190,7 @@ function render() {
     // Mientras hay una firma pendiente no se puede pedir otro cuidado.
     stats, mode, bathProgress, mood, busy: (action !== null && now < action.until) || pendingSign !== null,
   });
-  scene?.show({ petId: pet.petId, stage, anim });
+  scene?.show({ petId: pet.petId, stage, anim, variant: pet.variant ?? colorVariant });
 }
 
 /** Cada segundo: detecta muerte y cambio de etapa, y refresca las barras. */
@@ -939,6 +1216,7 @@ function tick() {
   if (grown && pet.diedAt === null) gameScreen.showToast(`¡${pet.name} creció a ${STAGE_LABEL[grown].toLowerCase()}!`);
   lastStage = stage;
   checkAchievements();
+  gameScreen.setGifts(giftsReady(now));
   if (action && now >= action.until) action = null;
   render();
 }
@@ -961,7 +1239,9 @@ function showScreen(next: Screen) {
   }
 }
 
-if (params.get('outside') === '1') {
+if (params.get('admin') === '1') {
+  startAdmin();
+} else if (params.get('outside') === '1') {
   // Vista previa del aviso para cuando la app se abra fuera de un Host. La detección real
   // (`isInsideContainer()` del Product SDK) se conectará después desde src/polkadot/.
   app.replaceChildren(h('section', { class: 'screen start-screen' },
@@ -988,11 +1268,14 @@ if (params.get('outside') === '1') {
   setRecordButton();
   gameScreen.setCoins(purse.coins);
   showScreen(pet ? 'game' : 'start');
+  // Con NFT se averigua en segundo plano qué contratos hay (v1 o v2).
+  if (nft) void ensureChainInfo();
   // Murió en una sesión anterior y nunca se preguntó: se pregunta ahora (solo con NFT).
   if (pet && pet.diedAt !== null && nft && !nft.asked) openRecord(true);
   window.addEventListener('storage', (event) => {
     if (event.key !== PET_STORAGE_KEY || !app.contains(startScreen.root)) return;
     pet = parsePetState(event.newValue);
+    config = configForPet(pet, speed);
     nft = pet ? loadNft() : null;
     showNftNote();
     setRecordButton();
@@ -1005,4 +1288,74 @@ if (params.get('outside') === '1') {
     if (pet) gameScreen.say('La partida se actualizó en otra pestaña.');
   });
   window.setInterval(tick, 1000);
+}
+
+/* ---------------------------------------------- administración (?admin=1) */
+
+function startAdmin() {
+  let view: AdminView = {
+    network: CHAIN_NAME, addresses: [], totalPets: null, season: null, seasonsOwner: null, itemsOwner: null, dropIntervalSec: null,
+    pendingClose: [], account: null, wallets: [], inHost: false, busy: 'Leyendo los contratos…', message: null,
+  };
+  const screenAdmin = createAdminScreen({
+    connect: (walletId) => void run('Conectando…', async (m) => {
+      const account = await m.connect(walletId);
+      view = { ...view, account: account.address };
+    }),
+    refresh: () => void load(),
+    pause: (paused) => void run(paused ? 'Pausando…' : 'Reanudando…', (m) => m.setSeasonPaused(paused)),
+    closeWeek: (week) => void run(`Cerrando la temporada ${week + 1}…`, (m) => m.closeSeason(week)),
+    setDropInterval: (minutes) => void run('Cambiando el intervalo…', async (m) => {
+      if (!(minutes >= 1)) throw new Error('Escribe al menos 1 minuto.');
+      await m.setDropInterval(minutes * 60);
+    }),
+    exit: () => { location.search = ''; },
+  });
+  app.replaceChildren(screenAdmin.root);
+  const sync = () => screenAdmin.sync(view);
+
+  async function run(busy: string, fn: (m: NftMinter) => Promise<void>) {
+    const m = await getMinter();
+    view = { ...view, busy, message: null };
+    sync();
+    try {
+      await fn(m);
+      await load();
+    } catch (error) {
+      view = { ...view, busy: null, message: m.explain(error) };
+      sync();
+    }
+  }
+
+  async function load() {
+    view = { ...view, busy: 'Leyendo los contratos…' };
+    sync();
+    const m = await getMinter();
+    try {
+      const [info, inHost] = await Promise.all([m.admin(), m.inHost()]);
+      const wallets = inHost ? [] : await m.wallets();
+      lastWallets = wallets;
+      const registered = info.season ? (await m.seasonRows(info.season.semana)).length : 0;
+      view = {
+        ...view, busy: null, inHost, wallets: wallets.map((w) => ({ id: w.id, name: w.name })),
+        addresses: [
+          { label: 'PolkaPets', address: PETS_ADDRESS, version: `v${info.versions.pets}` },
+          { label: 'Objetos', address: ITEMS_ADDR, version: info.versions.items ? `v${info.versions.items}` : undefined },
+          { label: 'Temporadas', address: TEMPORADAS_ADDRESS },
+          { label: 'Ranking v1', address: RANKING_ADDRESS },
+        ],
+        season: info.season ? {
+          week: info.season.semana, open: info.season.abierta, paused: info.season.pausada, opensAt: info.season.abre, closesAt: info.season.cierra, registered,
+        } : null,
+        seasonsOwner: info.seasonsOwner, itemsOwner: info.itemsOwner,
+        dropIntervalSec: info.dropInterval, pendingClose: info.pendingClose,
+      };
+    } catch (error) {
+      console.warn('[polkapets] admin', error);
+      const local = calendario(Date.now());
+      view = { ...view, busy: null, message: `No se pudieron leer los contratos (${m.explain(error)}). Semana local: ${local.semana + 1}.` };
+    }
+    sync();
+  }
+  void load();
 }

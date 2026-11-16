@@ -31,8 +31,8 @@ describe("PolkaPetsItems", () => {
     await pets.waitForDeployment();
     const items = await (await ethers.getContractFactory("PolkaPetsItems")).deploy(await pets.getAddress());
     await items.waitForDeployment();
-    await pets.mint("Michi", 0); // mascota 1
-    await pets.mint("Pelusa", 0); // mascota 2
+    await pets.mint("Michi", 0, 12, 1); // mascota 1
+    await pets.mint("Pelusa", 0, 12, 1); // mascota 2
     return { pets, items, owner, otro };
   }
 
@@ -53,7 +53,7 @@ describe("PolkaPetsItems", () => {
 
     it("el catálogo clasifica cada objeto", async () => {
       const { items } = await desplegar();
-      expect(await items.totalArticulos()).to.equal(24);
+      expect(await items.totalArticulos()).to.equal(31);
       expect((await items.articulo(SOMBRERO)).tipo).to.equal(TIPO.Accesorio);
       expect((await items.articulo(PARED_ROSA)).tipo).to.equal(TIPO.Pared);
       expect((await items.articulo(SILLON)).categoria).to.equal((await items.articulo(SILLA)).categoria);
@@ -69,7 +69,7 @@ describe("PolkaPetsItems", () => {
       const { items } = await desplegar();
       await expect(items.comprar(99, SOMBRERO)).to.be.reverted;
       await expect(items.comprar(1, 0)).to.be.revertedWithCustomError(items, "ArticuloInvalido");
-      await expect(items.comprar(1, 25)).to.be.revertedWithCustomError(items, "ArticuloInvalido");
+      await expect(items.comprar(1, 99)).to.be.revertedWithCustomError(items, "ArticuloInvalido");
       await items.comprar(1, SOMBRERO);
       await expect(items.comprar(1, SOMBRERO)).to.be.revertedWithCustomError(items, "YaComprado");
     });
@@ -303,7 +303,7 @@ describe("PolkaPetsItems", () => {
 
     it("el nombre de la mascota no puede inyectar marcado en el SVG ni el JSON", async () => {
       const { items, pets } = await desplegar();
-      await pets.mint('<script>"x"\\', 0); // mascota 3
+      await pets.mint('<script>"x"\\', 0, 12, 1); // mascota 3
       await items.comprar(3, SOMBRERO);
       const { json, svg } = leer(await items.tokenURI(1));
       expect(svg).to.not.contain("<script");

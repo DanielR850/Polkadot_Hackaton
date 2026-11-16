@@ -198,6 +198,9 @@ importers:
         specifier: 2.56.9
         version: 2.56.9(typescript@5.9.3)
     devDependencies:
+      playwright-core:
+        specifier: 1.49.1
+        version: 1.49.1
       typescript:
         specifier: 5.9.3
         version: 5.9.3
@@ -1181,6 +1184,11 @@ packages:
   picomatch@4.0.7:
     resolution: {integrity: sha512-qcJu88Q2IWqJsDD529JKMdwGm/dvInW4HvQnRwiH9JtihJvzGOscDtHE3x1pBKeUOTysQ8kVmLnJ2kJu7yhcGA==}
     engines: {node: '>=12'}
+
+  playwright-core@1.49.1:
+    resolution: {integrity: sha512-BzmpVcs4kE2CH15rWfzpjzVGhWERJfmnXmniSyKeRZUs9Ws65m+RGIi7mjJK/euCegfn3i7jvqWeWyHe9y3Vgg==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   polkadot-api@3.2.1:
     resolution: {integrity: sha512-cumk5MUUH8TnACIvl5jOtQ0Ct/0ttppA+mpsOLwjeoFRezX9C70sTTNe2liJWq2lYfG7mUELiN2CrahTXLfM8w==}
@@ -2444,6 +2452,8 @@ snapshots:
   picocolors@1.1.1: {}
 
   picomatch@4.0.7: {}
+
+  playwright-core@1.49.1: {}
 
   polkadot-api@3.2.1(esbuild@0.28.2)(rxjs@7.8.2):
     dependencies:

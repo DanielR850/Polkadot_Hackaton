@@ -13,11 +13,15 @@ export type MintView =
   | { step: 'searching' }
   | { step: 'choose'; inHost: boolean; wallets: readonly MintWalletView[]; suggested: ReadonlyArray<{ name: string; url: string }> }
   | { step: 'connecting'; inHost: boolean; via: string }
-  | { step: 'connected'; via: string; address: string; inHost: boolean; mode: PlayMode; rankingAvailable: boolean }
+  | {
+    step: 'connected'; via: string; address: string; inHost: boolean; mode: PlayMode; rankingAvailable: boolean;
+    /** Texto del estado de la temporada (Competencia) o por qué no está disponible. */
+    competitionNote?: string;
+  }
   | { step: 'minting'; inHost: boolean; progress: MintStepView }
-  | { step: 'done'; tokenId: string; url: string };
+  | { step: 'done'; tokenId: string; url: string; lifeText?: string; network?: string };
 
-/** Modo con cartera: pasivo (solo NFT) o ranking (NFT + leaderboard). */
+/** Modo con cartera: Pacífico ('passive', tu mundo, no muere) o Competencia ('ranking', puede morir y compite). */
 export type PlayMode = 'passive' | 'ranking';
 
 export interface MintIntents {
@@ -100,6 +104,10 @@ export function createMintScreen(intents: MintIntents) {
       portrait.replaceChildren(h('img', { class: 'pet-portrait', src: portraitUrl(pet?.slug ?? 'axolotl'), alt: pet?.label ?? '', draggable: 'false' }));
       error.hidden = true;
     },
+    /** Retrato con la variante de color elegida (URL ya recoloreada). */
+    setPortrait(url: string) {
+      portrait.querySelector('img')?.setAttribute('src', url);
+    },
     /** Aviso de error con botón; `onRetry` decide qué se reintenta (por defecto, buscar la cuenta). */
     showError(message: string | null, onRetry: () => void = intents.retry) {
       error.hidden = !message;
@@ -174,24 +182,26 @@ export function createMintScreen(intents: MintIntents) {
             h('div', {}, h('small', {}, 'Cuenta conectada'), h('b', {}, `${v.via} · ${short(v.address)}`))),
           h('p', { class: 'eyebrow' }, 'ELIGE CÓMO JUGAR'),
           h('div', { class: 'mode-options', role: 'group', 'aria-label': 'Modo de juego' },
-            option('passive', '🌿', 'Modo pasivo', 'Tu mascota es un NFT y la cuidas a tu ritmo. Sin leaderboard.'),
-            option('ranking', '🏆', 'Modo ranking',
-              v.rankingAvailable ? 'Además compites: al morir guardas cuánto vivió en el leaderboard (una firma más).' : 'El leaderboard no está disponible por ahora.',
+            option('passive', '🌿', 'Modo pacífico', 'Tu mundo: no muere. Si la descuidas se enferma y espera tus cuidados. Sin ranking.'),
+            option('ranking', '⚔️', 'Modo competencia',
+              v.rankingAvailable
+                ? `Puede morir. Cuando muera, registra cuánto vivió en la temporada semanal. ${v.competitionNote ?? ''}`
+                : v.competitionNote ?? 'La competencia no está disponible por ahora.',
               !v.rankingAvailable)),
           primary('🥚 ADOPTAR NFT', intents.mint),
           h('p', { class: 'hint' }, v.mode === 'ranking'
-            ? `Firmas al adoptar y, cuando muera, para guardar tu partida ${where}. Cuidarla es gratis.`
-            : `Firmas una sola vez ${where}, al adoptar. Cuidarla es gratis.`));
+            ? `Firmas ${where} al adoptar, en cada cuidado y, cuando muera, para registrar su tiempo.`
+            : `Firmas ${where} al adoptar y en cada cuidado.`));
       } else if (v.step === 'minting') {
         if (startedAt === 0 || v.progress === 'simulando') startedAt = Date.now();
         help.textContent = '';
         body.replaceChildren(stepper(v.progress, v.inHost));
       } else {
         startedAt = 0;
-        help.textContent = 'Tu mascota ya vive en la blockchain como NFT. Sin cuidados aguanta 11 horas.';
+        help.textContent = `Tu mascota ya vive en la blockchain como NFT. ${v.lifeText ?? ''}`;
         const link = h('a', { class: 'ghost', href: v.url, target: '_blank', rel: 'noopener noreferrer' }, 'Ver en Blockscout ↗');
         body.replaceChildren(
-          h('div', { class: 'mint-card mint-nft' }, h('small', {}, 'TU NFT'), h('b', { class: 'mint-token' }, `#${v.tokenId}`), h('small', {}, 'PolkaPets · Polkadot Hub TestNet')),
+          h('div', { class: 'mint-card mint-nft' }, h('small', {}, 'TU NFT'), h('b', { class: 'mint-token' }, `#${v.tokenId}`), h('small', {}, `PolkaPets · ${v.network ?? 'Polkadot Hub TestNet'}`)),
           primary('ENTRAR A LA HABITACIÓN', intents.enter),
           link);
       }

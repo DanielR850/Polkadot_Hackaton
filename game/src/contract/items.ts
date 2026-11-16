@@ -1,6 +1,6 @@
 // Cliente del contrato PolkaPetsItems: accesorios y muebles como NFT ligados a cada mascota.
 // Lecturas por ETH-RPC; compra y legado se simulan y se firman igual que el resto (pets.ts).
-import { BaseError, ContractFunctionRevertedError, parseAbi } from "viem";
+import { BaseError, ContractFunctionExecutionError, ContractFunctionRevertedError, parseAbi } from "viem";
 import { ITEMS_ADDRESS, PETS_ADDRESS } from "./config";
 import { escribirLlamada, publicClient, type Firmante, type PasoTx } from "./pets";
 
@@ -31,6 +31,19 @@ export const itemsAbi = parseAbi([
   "error LogroNoAlcanzado(uint16 logroId)",
   "error DuracionInvalida()",
   "error NoTransferible()",
+  // v2: comida, utilidad y drops.
+  "function version() pure returns (uint8)",
+  "function owner() view returns (address)",
+  "function usar(uint256 tokenId)",
+  "function reclamarDrop(uint256 mascotaId) returns (uint256 tokenId)",
+  "function dropsDisponibles(uint256 mascotaId) view returns (uint256)",
+  "function despensaDe(uint256 mascotaId) view returns (uint256[] tokens, uint16[] articulos)",
+  "function intervaloDrop() view returns (uint64)",
+  "function setIntervaloDrop(uint64 segundos)",
+  "error NoEsComida(uint256 tokenId)",
+  "error SinDrops(uint256 mascotaId)",
+  "error NoSePonen(uint16 articuloId)",
+  "error OwnableUnauthorizedAccount(address account)",
 ]);
 
 /** Lo que se guardó de una mascota que murió. */
@@ -114,6 +127,70 @@ export async function sellarLegadoMascota(
   await escribirLlamada(firmante, { functionName: "sellarLegado", args: [mascotaId, duracion, equipados], destino: destino() }, onPaso);
 }
 
+let versionItemsCache: number | null = null;
+
+/** 2 si ITEMS_ADDRESS es PolkaPetsItems v2 (comida, utilidad y drops); 1 si es el original; 0 si no hay. */
+export async function versionItems(): Promise<number> {
+  if (!ITEMS_ADDRESS) return 0;
+  if (versionItemsCache !== null) return versionItemsCache;
+  try {
+    versionItemsCache = Number(await publicClient.readContract({ address: ITEMS_ADDRESS, abi: itemsAbi, functionName: "version" }));
+  } catch (e) {
+    if (!(e instanceof ContractFunctionExecutionError)) throw e;
+    versionItemsCache = 1;
+  }
+  return versionItemsCache;
+}
+
+/** Comida NFT sin usar de una mascota: tokenId y artículo del catálogo. */
+export async function leerDespensa(mascotaId: bigint): Promise<Array<{ tokenId: bigint; articulo: number }>> {
+  if ((await versionItems()) < 2) return [];
+  const [tokens, articulos] = await publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "despensaDe", args: [mascotaId] });
+  return tokens.map((tokenId, i) => ({ tokenId, articulo: Number(articulos[i]) }));
+}
+
+export async function leerDropsDisponibles(mascotaId: bigint): Promise<number> {
+  if ((await versionItems()) < 2) return 0;
+  return Number(await publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "dropsDisponibles", args: [mascotaId] }));
+}
+
+/** Firma `usar`: quema la comida NFT y cura a la mascota en PolkaPets. */
+export async function usarComida(firmante: Firmante, tokenId: bigint, onPaso?: (p: PasoTx) => void): Promise<void> {
+  await verificarItems();
+  await escribirLlamada(firmante, { functionName: "usar", args: [tokenId], destino: destino() }, onPaso);
+}
+
+/**
+ * Firma `reclamarDrop` y devuelve el artículo que salió (la comida nueva de la despensa).
+ * El contrato elige la comida; se lee comparando la despensa antes y después.
+ */
+export async function reclamarDropMascota(firmante: Firmante, mascotaId: bigint, onPaso?: (p: PasoTx) => void): Promise<{ tokenId: bigint; articulo: number } | null> {
+  await verificarItems();
+  const antes = new Set((await leerDespensa(mascotaId)).map((d) => String(d.tokenId)));
+  await escribirLlamada(firmante, { functionName: "reclamarDrop", args: [mascotaId], destino: destino() }, onPaso);
+  onPaso?.("leyendo");
+  for (let intento = 0; intento < 4; intento++) {
+    if (intento > 0) await new Promise((r) => setTimeout(r, 1_500));
+    const nuevo = (await leerDespensa(mascotaId)).find((d) => !antes.has(String(d.tokenId)));
+    if (nuevo) return nuevo;
+  }
+  return null;
+}
+
+/** Admin: intervalo de drops (solo el dueño del contrato puede cambiarlo). */
+export async function leerAdminItems(): Promise<{ owner: string; intervaloDrop: number } | null> {
+  if ((await versionItems()) < 2) return null;
+  const [owner, intervalo] = await Promise.all([
+    publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "owner" }),
+    publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "intervaloDrop" }),
+  ]);
+  return { owner, intervaloDrop: Number(intervalo) };
+}
+
+export async function cambiarIntervaloDrop(firmante: Firmante, segundos: number, onPaso?: (p: PasoTx) => void): Promise<void> {
+  await escribirLlamada(firmante, { functionName: "setIntervaloDrop", args: [BigInt(Math.floor(segundos))], destino: destino() }, onPaso);
+}
+
 /** Mensaje en español para los errores propios de los objetos; null si no es uno de ellos. */
 export function errorItems(e: unknown): string | null {
   if (e instanceof Error && e.message === "YaComprado") return "Esta mascota ya compró ese objeto.";
@@ -138,6 +215,10 @@ export function errorItems(e: unknown): string | null {
     case "LogroNoAlcanzado": return "Todavía no cumples lo necesario para ese trofeo en la blockchain (tiempo desde la adopción u objetos comprados).";
     case "DuracionInvalida": return "La duración no es válida para este NFT (no puede ser mayor que el tiempo desde que lo adoptaste).";
     case "NoTransferible": return "Los objetos quedan ligados a su mascota y no se pueden transferir.";
+    case "NoEsComida": return "Ese objeto no es una comida de la despensa (o ya se usó).";
+    case "SinDrops": return "Todavía no hay un drop para reclamar. Sigue cuidándola.";
+    case "NoSePonen": return "La comida no se pone: se usa desde la despensa.";
+    case "OwnableUnauthorizedAccount": return "Solo la cuenta administradora del contrato puede hacer eso.";
     default: return null;
   }
 }

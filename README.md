@@ -15,6 +15,10 @@ pnpm dev
 
 ## Modos de juego
 
+> **Versión 2** (rama `codex/vestuario-capas`): modos **Pacífico** y **Competencia**, dificultad de
+> 1/7/12 h, temporadas semanales, colecciones NFT con utilidad, comida, regalos, vestuario por código,
+> variantes de color y pantalla `?admin=1`. Ver [docs/V2.md](docs/V2.md).
+
 - **Local:** permite elegir cualquiera de las cinco especies, no necesita wallet y guarda el progreso en este dispositivo. El menú de partida permite elegir otra mascota y reemplaza la partida local.
 - **NFT en Polkadot Hub TestNet:** usa las mismas pantallas retro que el juego local (habitación, barras, menú de comida, baño, ranking y nombre). Adoptar y cada cuidado son transacciones que firma la persona:
   - dentro de Polkadot Desktop o la Polkadot App, con la cuenta del Host (Product SDK, `game/src/contract/host.ts`);

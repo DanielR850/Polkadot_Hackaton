@@ -540,3 +540,58 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   .dialog { max-height: 92dvh; }
 }
 .item-bonus { color: var(--good) !important; }
+
+/* ---------- Color, dificultad y prendas (selección y accesorios) ---------- */
+.pet-options { display: grid; gap: 8px; margin-top: 16px; text-align: left; }
+.pet-options .eyebrow { margin: 6px 0 0; }
+.choice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice {
+  display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; font-family: var(--body); font-size: 20px;
+  background: var(--light); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); cursor: pointer;
+}
+.choice[aria-pressed="true"] { background: var(--accent-soft); outline: var(--px) solid var(--accent); outline-offset: 2px; transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.choice:focus-visible { outline: var(--px) dashed var(--accent); outline-offset: 3px; }
+.choice-swatch { width: 18px; height: 18px; border: 3px solid var(--ink); display: inline-block; }
+.mode-badge { display: inline-block; margin-top: 4px; padding: 2px 8px; font-size: 18px; background: var(--accent-soft); border: 2px solid var(--ink); }
+.mode-badge:empty { display: none; }
+
+/* ---------- Despensa ---------- */
+.pantry-gifts { display: flex; align-items: center; gap: 12px; width: 100%; margin-bottom: 8px; }
+.pantry-gifts > span:nth-child(2) { flex: 1; }
+.pantry-gifts .primary { white-space: nowrap; }
+
+/* ---------- Competencia por temporadas ---------- */
+.season-banner { display: flex; gap: 12px; align-items: flex-start; width: 100%; margin-bottom: 12px; }
+.season-banner small { display: block; }
+.season-hall { margin-top: 16px; display: grid; gap: 10px; }
+.season-hall h3 { margin: 0; }
+.season-week { padding: 10px; background: var(--panel-2); border: 3px solid var(--ink); }
+.season-week > b { font-family: var(--title); font-weight: 400; font-size: 10px; }
+.season-podium small { display: block; margin-top: 6px; color: var(--muted); }
+
+/* ---------- Administración ---------- */
+.admin-screen .admin-body { display: grid; gap: 14px; justify-items: center; }
+.admin-card { width: min(560px, 100%); }
+.admin-card .row { flex-wrap: wrap; justify-content: flex-start; }
+.admin-card input { width: 90px; padding: 6px; font: inherit; border: 3px solid var(--ink); }
+.admin-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 4px; }
+.admin-list li { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+.admin-list li > span { min-width: 110px; }
+.admin-list code { font-size: 16px; }
+
+@media (max-width: 560px) {
+  .pantry-gifts { flex-wrap: wrap; }
+  .choice { font-size: 18px; padding: 6px 10px; }
+}
+
+/* ---------- Íconos de pixel art (src/ui/pixelArt.ts) ---------- */
+.inv-icon img, .item-icon img, .px-icon img { display: block; width: 48px; height: 48px; image-rendering: pixelated; image-rendering: crisp-edges; }
+.item-icon img { width: 40px; height: 40px; }
+.shop-confirm .inv-icon img, .pantry-gifts .inv-icon img, .season-banner .inv-icon img { width: 40px; height: 40px; }
+
+/* ---------- Botones extra: cinco sin cortarse y regalos como insignia ---------- */
+.extras button { position: relative; font-size: 9px; padding-inline: 4px; overflow-wrap: anywhere; }
+.gift-badge {
+  position: absolute; top: -10px; right: -6px; padding: 2px 5px; font-family: var(--body); font-size: 15px; line-height: 1;
+  background: var(--mx-yellow); border: 2px solid var(--ink); box-shadow: 2px 2px 0 var(--ink);
+}

@@ -1,6 +1,7 @@
 import { itemsOfKind } from '../game/catalog.ts';
 import type { ItemKind } from '../game/types.ts';
 import { createDialog, h } from './dom.ts';
+import { pixelIcon } from './pixelArt.ts';
 
 const EFFECT_LABEL: Record<string, string> = { hunger: 'hambre', thirst: 'sed', energy: 'energía', happiness: 'felicidad', cleanliness: 'limpieza' };
 
@@ -20,7 +21,7 @@ export function createFeedMenu(onGive: (itemId: string) => void) {
           .map(([key, value]) => `${value! > 0 ? '+' : ''}${value} ${EFFECT_LABEL[key]}`).join(' · ');
         return h('label', { class: 'item-option' },
           h('input', { type: 'radio', name: 'item', value: item.id, class: 'sr-only' }),
-          h('span', { class: 'item-icon', 'aria-hidden': 'true' }, item.icon), h('b', {}, item.label), h('small', {}, effects));
+          pixelIcon(item.icon, 'item-icon'), h('b', {}, item.label), h('small', {}, effects));
       }));
     tab.addEventListener('click', () => select(kind));
     tabList.append(tab);

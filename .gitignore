@@ -13,3 +13,4 @@ contrato/deployments/
 *.log
 npm-debug.log*
 .DS_Store
+e2e/out/

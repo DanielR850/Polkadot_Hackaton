@@ -27,7 +27,16 @@ export interface PetState {
   sleeping: boolean;
   /** Momento en que se detectó la muerte; null mientras vive. */
   diedAt: number | null;
+  /** Dificultad: horas que aguanta sin cuidados (1, 7 o 12). Partidas anteriores: sin valor (11 h). */
+  lifeHours?: LifeHours;
+  /** Modo Pacífico: no muere, se enferma y espera cuidados. Partidas anteriores: puede morir. */
+  peaceful?: boolean;
+  /** Variante de color de la especie (`variants.ts`); null = colores originales. */
+  variant?: string | null;
 }
+
+/** Dificultades: 1 h (difícil), 7 h (normal) y 12 h (fácil) sin cuidados hasta morir. */
+export type LifeHours = 1 | 7 | 12;
 
 export type ItemKind = 'food' | 'drink';
 
@@ -67,4 +76,6 @@ export interface GameConfig {
   bathMaxGain: number;
   /** Debajo de este valor una necesidad se considera crítica (mascota triste, barra roja). */
   lowThreshold: number;
+  /** false en modo Pacífico: las necesidades llegan a 0 pero la mascota no muere. */
+  canDie: boolean;
 }

@@ -1,7 +1,7 @@
 // Cliente de red. Lecturas por el ETH-RPC público; escrituras firmadas por la wallet elegida
 // (MetaMask en un navegador normal, o el Host de Polkadot dentro de la Polkadot App/Desktop).
 // Antes de pedir una firma se simula la llamada: si el contrato la rechazaría, no se molesta al usuario.
-import { createPublicClient, createWalletClient, custom, defineChain, http, type Abi, type Address, type Hex } from "viem";
+import { ContractFunctionExecutionError, createPublicClient, createWalletClient, custom, defineChain, http, parseAbi, type Abi, type Address, type Hex } from "viem";
 import {
   CHAIN_ID,
   CHAIN_NAME,
@@ -33,6 +33,41 @@ export const publicClient = createPublicClient({
 });
 
 const contrato = { address: PETS_ADDRESS, abi: polkaPetsAbi } as const;
+
+/** Funciones nuevas de PolkaPets v2 (dificultad, modos y operadores). */
+export const petsV2Abi = parseAbi([
+  "function mint(string nombre, uint8 especie, uint8 horas, uint8 modo) returns (uint256)",
+  "function version() pure returns (uint8)",
+  "function owner() view returns (address)",
+  "function operador(address cuenta) view returns (bool)",
+  "error DificultadInvalida()",
+  "error NoEresOperador()",
+  "error NombreInvalido()",
+  "error EspecieInvalida()",
+  "error EstaMuerta(uint256 tokenId)",
+  "error NoEresDueno(uint256 tokenId)",
+  "error NoExiste(uint256 tokenId)",
+]);
+
+let versionPetsCache: number | null = null;
+
+/**
+ * 2 si PETS_ADDRESS es PolkaPets v2; 1 si es el despliegue original (no tiene `version()`).
+ * Un error de red no se guarda: se vuelve a preguntar la próxima vez.
+ */
+export async function versionPets(): Promise<number> {
+  if (versionPetsCache !== null) return versionPetsCache;
+  try {
+    versionPetsCache = Number(await publicClient.readContract({ address: PETS_ADDRESS, abi: petsV2Abi, functionName: "version" }));
+  } catch (e) {
+    if (!(e instanceof ContractFunctionExecutionError)) throw e;
+    versionPetsCache = 1;
+  }
+  return versionPetsCache;
+}
+
+/** Modo al adoptar en v2: 0 Pacífico (no muere), 1 Competencia. */
+export interface OpcionesAdopcion { horas: 1 | 7 | 12; modo: 0 | 1 }
 
 // ───────────────────────────────────────────────────────────── cuenta
 
@@ -127,6 +162,13 @@ export type Escritura = (
   | { functionName: "comprar"; args: [bigint, number] }
   | { functionName: "reclamarLogro"; args: [bigint, number] }
   | { functionName: "sellarLegado"; args: [bigint, bigint, readonly number[]] }
+  | { functionName: "mint"; args: [string, number, number, number] }
+  | { functionName: "usar"; args: [bigint] }
+  | { functionName: "reclamarDrop"; args: [bigint] }
+  | { functionName: "registrar"; args: [bigint] }
+  | { functionName: "cerrarTemporada"; args: [bigint] }
+  | { functionName: "setPausada"; args: [boolean] }
+  | { functionName: "setIntervaloDrop"; args: [bigint] }
 ) & { destino?: Destino };
 
 /** Contrato y argumentos para viem (simular o enviar). */
@@ -181,11 +223,23 @@ async function escribir(firmante: Firmante, llamada: Escritura, onPaso?: (p: Pas
 /** Igual que escribir, para otros módulos del cliente (ranking). */
 export const escribirLlamada = escribir;
 
-/** Adopta una mascota. Devuelve el tokenId nuevo. */
-export async function adoptar(firmante: Firmante, nombre: string, especie: number, onPaso?: (p: PasoTx) => void): Promise<bigint> {
+/**
+ * Adopta una mascota. Devuelve el tokenId nuevo. Con PolkaPets v2 se firman también la dificultad y
+ * el modo; con el despliegue v1 solo nombre y especie (aguanta 1 h 52 min y siempre puede morir).
+ */
+export async function adoptar(
+  firmante: Firmante, nombre: string, especie: number, onPaso?: (p: PasoTx) => void, opciones?: OpcionesAdopcion,
+): Promise<bigint> {
   const cuenta = firmante.cuenta;
   const antes = new Set((await mascotasDe(cuenta)).map(String));
-  await escribir(firmante, { functionName: "mint", args: [nombre.trim(), especie] }, onPaso);
+  if ((await versionPets()) >= 2) {
+    const o = opciones ?? { horas: 7, modo: 0 };
+    await escribir(firmante, {
+      functionName: "mint", args: [nombre.trim(), especie, o.horas, o.modo], destino: { address: PETS_ADDRESS, abi: petsV2Abi },
+    }, onPaso);
+  } else {
+    await escribir(firmante, { functionName: "mint", args: [nombre.trim(), especie] }, onPaso);
+  }
   onPaso?.("leyendo");
   // El ETH-RPC puede ir un bloque atrás: se relee unas veces antes de rendirse.
   for (let intento = 0; intento < 4; intento++) {

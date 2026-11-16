@@ -4,6 +4,7 @@ pragma solidity ^0.8.28;
 /** Lo que este ranking lee de PolkaPets (mismo orden de campos que PolkaPets.MascotaView). */
 interface IPolkaPets {
     enum Etapa { Bebe, Joven, Adulta, Enferma, Muerta }
+    enum Modo { Pacifico, Competencia }
 
     struct MascotaView {
         uint256 tokenId;
@@ -23,6 +24,8 @@ interface IPolkaPets {
         Etapa etapa;
         uint64 duracion;
         uint64 muerte;
+        uint8 horas;
+        Modo modo;
     }
 
     function ownerOf(uint256 tokenId) external view returns (address);

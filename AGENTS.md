@@ -13,8 +13,10 @@ Consultar `docs/decisions/` si la tarea cambia límites entre módulos, red o SD
 - `src/infrastructure/`: recursos del navegador (música con Web Audio).
 - `src/polkadot/`: adaptador del mint y del leaderboard (`nftMint.ts`). No filtra SDK a las reglas.
 - `game/src/contract/`: cliente de los contratos (viem, Host SDK, ABI y direcciones).
-- `contrato/`: Solidity y Hardhat (`PolkaPets.sol`, `PolkaPetsRanking.sol`); se compila y despliega
-  por separado del bundle web.
+- `contrato/`: Solidity y Hardhat (`PolkaPets.sol`, `PolkaPetsItems.sol`, `PolkaPetsTemporadas.sol`,
+  `PolkaPetsRanking.sol`); se compila y despliega por separado del bundle web (`npm run deploy:v2:*`).
+- Prendas (`wearables.ts`) y variantes de color (`variants.ts`) se generan con código sobre las
+  ilustraciones originales: no modificar los PNG ni bajar su calidad.
 
 ## Reglas de integración
 

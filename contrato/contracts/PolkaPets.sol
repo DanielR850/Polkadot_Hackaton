@@ -3,6 +3,7 @@ pragma solidity ^0.8.28;
 
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 
 /**
  * @title PolkaPets
@@ -12,16 +13,27 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
  *         cuando la vida llega a 0, muere. El ranking ordena las mascotas por cuánto
  *         tiempo vivieron.
  *
+ *         Versión 2: al adoptar se elige la dificultad (cuántas horas aguanta sin ningún
+ *         cuidado: 1, 7 o 12) y el modo: Pacífico (no muere: se enferma y espera cuidados)
+ *         o Competencia (puede morir y entra a la temporada semanal). Un operador autorizado
+ *         por el dueño del contrato (PolkaPetsItems) puede curarla con objetos NFT.
+ *
  * @dev    Nada se actualiza solo en la cadena: en storage se guardan los valores del
  *         momento de la última interacción y el estado "ahora" se calcula al leer
  *         (`_estado`). Así no hace falta un keeper externo. El instante exacto de la
  *         muerte también se calcula (`_momentoMuerte`), para que la duración del
  *         ranking no dependa de cuándo alguien mira a la mascota.
  */
-contract PolkaPets is ERC721, ERC721Enumerable {
+contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
     // ─────────────────────────────────────────────────────────────────────────
     // Tipos
     // ─────────────────────────────────────────────────────────────────────────
+
+    /** Pacífico: no muere. Competencia: puede morir y entra a la temporada semanal. */
+    enum Modo {
+        Pacifico,
+        Competencia
+    }
 
     enum Etapa {
         Bebe, // nivel 1
@@ -45,6 +57,8 @@ contract PolkaPets is ERC721, ERC721Enumerable {
         uint8 limpieza; // 100 = limpia
         uint16 nivel;
         uint32 xp;
+        uint8 horas; // dificultad: horas que aguanta sin ningún cuidado (1, 7 o 12)
+        Modo modo;
     }
 
     /** Estado "ahora" de una mascota, con el paso del tiempo ya aplicado. */
@@ -66,6 +80,8 @@ contract PolkaPets is ERC721, ERC721Enumerable {
         Etapa etapa;
         uint64 duracion; // segundos vividos (hasta ahora, o hasta su muerte)
         uint64 muerte; // timestamp de la muerte; 0 si sigue viva
+        uint8 horas;
+        Modo modo;
     }
 
     /** Una fila del ranking de longevidad. */
@@ -88,18 +104,27 @@ contract PolkaPets is ERC721, ERC721Enumerable {
     uint16 public constant XP_POR_NIVEL = 100;
     uint32 public constant XP_POR_CUIDADO = 10;
 
-    /** Segundos que tarda cada necesidad en bajar 1 punto. */
-    uint64 public constant SEG_HAMBRE = 60;
-    uint64 public constant SEG_SED = 45;
-    uint64 public constant SEG_ENERGIA = 120;
-    uint64 public constant SEG_FELICIDAD = 90;
-    uint64 public constant SEG_LIMPIEZA = 150;
+    /**
+     * Segundos que tarda cada necesidad en bajar 1 punto, POR CADA HORA de dificultad.
+     * Con estos valores, una mascota sin ningún cuidado muere exactamente a las `horas`
+     * horas (1 h → 3600 s). Una mascota de 7 h baja 1 punto de hambre cada 224 s.
+     */
+    uint64 public constant SEG_HAMBRE = 32;
+    uint64 public constant SEG_SED = 24;
+    uint64 public constant SEG_ENERGIA = 64;
+    uint64 public constant SEG_FELICIDAD = 48;
+    uint64 public constant SEG_LIMPIEZA = 80;
 
     /**
-     * Segundos de "necesidad en 0" que cuestan 1 punto de vida. Con una necesidad en 0
-     * se pierde 1 de vida cada 30 s; con dos, cada 15 s; y así.
+     * Segundos de "necesidad en 0" que cuestan 1 punto de vida, por hora de dificultad.
+     * Con una necesidad en 0 se pierde 1 de vida cada 16 s × horas; con dos, el doble de rápido.
      */
-    uint64 public constant SEG_VIDA = 30;
+    uint64 public constant SEG_VIDA = 16; // por hora de dificultad
+
+    /** Dificultades permitidas (horas sin cuidados hasta morir). */
+    uint8 public constant HORAS_DIFICIL = 1;
+    uint8 public constant HORAS_NORMAL = 7;
+    uint8 public constant HORAS_FACIL = 12;
 
     /** Alimentar da comida y agua. */
     uint8 public constant GANA_COMIDA = 40;
@@ -124,6 +149,8 @@ contract PolkaPets is ERC721, ERC721Enumerable {
 
     uint256 private _siguienteId = 1;
     mapping(uint256 => MascotaRaw) private _mascotas;
+    /** Contratos que pueden curar mascotas (p. ej. PolkaPetsItems al usar una comida NFT). */
+    mapping(address => bool) public operador;
 
     // ─────────────────────────────────────────────────────────────────────────
     // Eventos y errores
@@ -133,23 +160,37 @@ contract PolkaPets is ERC721, ERC721Enumerable {
     event Cuidada(uint256 indexed tokenId, string accion);
     event NombreCambiado(uint256 indexed tokenId, string nombre);
     event SubioNivel(uint256 indexed tokenId, uint16 nivel);
+    event Curada(uint256 indexed tokenId, address indexed operador, uint8 vida, uint8 necesidades);
+    event OperadorCambiado(address indexed operador, bool permitido);
 
     error NoExiste(uint256 tokenId);
     error NoEresDueno(uint256 tokenId);
     error EstaMuerta(uint256 tokenId);
     error NombreInvalido();
     error EspecieInvalida();
+    error DificultadInvalida();
+    error NoEresOperador();
 
-    constructor() ERC721("PolkaPets", "PPET") {}
+    constructor() ERC721("PolkaPets", "PPET") Ownable(msg.sender) {}
+
+    /** @notice Versión de la interfaz; el cliente la usa para saber qué funciones existen. */
+    function version() external pure returns (uint8) {
+        return 2;
+    }
 
     // ─────────────────────────────────────────────────────────────────────────
     // Acciones (transacciones)
     // ─────────────────────────────────────────────────────────────────────────
 
-    /** @notice Adopta una mascota nueva. Nace con todo al máximo. */
-    function mint(string calldata nombre, uint8 especie) external returns (uint256 tokenId) {
+    /**
+     * @notice Adopta una mascota nueva. Nace con todo al máximo.
+     * @param horas dificultad: 1, 7 o 12 horas sin cuidados hasta morir.
+     * @param modo Pacífico (no muere) o Competencia.
+     */
+    function mint(string calldata nombre, uint8 especie, uint8 horas, Modo modo) external returns (uint256 tokenId) {
         _validarNombre(nombre);
         if (especie >= NUM_ESPECIES) revert EspecieInvalida();
+        if (horas != HORAS_DIFICIL && horas != HORAS_NORMAL && horas != HORAS_FACIL) revert DificultadInvalida();
 
         tokenId = _siguienteId++;
         uint64 ahora = uint64(block.timestamp);
@@ -165,7 +206,9 @@ contract PolkaPets is ERC721, ERC721Enumerable {
             felicidad: STAT_MAX,
             limpieza: STAT_MAX,
             nivel: 1,
-            xp: 0
+            xp: 0,
+            horas: horas,
+            modo: modo
         });
 
         _safeMint(msg.sender, tokenId);
@@ -214,6 +257,33 @@ contract PolkaPets is ERC721, ERC721Enumerable {
         emit NombreCambiado(tokenId, nombre);
     }
 
+    /**
+     * @notice Un operador autorizado (PolkaPetsItems) cura a una mascota viva: suma vida y,
+     *         si `necesidades` > 0, también a las cinco necesidades. No suma XP.
+     */
+    function curar(uint256 tokenId, uint8 vida, uint8 necesidades) external {
+        if (!operador[msg.sender]) revert NoEresOperador();
+        if (_ownerOf(tokenId) == address(0)) revert NoExiste(tokenId);
+        MascotaRaw storage m = _mascotas[tokenId];
+        (uint8[5] memory s, uint8 vidaAhora, uint64 muerte) = _estado(m, uint64(block.timestamp));
+        if (muerte != 0) revert EstaMuerta(tokenId);
+        for (uint256 i = 0; i < N; i++) s[i] = _sumar(s[i], necesidades);
+        m.hambre = s[0];
+        m.sed = s[1];
+        m.energia = s[2];
+        m.felicidad = s[3];
+        m.limpieza = s[4];
+        m.vida = _sumar(vidaAhora, vida);
+        m.ultimaInteraccion = uint64(block.timestamp);
+        emit Curada(tokenId, msg.sender, vida, necesidades);
+    }
+
+    /** @notice El dueño del contrato autoriza o quita un operador. */
+    function setOperador(address cuenta, bool permitido) external onlyOwner {
+        operador[cuenta] = permitido;
+        emit OperadorCambiado(cuenta, permitido);
+    }
+
     // ─────────────────────────────────────────────────────────────────────────
     // Lectura (view, gratis)
     // ─────────────────────────────────────────────────────────────────────────
@@ -242,6 +312,8 @@ contract PolkaPets is ERC721, ERC721Enumerable {
         v.muerte = muerte;
         v.duracion = (muerte == 0 ? ahora : muerte) - m.nacimiento;
         v.etapa = _etapa(m.nivel, s, muerte);
+        v.horas = m.horas;
+        v.modo = m.modo;
     }
 
     /** @notice tokenIds de las mascotas de un dueño. */
@@ -301,7 +373,7 @@ contract PolkaPets is ERC721, ERC721Enumerable {
     {
         uint64 t = ahora - m.ultimaInteraccion;
         uint8[5] memory base = _base(m);
-        uint64[5] memory seg = _segPorPunto();
+        uint64[5] memory seg = _segPorPunto(m.horas);
         uint256[5] memory tCero; // segundos (desde la última interacción) en que cada una llega a 0
         uint256 ceroSeg;
 
@@ -311,13 +383,18 @@ contract PolkaPets is ERC721, ERC721Enumerable {
             if (t > tCero[i]) ceroSeg += t - tCero[i];
         }
 
-        uint256 limite = uint256(m.vida) * SEG_VIDA;
-        if (ceroSeg >= limite) {
+        uint256 segVida = uint256(SEG_VIDA) * m.horas;
+        uint256 limite = uint256(m.vida) * segVida;
+        if (m.modo == Modo.Pacifico) {
+            // Pacífico: no muere. La vida baja hasta 1 y ahí espera cuidados.
+            uint256 perdida = ceroSeg / segVida;
+            vida = perdida >= m.vida ? 1 : m.vida - uint8(perdida);
+        } else if (ceroSeg >= limite) {
             muerte = m.ultimaInteraccion + uint64(_momentoMuerte(tCero, limite));
             vida = 0;
             for (uint256 i = 0; i < N; i++) s[i] = 0;
         } else {
-            vida = m.vida - uint8(ceroSeg / SEG_VIDA);
+            vida = m.vida - uint8(ceroSeg / segVida);
         }
     }
 
@@ -400,8 +477,9 @@ contract PolkaPets is ERC721, ERC721Enumerable {
         b[4] = m.limpieza;
     }
 
-    function _segPorPunto() private pure returns (uint64[5] memory) {
-        return [SEG_HAMBRE, SEG_SED, SEG_ENERGIA, SEG_FELICIDAD, SEG_LIMPIEZA];
+    function _segPorPunto(uint8 horas) private pure returns (uint64[5] memory) {
+        uint64 h = horas;
+        return [SEG_HAMBRE * h, SEG_SED * h, SEG_ENERGIA * h, SEG_FELICIDAD * h, SEG_LIMPIEZA * h];
     }
 
     function _etapa(uint16 nivel, uint8[5] memory s, uint64 muerte) private pure returns (Etapa) {

@@ -3,7 +3,9 @@
 import { SPACE_SECTIONS, type InventoryKind } from '../game/inventory.ts';
 import { describeBonus } from '../game/bonuses.ts';
 import { canBuy, type ShopItem } from '../game/shop.ts';
+import { describeFood, FOOD_CATALOG, type SpecialFood } from '../game/pantry.ts';
 import { createDialog, h } from './dom.ts';
+import { pixelIcon } from './pixelArt.ts';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -11,11 +13,16 @@ export interface ShopIntents {
   buy(item: ShopItem): void;
   /** Ponerse o colocar lo recién comprado. */
   use(item: ShopItem): void;
+  /** Comprar una comida especial (va a la despensa; se puede comprar varias veces). */
+  buyFood?(food: SpecialFood): void;
 }
 
-const SECTIONS: ReadonlyArray<{ kind: InventoryKind; label: string; icon: string }> = [
-  { kind: 'accessory', label: 'Accesorios', icon: '🎩' },
+type Section = InventoryKind | 'food';
+
+const SECTIONS: ReadonlyArray<{ kind: Section; label: string; icon: string }> = [
+  { kind: 'accessory', label: 'Ropa', icon: '🎩' },
   ...SPACE_SECTIONS,
+  { kind: 'food', label: 'Comida', icon: '🫔' },
 ];
 
 export function createShopDialog(items: readonly ShopItem[], intents: ShopIntents) {
@@ -26,7 +33,9 @@ export function createShopDialog(items: readonly ShopItem[], intents: ShopIntent
   const panel = h('div', { class: 'shop-panel', hidden: true });
   body.append(wallet, tabs, grid, panel);
 
-  let section: InventoryKind = 'accessory';
+  let section: Section = 'accessory';
+  /** Cuántas de cada comida hay en la despensa. */
+  let pantryCount: Readonly<Record<string, number>> = {};
   let coins = 0;
   let owned: readonly string[] = [];
   let busy = false;
@@ -45,11 +54,12 @@ export function createShopDialog(items: readonly ShopItem[], intents: ShopIntent
   };
   const preview = (item: ShopItem) => item.color !== undefined
     ? h('span', { class: 'inv-swatch', style: `background:${hex(item.color)}`, 'aria-hidden': 'true' })
-    : h('span', { class: 'inv-icon', 'aria-hidden': 'true' }, item.icon);
+    : pixelIcon(item.icon, 'inv-icon');
 
   function draw() {
     wallet.textContent = `Tienes 🪙 ${coins}. Gana más jugando a los minijuegos.`;
     for (const t of tabButtons) t.b.setAttribute('aria-selected', String(t.kind === section));
+    if (section === 'food') { drawFood(); return; }
     grid.replaceChildren(...items.filter((i) => i.kind === section && !i.exclusive).map((item) => {
       const mine = owned.includes(item.id);
       const card = h('button', { type: 'button', class: 'item-option inv-item shop-item', 'aria-pressed': String(mine) },
@@ -60,6 +70,30 @@ export function createShopDialog(items: readonly ShopItem[], intents: ShopIntent
       card.addEventListener('click', () => confirm(item));
       return card;
     }));
+  }
+
+  function drawFood() {
+    grid.replaceChildren(...FOOD_CATALOG.filter((f) => !f.dropOnly).map((food) => {
+      const have = pantryCount[food.id] ?? 0;
+      const card = h('button', { type: 'button', class: 'item-option inv-item shop-item' },
+        pixelIcon(food.icon, 'inv-icon'), h('b', {}, food.name),
+        h('small', { class: 'item-bonus' }, describeFood(food)),
+        h('small', { class: 'shop-price' }, `🪙 ${food.price}${have ? ` · tienes ${have}` : ''}`));
+      card.disabled = busy;
+      card.addEventListener('click', () => confirmFood(food));
+      return card;
+    }));
+  }
+
+  function confirmFood(food: SpecialFood) {
+    const ok = coins >= food.price;
+    panel.hidden = false;
+    panel.replaceChildren(
+      h('div', { class: 'mint-card shop-confirm' }, pixelIcon(food.icon, 'inv-icon'),
+        h('span', {}, h('b', {}, food.name), h('small', {}, ok ? `${describeFood(food)}. Va a tu 🧺 Despensa. Te quedarán 🪙 ${coins - food.price}.` : `Te faltan ${food.price - coins} 🪙.`))),
+      h('div', { class: 'row chain-row' },
+        button('Cancelar', 'ghost', () => { panel.hidden = true; }),
+        Object.assign(button(`Comprar por 🪙 ${food.price}`, 'primary', () => intents.buyFood?.(food)), { disabled: !ok })));
   }
 
   /** Paso de confirmación: muestra el objeto, el precio y si alcanza. */
@@ -76,18 +110,29 @@ export function createShopDialog(items: readonly ShopItem[], intents: ShopIntent
   }
 
   return {
-    open(state: { coins: number; owned: readonly string[] }) {
+    open(state: { coins: number; owned: readonly string[]; pantry?: Readonly<Record<string, number>> }) {
       coins = state.coins;
       owned = state.owned;
+      pantryCount = state.pantry ?? {};
       busy = false;
       panel.hidden = true;
       draw();
       if (!dialog.open) dialog.showModal();
     },
-    buying(item: ShopItem) {
+    buying(item: { name: string }) {
       busy = true;
       draw();
       panel.replaceChildren(h('p', { class: 'hint' }, `Comprando ${item.name}…`));
+    },
+    /** Comida comprada: se actualizan monedas y despensa. */
+    boughtFood(food: SpecialFood, state: { coins: number; pantry: Readonly<Record<string, number>> }) {
+      coins = state.coins;
+      pantryCount = state.pantry;
+      busy = false;
+      draw();
+      panel.hidden = false;
+      panel.replaceChildren(h('div', { class: 'mint-card shop-confirm' }, pixelIcon(food.icon, 'inv-icon'),
+        h('span', {}, h('b', {}, `¡Compraste ${food.name}!`), h('small', {}, 'Está en tu 🧺 Despensa: úsala cuando tu mascota lo necesite.'))));
     },
     /** Compra terminada: se actualizan monedas e inventario y se ofrece usarlo. */
     bought(item: ShopItem, state: { coins: number; owned: readonly string[] }) {

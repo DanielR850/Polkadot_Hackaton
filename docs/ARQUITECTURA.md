@@ -2,6 +2,12 @@
 
 ## Estado actual
 
+> Versión 2: ver [V2.md](V2.md). Con NFT cada cuidado se firma (Pacífico y Competencia); la
+> temporada (`PolkaPetsTemporadas`) lee la duración de la cadena; `src/game/` suma `pantry.ts`
+> (comida y regalos), `wearables.ts` (prendas por código) y `variants.ts` (colores); `src/ui/` suma
+> `pantryDialog`, `seasonDialog` y `adminScreen`; `game/src/contract/temporadas.ts` es el cliente
+> de temporadas. Lo de abajo describe la versión anterior y sigue valiendo para los contratos v1.
+
 Una sola app web (Vite + TypeScript + Phaser) en la raíz, publicada en `polka-pets.dot`:
 
 - **Juego:** nombre → elegir mascota (5 especies) → adoptar como NFT (opcional) → habitación.

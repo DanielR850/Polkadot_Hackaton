@@ -3,13 +3,35 @@
 // dentro de Polkadot Desktop o la Polkadot App firma el Host; en un navegador, una wallet EVM.
 import { EXPLORER_URL, PETS_ADDRESS } from '../../game/src/contract/config.ts';
 import { conectarHost, dentroDelHost } from '../../game/src/contract/host.ts';
-import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
+import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, versionPets, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
 import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../../game/src/contract/wallets.ts';
 import { mensajeError } from '../../game/src/lib/txErrors.ts';
-import { comprarArticulo, errorItems, itemsActivo, reclamarLogroMascota, sellarLegadoMascota } from '../../game/src/contract/items.ts';
+import {
+  cambiarIntervaloDrop, comprarArticulo, errorItems, itemsActivo, leerAdminItems, leerDespensa, leerDropsDisponibles, reclamarDropMascota,
+  reclamarLogroMascota, sellarLegadoMascota, usarComida, versionItems,
+} from '../../game/src/contract/items.ts';
+import {
+  cerrarTemporada, errorTemporadas, leerAdminTemporadas, leerCampeones, leerRegistros, leerTemporada, pausarTemporadas, registrarEnTemporada,
+  semanasSinCerrar, temporadasActivas, yaRegistradaTemporada, type RegistroTemporada, type Temporada,
+} from '../../game/src/contract/temporadas.ts';
 import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../../game/src/contract/ranking.ts';
 
-export type { FilaLeaderboard, Partida };
+export type { FilaLeaderboard, Partida, RegistroTemporada, Temporada };
+
+/** Qué versión de cada contrato está desplegada (para mostrar u ocultar lo nuevo). */
+export interface ChainVersions { pets: number; items: number; seasons: boolean }
+
+/** Datos de la pantalla de administración. */
+export interface AdminInfo {
+  versions: ChainVersions;
+  season: Temporada | null;
+  seasonsOwner: string | null;
+  seasonStart: number | null;
+  openDays: number | null;
+  itemsOwner: string | null;
+  dropInterval: number | null;
+  pendingClose: number[];
+}
 
 export type MintStep = PasoTx;
 /** Funciones de cuidado del contrato PolkaPets. */
@@ -33,8 +55,28 @@ export interface NftMinter {
   suggested: ReadonlyArray<{ name: string; url: string }>;
   /** walletId null = conectar con el Host. */
   connect(walletId: string | null): Promise<MintAccount>;
-  /** Firma `mint(nombre, especie)` y devuelve el tokenId. Si el contrato no admite la especie, usa la 0. */
-  mint(name: string, petId: number, onStep?: (step: MintStep) => void): Promise<bigint>;
+  /**
+   * Firma la adopción y devuelve el tokenId. Si el contrato no admite la especie, usa la 0.
+   * Con PolkaPets v2 también firma la dificultad (horas) y el modo (Pacífico o Competencia).
+   */
+  mint(name: string, petId: number, onStep?: (step: MintStep) => void, options?: { lifeHours: 1 | 7 | 12; peaceful: boolean }): Promise<bigint>;
+  versions(): Promise<ChainVersions>;
+  /** Temporada de Competencia en curso (v2), o null si no hay contrato de temporadas. */
+  season(): Promise<Temporada | null>;
+  seasonRows(week: number): Promise<RegistroTemporada[]>;
+  champions(): Promise<Array<{ semana: number; podio: RegistroTemporada[] }>>;
+  isSeasonRecorded(tokenId: bigint): Promise<boolean>;
+  /** Firma el registro en la temporada (la duración la calcula la cadena). */
+  recordSeason(tokenId: bigint, onStep?: (step: MintStep) => void): Promise<void>;
+  closeSeason(week: number, onStep?: (step: MintStep) => void): Promise<void>;
+  /** Comida NFT sin usar de la mascota. */
+  pantry(tokenId: bigint): Promise<Array<{ tokenId: bigint; articulo: number }>>;
+  useFood(foodTokenId: bigint, onStep?: (step: MintStep) => void): Promise<void>;
+  dropsAvailable(tokenId: bigint): Promise<number>;
+  claimDrop(tokenId: bigint, onStep?: (step: MintStep) => void): Promise<{ tokenId: bigint; articulo: number } | null>;
+  admin(): Promise<AdminInfo>;
+  setSeasonPaused(paused: boolean, onStep?: (step: MintStep) => void): Promise<void>;
+  setDropInterval(seconds: number, onStep?: (step: MintStep) => void): Promise<void>;
   /** Página del NFT en Blockscout. */
   nftUrl(tokenId: bigint | string): string;
   /** Cuenta conectada, o null. */
@@ -123,8 +165,11 @@ export function createNftMinter(): NftMinter {
       await cambiarNombre(signer, tokenId, name, onStep);
     },
 
-    async mint(name, petId, onStep) {
+    async mint(name, petId, onStep, options) {
       if (!signer) throw new Error('Conecta tu cuenta primero.');
+      if (options) {
+        return adoptar(signer, name, petId < species ? petId : 0, onStep, { horas: options.lifeHours, modo: options.peaceful ? 0 : 1 });
+      }
       // Comodín: el contrato desplegado solo admite la especie 0 (NUM_ESPECIES = 1). Si la especie
       // elegida no cabe, el NFT se registra como especie 0 y el juego sigue mostrando el animal
       // elegido (vive en la partida local). Con un contrato de 5 especies se usa la especie real.
@@ -133,6 +178,50 @@ export function createNftMinter(): NftMinter {
 
     nftUrl: (tokenId) => `${EXPLORER_URL}/token/${PETS_ADDRESS}/instance/${tokenId}`,
 
-    explain: (error) => errorItems(error) ?? errorRanking(error) ?? mensajeError(error),
+    async versions() {
+      const [pets, items] = await Promise.all([versionPets(), versionItems()]);
+      return { pets, items, seasons: temporadasActivas() };
+    },
+    season: () => leerTemporada(),
+    seasonRows: (week) => leerRegistros(week),
+    champions: () => leerCampeones(),
+    isSeasonRecorded: (tokenId) => yaRegistradaTemporada(tokenId),
+    async recordSeason(tokenId, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await registrarEnTemporada(signer, tokenId, onStep);
+    },
+    async closeSeason(week, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await cerrarTemporada(signer, week, onStep);
+    },
+    pantry: (tokenId) => leerDespensa(tokenId),
+    async useFood(foodTokenId, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await usarComida(signer, foodTokenId, onStep);
+    },
+    dropsAvailable: (tokenId) => leerDropsDisponibles(tokenId),
+    async claimDrop(tokenId, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      return reclamarDropMascota(signer, tokenId, onStep);
+    },
+    async admin() {
+      const versions = await this.versions();
+      const [season, temporadas, items] = await Promise.all([leerTemporada(), leerAdminTemporadas(), leerAdminItems()]);
+      const pendingClose = season ? await semanasSinCerrar(season.semana, season.abierta) : [];
+      return {
+        versions, season, pendingClose,
+        seasonsOwner: temporadas?.owner ?? null, seasonStart: temporadas?.inicio ?? null, openDays: temporadas?.diasAbierta ?? null,
+        itemsOwner: items?.owner ?? null, dropInterval: items?.intervaloDrop ?? null,
+      };
+    },
+    async setSeasonPaused(paused, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await pausarTemporadas(signer, paused, onStep);
+    },
+    async setDropInterval(seconds, onStep) {
+      if (!signer) throw new Error('Conecta tu cuenta primero.');
+      await cambiarIntervaloDrop(signer, seconds, onStep);
+    },
+    explain: (error) => errorTemporadas(error) ?? errorItems(error) ?? errorRanking(error) ?? mensajeError(error),
   };
 }

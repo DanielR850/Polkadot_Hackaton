@@ -14,6 +14,13 @@ export const PETS_ADDRESS: `0x${string}` = LOCAL
   ? "0x5FbDB2315678afecb367f032d93F642f64180aa3"
   : "0x758425A3b756079B34FF97cB9C7A764fD44C008a";
 
+/*
+ * Versión 2 (dificultad, modos, comida NFT, drops y temporadas): `npm run deploy:v2:testnet` desde
+ * contrato/ imprime las tres direcciones nuevas (PETS, ITEMS y TEMPORADAS); pégalas aquí. Mientras
+ * tanto la app detecta que los contratos de TestNet son v1 y sigue funcionando con ellos.
+ * En local (`pnpm dev:local`) las direcciones son las de `npm run deploy:v2:local` en un nodo nuevo.
+ */
+
 /** ETH-RPC de Polkadot Hub TestNet (o del nodo local). */
 export const ETH_RPC_URL = LOCAL ? "http://127.0.0.1:8545" : "https://eth-rpc-testnet.polkadot.io";
 
@@ -54,13 +61,19 @@ export const RELECTURA_MS = 20_000;
 export const RANKING_ADDRESS: `0x${string}` | null = LOCAL ? null : "0xf675957A89bfF3e02BD8AeB302Ca2E8Ca6f2a5d2";
 
 /**
+ * Contrato PolkaPetsTemporadas (v2): Competencia semanal de lunes a viernes, podio y campeones.
+ * null mientras no esté desplegado: la Competencia usa entonces el ranking v1 de arriba.
+ */
+export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" : null;
+
+/**
  * Contrato PolkaPetsItems (contrato/contracts/PolkaPetsItems.sol): accesorios y muebles como NFT
  * ligados a cada mascota. null mientras no esté desplegado: las compras de la tienda siguen siendo
  * locales (sin NFT) y no se ofrece guardar el legado. Pega aquí la dirección que imprime
  * `npm run deploy:items:testnet` desde contrato/ (debe estar ligado a PETS_ADDRESS).
  */
 export const ITEMS_ADDRESS: `0x${string}` | null = LOCAL
-  ? "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9"
+  ? "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
   : "0x1beBe6e86473E58f321068413f6eafA410C5FF20";
 
 /** Ranking: filas por página y máximo de mascotas que se leen. */

@@ -3,7 +3,7 @@
 // juego funciona igual si la app estuvo cerrada.
 import { DEFAULT_CONFIG } from './config.ts';
 import { findItem } from './catalog.ts';
-import type { GameConfig, NeedKey, Needs, PetId, PetState, Stage, Stats } from './types.ts';
+import type { GameConfig, LifeHours, NeedKey, Needs, PetId, PetState, Stage, Stats } from './types.ts';
 
 export const NEED_KEYS: readonly NeedKey[] = ['hunger', 'thirst', 'energy', 'happiness', 'cleanliness'];
 export const NAME_MAX_LENGTH = 16;
@@ -25,9 +25,14 @@ export function validateName(raw: string): NameResult {
   return { ok: true, value };
 }
 
-export function createPet(petId: PetId, name: string, now: number): PetState {
+export interface PetOptions { lifeHours?: LifeHours; peaceful?: boolean; variant?: string | null }
+
+export function createPet(petId: PetId, name: string, now: number, options: PetOptions = {}): PetState {
   const needs = Object.fromEntries(NEED_KEYS.map((key) => [key, START_VALUE])) as Needs;
-  return { version: 2, petId, name, bornAt: now, updatedAt: now, needs, sleeping: false, diedAt: null };
+  return {
+    version: 2, petId, name, bornAt: now, updatedAt: now, needs, sleeping: false, diedAt: null,
+    lifeHours: options.lifeHours, peaceful: options.peaceful === true, variant: options.variant ?? null,
+  };
 }
 
 /** Avanza las necesidades `minutes` minutos, dormida o despierta. */
@@ -86,6 +91,8 @@ export function computeStage(state: PetState, now: number, config: GameConfig = 
  */
 export function isDead(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG): boolean {
   if (state.diedAt !== null) return true;
+  // Modo Pacífico: se enferma pero no muere.
+  if (!config.canDie) return false;
   const stats = computeStats(state, now, config);
   return stats.health <= 0 || (stats.hunger <= 0 && stats.thirst <= 0);
 }
@@ -146,6 +153,14 @@ export function feed(state: PetState, itemId: string, now: number, config: GameC
 /** Jugar: sube la felicidad (en los minijuegos, según el puntaje) y cansa, ensucia y da sed. */
 export function play(state: PetState, now: number, config: GameConfig = DEFAULT_CONFIG, happiness = 20): PetState {
   return careAction(state, now, config, { happiness, energy: -12, cleanliness: -5, thirst: -5 });
+}
+
+/** Efecto de una comida especial (despensa): suma a las necesidades indicadas. */
+export function eatSpecial(state: PetState, effects: Partial<Needs>, now: number, config: GameConfig = DEFAULT_CONFIG): PetState {
+  if (isDead(state, now, config)) return state;
+  const settled = settle(state, now, config);
+  // Una comida especial despierta a la mascota: la cura aunque esté dormida.
+  return applyEffects({ ...settled, sleeping: false }, effects);
 }
 
 /** `scrubPercent` (0–100) es cuánto se frotó en la escena del baño. Se aplica una sola vez al salir. */

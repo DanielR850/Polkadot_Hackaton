@@ -1,4 +1,5 @@
 import { isPetId } from './catalog.ts';
+import { isLifeHours } from './config.ts';
 import { NEED_KEYS } from './petState.ts';
 import type { PetState } from './types.ts';
 
@@ -23,6 +24,9 @@ export function parsePetState(raw: string | null): PetState | null {
       needs: { ...data.needs! },
       sleeping: data.sleeping === true,
       diedAt: typeof data.diedAt === 'number' ? data.diedAt : null,
+      lifeHours: isLifeHours(data.lifeHours) ? data.lifeHours : undefined,
+      peaceful: data.peaceful === true,
+      variant: typeof data.variant === 'string' ? data.variant : null,
     };
   } catch {
     return null;

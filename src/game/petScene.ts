@@ -5,6 +5,9 @@ import { findPet } from './catalog.ts';
 import { scrubProgress, spongeTouchesPet } from './sponge.ts';
 import type { PetId, Stage } from './types.ts';
 import type { RoomDecor } from './inventory.ts';
+import { ICON_SIZE, pixelIconCanvas } from '../ui/pixelArt.ts';
+import { findVariant, recolorPixels, SPECIES_RAMPS, variantOutline } from './variants.ts';
+import { BLOCK, buildTopHat, colorOf, findPalette, HAT_SIZES, HEAD_ANCHORS, type HeadAnchor, type HeadWear, wearKey } from './wearables.ts';
 
 /** Lugares de los muebles (en el piso) y adornos (en la pared). */
 const FURNITURE_X = [104, 332, 446];
@@ -17,7 +20,13 @@ const darker = (c: number, f = 0.82) =>
 // Escena de la habitación. Solo dibuja y anima; las reglas viven en petState.ts.
 // Si no hay sprite para la mascota, etapa y animación, dibuja el marcador temporal con formas.
 
-export interface SceneView { petId: PetId; stage: Stage; anim: PetAnim }
+export interface SceneView {
+  petId: PetId;
+  stage: Stage;
+  anim: PetAnim;
+  /** Variante de color (`variants.ts`); null o desconocida = colores originales. */
+  variant?: string | null;
+}
 
 export interface PetSceneHandle {
   show(view: SceneView): void;
@@ -32,8 +41,11 @@ export interface PetSceneHandle {
   setRoomColors(colors: RoomColors): void;
   /** Decoración del inventario: color de pared y piso, muebles en el piso y adornos en la pared. */
   setDecor(decor: RoomDecor): void;
-  /** Accesorio que lleva la mascota (por ahora un emoji sobre la cabeza), o null. */
-  setAccessory(icon: string | null): void;
+  /**
+   * Accesorio que lleva la mascota, o null. Si `wear` existe se dibuja como prenda de pixel art
+   * ajustada a la cabeza de cada especie y edad; si no, el emoji sobre la cabeza.
+   */
+  setAccessory(icon: string | null, wear?: HeadWear | null): void;
 }
 
 export interface RoomColors { wall: number; stripe: number }
@@ -157,7 +169,17 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private eatTimers: Phaser.Time.TimerEvent[] = [];
     private decor: RoomDecor = { wall: null, floor: null, furniture: [], decor: [] };
     private decorLayer!: Phaser.GameObjects.Container;
-    private accessory!: Phaser.GameObjects.Text;
+    private accessory!: Phaser.GameObjects.Image;
+    /** Prenda de pixel art sobre la cabeza; sigue cada movimiento de la ilustración (update). */
+    private hat!: Phaser.GameObjects.Image;
+    private wear: HeadWear | null = null;
+    /** Emoji del accesorio; se guarda aunque la escena aún no exista y se aplica en create(). */
+    private accessoryIcon: string | null = null;
+    /** Ilustraciones recoloreadas: una por imagen original y variante (se generan una sola vez). */
+    private recolored = new WeakMap<object, Map<string, HTMLCanvasElement>>();
+    /** Última posición y escala aplicadas a la mascota (para no reasignarlas cada segundo). */
+    private placeKey = '';
+    private bobPace = 1;
 
     constructor() { super('room'); }
 
@@ -211,8 +233,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.face = this.add.graphics();
       this.placeholder = this.add.container(0, 0, [...this.ears, this.body, this.belly, ...this.blush, this.face]);
       this.sprite = this.add.sprite(0, 0, '__DEFAULT').setVisible(false);
-      this.accessory = this.add.text(0, -80, '', { fontSize: '40px' }).setOrigin(0.5, 1).setVisible(false);
-      this.bobber = this.add.container(0, 0, [this.placeholder, this.sprite, this.accessory]);
+      this.accessory = this.add.image(0, -80, '__DEFAULT').setOrigin(0.5, 1).setVisible(false);
+      this.hat = this.add.image(0, 0, '__DEFAULT').setVisible(false);
+      this.bobber = this.add.container(0, 0, [this.placeholder, this.sprite, this.hat, this.accessory]);
       this.petRoot = this.add.container(ROOM_POS.x, ROOM_POS.y, [this.bobber]);
       this.bob = this.tweens.add({ targets: this.bobber, y: -7, duration: 950, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
 
@@ -227,6 +250,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
 
       this.ready = true;
       this.drawDecor();
+      this.setAccessory(this.accessoryIcon, this.wear);
       if (this.view) this.apply(this.view);
     }
 
@@ -237,23 +261,108 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.drawDecor();
     }
 
-    setAccessory(icon: string | null) {
-      if (!this.ready) { this.time?.delayedCall(50, () => this.setAccessory(icon)); return; }
-      this.accessory.setText(icon ?? '').setVisible(icon !== null);
+    setAccessory(icon: string | null, wear: HeadWear | null = null) {
+      this.wear = wear;
+      this.accessoryIcon = icon;
+      // Antes de create() no hay objetos: se aplica al terminar de crear la escena.
+      if (!this.ready) return;
+      const key = !wear && icon ? this.iconTexture(icon) : null;
+      if (key) this.accessory.setTexture(key).setDisplaySize(ICON_SIZE * 3, ICON_SIZE * 3);
+      this.accessory.setVisible(key !== null);
       this.placeAccessory();
+      this.dressHat();
     }
 
-    /** Muebles en el piso y adornos en la pared, como emojis por ahora. */
+    /** Ancla de la cabeza para la ilustración visible, o null si no hay ilustración (marcador). */
+    private headAnchor(): HeadAnchor | null {
+      if (!this.view || !this.sprite.visible) return null;
+      return HEAD_ANCHORS[this.view.petId]?.[this.view.stage] ?? null;
+    }
+
+    /**
+     * Elige la textura de la prenda para la mascota actual. Cada combinación de forma, tamaño,
+     * paleta y contorno se genera una sola vez como pixel art (bloques de `block` píxeles de la
+     * imagen original), así que se ve con el mismo tamaño de píxel que la ilustración.
+     */
+    private dressHat() {
+      const anchor = this.headAnchor();
+      const hidden = !this.wear || !anchor || this.view?.anim === 'dead' || this.view?.anim === 'bath';
+      this.hat.setVisible(!hidden);
+      if (hidden || !this.wear || !anchor) return;
+      const shape = HAT_SIZES[anchor.size];
+      const block = anchor.block ?? BLOCK;
+      // Con una variante de color, el contorno de la prenda es el de esa variante.
+      const variant = this.view ? findVariant(this.view.petId, this.view.variant) : null;
+      const outline = variant ? variantOutline(variant) : anchor.outline;
+      const key = `${wearKey(this.wear, anchor.size, outline)}-${block}`;
+      const art = buildTopHat(shape);
+      if (!this.textures.exists(key)) {
+        const canvas = document.createElement('canvas');
+        canvas.width = art.width * block;
+        canvas.height = art.height * block;
+        const ctx = canvas.getContext('2d')!;
+        const palette = findPalette(this.wear.palette);
+        for (let i = 0; i < art.pixels.length; i++) {
+          const color = colorOf(art.pixels[i], palette, outline);
+          if (color === null) continue;
+          ctx.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+          ctx.fillRect((i % art.width) * block, Math.floor(i / art.width) * block, block, block);
+        }
+        this.textures.addCanvas(key, canvas);
+      }
+      this.hat.setTexture(key).setOrigin(art.pivot.x / art.width, art.pivot.y / art.height);
+      this.followHead();
+    }
+
+    /** Copia posición, giro, escala y tinte de la ilustración para que la prenda se mueva con ella. */
+    private followHead() {
+      const anchor = this.headAnchor();
+      if (!anchor || !this.hat.visible) return;
+      const frame = this.sprite.frame;
+      const lx = (anchor.x - frame.width / 2) * this.sprite.scaleX;
+      const ly = (anchor.y - frame.height / 2) * this.sprite.scaleY;
+      const cos = Math.cos(this.sprite.rotation);
+      const sin = Math.sin(this.sprite.rotation);
+      this.hat
+        .setPosition(this.sprite.x + lx * cos - ly * sin, this.sprite.y + lx * sin + ly * cos)
+        .setRotation(this.sprite.rotation + Phaser.Math.DegToRad(anchor.angle))
+        .setScale(this.sprite.scaleX, this.sprite.scaleY)
+        .setAlpha(this.sprite.alpha);
+      if (this.sprite.isTinted) this.hat.setTint(this.sprite.tint); else this.hat.clearTint();
+    }
+
+    update() {
+      if (this.ready) this.followHead();
+    }
+
+    /** Textura de pixel art de un emoji (src/ui/pixelArt.ts), o null si no se pudo dibujar. */
+    private iconTexture(emoji: string): string | null {
+      const key = `px-${emoji}`;
+      if (this.textures.exists(key)) return key;
+      const canvas = pixelIconCanvas(emoji);
+      if (!canvas) return null;
+      this.textures.addCanvas(key, canvas);
+      return key;
+    }
+
+    /** Imagen de pixel art (escala entera de píxeles) o, si no se puede, el emoji como texto. */
+    private iconObject(emoji: string, x: number, y: number, scale: number): Phaser.GameObjects.Image | Phaser.GameObjects.Text {
+      const key = this.iconTexture(emoji);
+      if (key) return this.add.image(x, y, key).setScale(scale);
+      return this.add.text(x, y, emoji, { fontSize: `${ICON_SIZE * scale}px` });
+    }
+
+    /** Muebles en el piso y adornos en la pared, en pixel art con la paleta del juego. */
     private drawDecor() {
       this.decorLayer.removeAll(true);
       const floorY = Math.round(H * 0.74);
       this.decor.furniture.forEach((icon, i) => {
         this.decorLayer.add(this.add.ellipse(FURNITURE_X[i], floorY + 26, 64, 10, 0x000000, 0.18));
-        this.decorLayer.add(this.add.text(FURNITURE_X[i], floorY + 28, icon, { fontSize: '54px' }).setOrigin(0.5, 1));
+        this.decorLayer.add(this.iconObject(icon, FURNITURE_X[i], floorY + 28, 4).setOrigin(0.5, 1));
       });
       this.decor.decor.forEach((icon, i) => {
         const { x, y } = DECOR_SPOTS[i];
-        this.decorLayer.add(this.add.text(x, y, icon, { fontSize: '40px' }).setOrigin(0.5));
+        this.decorLayer.add(this.iconObject(icon, x, y, 3).setOrigin(0.5));
       });
     }
 
@@ -304,13 +413,19 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.sponge.setVisible(bathing);
       this.night.setVisible(view.anim === 'sleep');
       this.zzz.setVisible(view.anim === 'sleep');
-      this.petRoot.setPosition(pos.x, pos.y).setScale(scale);
+      const placeKey = `${pos.x},${pos.y},${scale}`;
+      if (placeKey !== this.placeKey) {
+        this.placeKey = placeKey;
+        this.petRoot.setPosition(pos.x, pos.y).setScale(scale);
+      }
       this.game.canvas.style.touchAction = bathing ? 'none' : 'auto';
 
-      if (view.anim === 'dead') { this.bob.pause(); this.bobber.y = 0; } else { this.bob.resume(); }
-      this.bob.timeScale = view.anim === 'sleep' ? 0.45 : 1;
+      if (view.anim === 'dead') { this.bob.pause(); this.bobber.y = 0; } else if (this.bob.isPaused()) { this.bob.resume(); }
+      // Dormida el vaivén va más lento; el cambio de ritmo es gradual para que no dé un salto.
+      const pace = view.anim === 'sleep' ? 0.45 : 1;
+      if (this.bobPace !== pace) { this.bobPace = pace; this.tweens.add({ targets: this.bob, timeScale: pace, duration: 500, ease: 'Sine.inOut' }); }
 
-      const key = `${view.petId}|${view.stage}|${view.anim}`;
+      const key = `${view.petId}|${view.stage}|${view.anim}|${view.variant ?? ''}`;
       if (key === this.drawnKey) return;
       this.drawnKey = key;
       // Accesorio: sobre la cabeza; se oculta muerta y durante el baño.
@@ -321,10 +436,11 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.sprite.setVisible(spriteAnim !== null);
       this.placeholder.setVisible(spriteAnim === null);
       if (spriteAnim) {
-        this.sprite.play(spriteAnim.key);
+        this.sprite.play(this.variantAnim(spriteAnim.key, view));
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
         const scale = (BODY.ry * 3) / spriteAnim.frameHeight;
         this.animateSprite(view, scale);
+        this.dressHat();
         this.clearEat();
         if (view.anim === 'eat') {
           const hasFrames = spriteAnim.key === spriteKey(view.petId, view.stage, 'eat');
@@ -333,6 +449,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         return;
       }
       this.clearEat();
+      this.hat.setVisible(false);
       this.paintPlaceholder(view);
     }
 
@@ -413,41 +530,93 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     /** Da movimiento propio a los retratos de un fotograma en cada estado del juego. */
     private animateSprite(view: SceneView, scale: number) {
       const { anim, petId } = view;
-      this.tweens.killTweensOf(this.sprite);
-      this.sprite.clearTint().setAlpha(1).setAngle(0).setPosition(0, 0).setScale(scale);
+      const sprite = this.sprite;
+      this.tweens.killTweensOf(sprite);
+      sprite.clearTint().setAlpha(1).setScale(scale);
+      // Cada estado tiene una pose (posición e inclinación). Se llega a ella con una transición
+      // corta desde la pose anterior en vez de saltar de golpe; después empieza su movimiento.
+      const pose = (to: { x?: number; y?: number; angle?: number }, duration: number, then?: () => void) => {
+        this.tweens.add({
+          targets: sprite, x: to.x ?? 0, y: to.y ?? 0, angle: to.angle ?? 0, duration, ease: 'Sine.out',
+          onComplete: then ? () => { if (this.view?.anim === anim) then(); } : undefined,
+        });
+      };
+      const loop = (props: Record<string, number>, duration: number) =>
+        this.tweens.add({ targets: sprite, ...props, duration, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       if (anim === 'dead') {
-        this.sprite.setTint(0x888888).setAngle(75).setY(25);
+        sprite.setTint(0x888888);
+        pose({ y: 25, angle: 75 }, 650);
         return;
       }
       if (anim === 'sad') {
-        this.sprite.setTint(0xb8c5dd).setY(8);
-        this.tweens.add({ targets: this.sprite, y: 12, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        sprite.setTint(0xb8c5dd);
+        pose({ y: 8 }, 300, () => loop({ y: 12 }, 1100));
         return;
       }
       if (anim === 'sleep') {
-        this.sprite.setAngle(-9).setY(8);
-        this.tweens.add({ targets: this.sprite, scaleY: scale * 1.04, duration: 1550, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        // Se acomoda despacio y respira lento.
+        pose({ y: 8, angle: -9 }, 700, () => loop({ scaleY: scale * 1.04 }, 1550));
         return;
       }
       if (anim === 'play') {
         // Cada especie conserva una forma reconocible de jugar.
-        if (petId === 4) this.tweens.add({ targets: this.sprite, x: 12, y: -5, angle: 5, duration: 470, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-        else if (petId === 2) this.tweens.add({ targets: this.sprite, y: 7, scaleY: scale * 0.92, duration: 260, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-        else if (petId === 3) this.tweens.add({ targets: this.sprite, x: 11, angle: -5, duration: 190, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-        else this.tweens.add({ targets: this.sprite, y: -16, angle: 7, duration: 230, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        pose({}, 180, () => {
+          if (petId === 4) loop({ x: 12, y: -5, angle: 5 }, 470);
+          else if (petId === 2) loop({ y: 7, scaleY: scale * 0.92 }, 260);
+          else if (petId === 3) loop({ x: 11, angle: -5 }, 190);
+          else loop({ y: -16, angle: 7 }, 230);
+        });
         return;
       }
       if (anim === 'eat') {
         // Las mordidas las anima playEat; aquí solo se acerca un poco a la comida.
-        this.sprite.setY(2);
+        pose({ y: 2 }, 160);
         return;
       }
       if (anim === 'bath') {
-        this.tweens.add({ targets: this.sprite, angle: 4, duration: 360, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+        pose({}, 200, () => loop({ angle: 4 }, 360));
         return;
       }
-      if (petId === 4) this.tweens.add({ targets: this.sprite, y: -5, angle: 2, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-      else this.tweens.add({ targets: this.sprite, scaleY: scale * 1.025, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      pose({}, 450, () => {
+        if (petId === 4) loop({ y: -5, angle: 2 }, 1500);
+        else loop({ scaleY: scale * 1.025 }, 1000);
+      });
+    }
+
+    /**
+     * Animación con la variante de color aplicada. La primera vez recolorea la imagen original
+     * (mapa de degradado, sin redibujar) y registra su textura y su animación; después la reutiliza.
+     */
+    private variantAnim(key: string, view: SceneView): string {
+      const ramp = SPECIES_RAMPS[view.petId];
+      const variant = findVariant(view.petId, view.variant);
+      const sheet = SPRITES.find((s) => spriteKey(s.petId, s.stage, s.anim) === key);
+      if (!ramp || !variant || !sheet) return key;
+      const vkey = `${key}@${variant.id}`;
+      if (this.anims.exists(vkey)) return vkey;
+      if (!this.textures.exists(vkey)) {
+        const source = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+        let bySource = this.recolored.get(source);
+        if (!bySource) { bySource = new Map(); this.recolored.set(source, bySource); }
+        let canvas = bySource.get(variant.id);
+        if (!canvas) {
+          canvas = document.createElement('canvas');
+          canvas.width = source.width;
+          canvas.height = source.height;
+          const ctx = canvas.getContext('2d', { willReadFrequently: true })!;
+          ctx.drawImage(source, 0, 0);
+          const pixels = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          pixels.data.set(recolorPixels(pixels.data, canvas.width, canvas.height, ramp, variant));
+          ctx.putImageData(pixels, 0, 0);
+          bySource.set(variant.id, canvas);
+        }
+        this.textures.addSpriteSheet(vkey, canvas as unknown as HTMLImageElement, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
+      }
+      this.anims.create({ key: vkey, frames: this.anims.generateFrameNumbers(vkey, {
+        ...(sheet.firstFrame === undefined ? {} : { start: sheet.firstFrame }),
+        ...(sheet.lastFrame === undefined ? {} : { end: sheet.lastFrame }),
+      }), frameRate: sheet.fps, repeat: sheet.loop === false ? 0 : -1 });
+      return vkey;
     }
 
     private findSprite(view: SceneView): { key: string; frameHeight: number } | null {
@@ -805,6 +974,6 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     resetBath: () => scene.resetBath(),
     setRoomColors: (colors) => scene.setRoomColors(colors),
     setDecor: (decor) => scene.setDecor(decor),
-    setAccessory: (icon) => scene.setAccessory(icon),
+    setAccessory: (icon, wear) => scene.setAccessory(icon, wear),
   };
 }

@@ -1,4 +1,4 @@
-import type { GameConfig } from './types.ts';
+import type { GameConfig, LifeHours, PetState } from './types.ts';
 
 const MINUTE = 60_000;
 
@@ -21,7 +21,36 @@ export const DEFAULT_CONFIG: GameConfig = {
   adultAtMs: 4 * 60 * MINUTE,
   bathMaxGain: 70,
   lowThreshold: 30,
+  canDie: true,
 };
+
+/** Horas que aguanta sin cuidados la configuración base (de arriba). */
+export const BASE_LIFE_HOURS = 11;
+
+export const DIFFICULTIES: ReadonlyArray<{ hours: LifeHours; label: string; detail: string }> = [
+  { hours: 1, label: 'Difícil', detail: 'Aguanta 1 hora sin cuidados.' },
+  { hours: 7, label: 'Normal', detail: 'Aguanta 7 horas sin cuidados.' },
+  { hours: 12, label: 'Fácil', detail: 'Aguanta 12 horas sin cuidados.' },
+];
+export const DEFAULT_LIFE_HOURS: LifeHours = 7;
+export const isLifeHours = (v: unknown): v is LifeHours => v === 1 || v === 7 || v === 12;
+
+/**
+ * Ajusta la configuración a la dificultad: las necesidades bajan más rápido o más lento para que,
+ * sin ningún cuidado, la mascota aguante `hours` horas (como el contrato PolkaPets v2).
+ */
+export function withLife(config: GameConfig, hours: number, peaceful = false): GameConfig {
+  const factor = BASE_LIFE_HOURS / hours;
+  const decayPerMinute = { ...config.decayPerMinute };
+  for (const key of Object.keys(decayPerMinute) as Array<keyof typeof decayPerMinute>) decayPerMinute[key] *= factor;
+  return { ...config, decayPerMinute, canDie: !peaceful };
+}
+
+/** Configuración de una partida: dificultad y modo de la mascota, y `?speed=` para pruebas. */
+export function configForPet(pet: Pick<PetState, 'lifeHours' | 'peaceful'> | null, speed = 1): GameConfig {
+  const base = pet?.lifeHours ? withLife(DEFAULT_CONFIG, pet.lifeHours, pet.peaceful === true) : { ...DEFAULT_CONFIG, canDie: pet?.peaceful !== true };
+  return withSpeed(base, speed);
+}
 
 /**
  * Acelera o frena el tiempo del juego para probar etapas y muerte (`?speed=10` en la URL).

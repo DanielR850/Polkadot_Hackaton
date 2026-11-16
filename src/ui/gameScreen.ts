@@ -38,6 +38,8 @@ export interface GameIntents {
   shop?(): void;
   /** Ver los trofeos (logros) de la mascota. */
   trophies?(): void;
+  /** Despensa: comida especial y regalos (drops). */
+  pantry?(): void;
 }
 
 /** Botón de registrar en el panel de muerte: oculto, disponible o ya registrado. */
@@ -108,7 +110,11 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   shopBtn.addEventListener('click', () => intents.shop?.());
   const trophiesBtn = h('button', { type: 'button', class: 'ghost' }, '🏆 Trofeos');
   trophiesBtn.addEventListener('click', () => intents.trophies?.());
-  const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, trophiesBtn);
+  const pantryBtn = h('button', { type: 'button', class: 'ghost' }, '🧺 Despensa');
+  pantryBtn.addEventListener('click', () => intents.pantry?.());
+  const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, pantryBtn, trophiesBtn);
+  /** Modo y dificultad de la partida (p. ej. "⚔️ Competencia · 7 h"). */
+  const badge = h('span', { class: 'mode-badge' });
   const coinsEl = h('span', { class: 'coin-pill', title: 'Pesitos ganados en los minijuegos' }, '🪙 0');
 
   const bathFill = h('div', { class: 'meter-fill bath-fill' });
@@ -141,7 +147,7 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
 
   const root = h('section', { class: 'screen game-screen', 'aria-label': 'Juego' },
     h('header', { class: 'topbar' },
-      h('div', {}, h('span', { class: 'eyebrow' }, 'MI PEQUEÑO MUNDO'), nameEl),
+      h('div', {}, h('span', { class: 'eyebrow' }, 'MI PEQUEÑO MUNDO'), nameEl, badge),
       h('div', { class: 'topbar-tools' }, coinsEl, menuButton,
         h('div', { class: 'day-pill' }, h('span', { class: 'live-dot' }), stageEl, ageEl), menu)),
     h('main', { class: 'layout' },
@@ -193,6 +199,11 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
     say(text: string) { feedback.textContent = text; },
     setNote(text: string, detail: string) { noteText.textContent = text; noteDetail.textContent = detail; },
     setCoins(coins: number) { coinsEl.textContent = `🪙 ${coins}`; },
+    setBadge(text: string) { badge.textContent = text; badge.hidden = !text; },
+    /** Marca el botón de la despensa cuando hay regalos por abrir. */
+    setGifts(count: number) {
+      pantryBtn.replaceChildren('🧺 Despensa', ...(count > 0 ? [h('span', { class: 'gift-badge', title: `${count} regalos por abrir` }, `🎁 ${count}`)] : []));
+    },
     /** Solo en modo ranking se muestran los botones del leaderboard. */
     setRankingVisible(visible: boolean) {
       rankingBtn.button.hidden = !visible;

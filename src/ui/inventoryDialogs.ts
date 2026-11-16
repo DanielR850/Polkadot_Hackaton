@@ -2,7 +2,9 @@
 // Solo muestran lo que la persona ya tiene; los objetos llegarán como NFT (src/game/inventory.ts).
 import { describeBonus } from '../game/bonuses.ts';
 import { placeBlocker, SLOTS, SPACE_SECTIONS, type Equipped, type InventoryItem, type InventoryKind } from '../game/inventory.ts';
+import { HAT_PALETTES } from '../game/wearables.ts';
 import { createDialog, h } from './dom.ts';
+import { pixelIcon } from './pixelArt.ts';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
 
@@ -11,13 +13,15 @@ export interface InventoryIntents {
   select(kind: 'accessory' | 'wall' | 'floor', id: string | null): void;
   /** Poner o quitar un mueble o adorno. */
   toggle(kind: 'furniture' | 'decor', id: string): void;
+  /** Color de la prenda de pixel art puesta (sombrero). */
+  palette?(id: string): void;
 }
 
 /** Tarjeta de un objeto. */
 function itemCard(item: InventoryItem | null, active: boolean, label: string, onClick: () => void, disabled = false, hint = '') {
   const swatch = item?.color !== undefined
     ? h('span', { class: 'inv-swatch', style: `background:${hex(item.color)}`, 'aria-hidden': 'true' })
-    : h('span', { class: 'inv-icon', 'aria-hidden': 'true' }, item?.icon ?? '✖');
+    : pixelIcon(item?.icon ?? '✖', 'inv-icon');
   const b = h('button', { type: 'button', class: 'item-option inv-item', 'aria-pressed': String(active) }, swatch, h('b', {}, label), ...(item?.category ? [h('small', {}, item.category)] : []),
     ...(item?.bonus ? [h('small', { class: 'item-bonus' }, describeBonus(item.bonus))] : []));
   b.disabled = disabled;
@@ -37,10 +41,22 @@ export function createAccessoriesDialog(intents: InventoryIntents) {
   const { dialog, body } = createDialog('Accesorios', 'inventory-dialog');
   const status = h('p', { class: 'hint' });
   const grid = h('div', { class: 'item-grid inv-grid' });
-  body.append(status, grid);
+  const colors = h('div', { class: 'pet-options', hidden: true });
+  body.append(status, grid, colors);
 
   return {
     open() { if (!dialog.open) dialog.showModal(); },
+    /** Muestra los colores de la prenda puesta si es de pixel art (`current` = paleta elegida). */
+    colors(wearable: boolean, current: string) {
+      colors.hidden = !wearable;
+      if (!wearable) return;
+      colors.replaceChildren(h('p', { class: 'eyebrow' }, 'COLOR DEL SOMBRERO'), h('div', { class: 'choice-row' }, ...HAT_PALETTES.map((p) => {
+        const b = h('button', { type: 'button', class: 'choice', 'aria-pressed': String(p.id === current) },
+          h('span', { class: 'choice-swatch', style: `background:${hex(p.body[2])};box-shadow:inset 0 -6px 0 ${hex(p.band[1])}`, 'aria-hidden': 'true' }), p.name);
+        b.addEventListener('click', () => intents.palette?.(p.id));
+        return b;
+      })));
+    },
     loading() { status.textContent = 'Cargando tu inventario…'; grid.replaceChildren(); },
     failed() { status.textContent = 'No se pudo cargar tu inventario. Intenta de nuevo.'; grid.replaceChildren(); },
     render(owned: readonly InventoryItem[], equipped: Equipped) {
