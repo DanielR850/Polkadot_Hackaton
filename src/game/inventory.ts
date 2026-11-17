@@ -1,0 +1,223 @@
+// Inventario de accesorios y decoración. Lógica pura: no importa Phaser, DOM ni Polkadot.
+//
+// Los objetos los tendrá la persona como NFT (los implementa el equipo después). Este módulo solo
+// define qué es un objeto, de dónde se leen (`InventorySource`) y qué tiene puesto. Para conectar
+// los NFT basta con crear otra fuente que devuelva `InventoryItem[]` leídos del contrato.
+
+/** Dónde se usa un objeto: en la mascota o en una sección de la habitación. */
+export type InventoryKind = 'accessory' | 'wall' | 'floor' | 'furniture' | 'decor';
+
+/** Bonos en porcentaje que da un objeto puesto: más pesitos o más felicidad al jugar. */
+export interface Bonus {
+  /** % extra de pesitos ganados en los minijuegos. */
+  coins?: number;
+  /** % extra de felicidad que dan los minijuegos. */
+  happiness?: number;
+}
+
+export interface InventoryItem {
+  /** Identificador estable (por ejemplo `nft:<contrato>:<tokenId>`). */
+  id: string;
+  kind: InventoryKind;
+  name: string;
+  /** Emoji de respaldo (textos y NFT); se dibuja solo si falta la imagen. */
+  icon: string;
+  /**
+   * Pixel art del objeto, relativo a `public/assets/` (por ejemplo `items/furniture/sillon.png`).
+   * Pared y piso: un azulejo que se repite. Reemplaza el PNG para cambiar cómo se ve.
+   */
+  image?: string;
+  /** Color de la pared o del piso (0xRRGGBB). Con imagen, se usa como color base. */
+  color?: number;
+  /**
+   * Categoría de un mueble o adorno ("Asiento", "Planta"…). Solo puede haber uno puesto por
+   * categoría; el contrato PolkaPetsItems aplica la misma regla.
+   */
+  category?: string;
+  /** Bono que da mientras está puesto. */
+  bonus?: Bonus;
+}
+
+/** De dónde salen los objetos de la persona. */
+export interface InventorySource {
+  list(): Promise<InventoryItem[]>;
+}
+
+/** Lo que tiene puesto. Pared y piso: uno o el original (null). Muebles y adornos: varios. */
+export interface Equipped {
+  accessory: string | null;
+  wall: string | null;
+  floor: string | null;
+  furniture: string[];
+  decor: string[];
+}
+
+/** Lugares disponibles en la habitación. */
+export const SLOTS = { furniture: 3, decor: 2 } as const;
+
+/** Secciones de "Mi espacio", en el orden en que se muestran. */
+export const SPACE_SECTIONS: ReadonlyArray<{ kind: Exclude<InventoryKind, 'accessory'>; label: string; icon: string }> = [
+  { kind: 'wall', label: 'Pared', icon: '🧱' },
+  { kind: 'floor', label: 'Piso', icon: '🟫' },
+  { kind: 'furniture', label: 'Muebles', icon: '🪑' },
+  { kind: 'decor', label: 'Adornos', icon: '🖼️' },
+];
+
+/** Lo que la escena necesita para dibujar la habitación decorada. */
+export interface RoomDecor {
+  wall: number | null;
+  floor: number | null;
+  /** Azulejo de la pared y del piso (ruta en `public/assets/`), o null para el dibujado. */
+  wallImage: string | null;
+  floorImage: string | null;
+  furniture: DecorPiece[];
+  decor: DecorPiece[];
+}
+
+/** Un objeto que se dibuja: su imagen y el emoji de respaldo si la imagen no carga. */
+export interface DecorPiece { icon: string; image?: string }
+
+export const EMPTY_DECOR: RoomDecor = { wall: null, floor: null, wallImage: null, floorImage: null, furniture: [], decor: [] };
+
+export const NOTHING_EQUIPPED: Equipped = { accessory: null, wall: null, floor: null, furniture: [], decor: [] };
+
+/**
+ * Quita lo que ya no está en el inventario y respeta las reglas de lo puesto: un accesorio, una
+ * pared, un piso, un mueble o adorno por categoría y los lugares disponibles.
+ */
+export function sanitize(equipped: Equipped, owned: readonly InventoryItem[]): Equipped {
+  const find = (id: string | null, kind: InventoryKind) => (id ? owned.find((i) => i.id === id && i.kind === kind) : undefined);
+  const has = (id: string | null, kind: InventoryKind) => (find(id, kind) ? id : null);
+  const many = (ids: string[], kind: 'furniture' | 'decor') => {
+    const kept: string[] = [];
+    const categories = new Set<string>();
+    for (const id of new Set(ids)) {
+      const item = find(id, kind);
+      if (!item || kept.length >= SLOTS[kind]) continue;
+      if (item.category) {
+        if (categories.has(item.category)) continue;
+        categories.add(item.category);
+      }
+      kept.push(id);
+    }
+    return kept;
+  };
+  return {
+    accessory: has(equipped.accessory, 'accessory'),
+    wall: has(equipped.wall, 'wall'),
+    floor: has(equipped.floor, 'floor'),
+    furniture: many(equipped.furniture, 'furniture'),
+    decor: many(equipped.decor, 'decor'),
+  };
+}
+
+export type EquipResult = { ok: true; equipped: Equipped } | { ok: false; reason: string };
+
+/** Por qué no se puede poner este mueble o adorno ahora; null si se puede. */
+export function placeBlocker(
+  equipped: Equipped, kind: 'furniture' | 'decor', item: InventoryItem, owned: readonly InventoryItem[],
+): string | null {
+  const placed = equipped[kind];
+  if (placed.includes(item.id)) return null;
+  if (item.category) {
+    const same = placed.map((id) => owned.find((i) => i.id === id)).find((i) => i?.category === item.category);
+    if (same) return `Ya tienes puesto «${same.name}» de la categoría ${item.category}. Quítalo primero.`;
+  }
+  if (placed.length >= SLOTS[kind]) return 'Ya no hay lugar libre. Quita algo primero.';
+  return null;
+}
+
+/** Pone o quita un mueble o adorno. Rechaza dos de la misma categoría o si no hay lugar libre. */
+export function toggle(
+  equipped: Equipped, kind: 'furniture' | 'decor', id: string, owned: readonly InventoryItem[],
+): EquipResult {
+  const list = equipped[kind];
+  if (list.includes(id)) return { ok: true, equipped: { ...equipped, [kind]: list.filter((x) => x !== id) } };
+  const item = owned.find((i) => i.id === id && i.kind === kind);
+  if (!item) return { ok: false, reason: 'Ese objeto no está en tu inventario.' };
+  const reason = placeBlocker(equipped, kind, item, owned);
+  return reason ? { ok: false, reason } : { ok: true, equipped: { ...equipped, [kind]: [...list, id] } };
+}
+
+/** true si lo puesto cumple todas las reglas con lo que se tiene (lo mismo que valida el contrato). */
+export function isValidEquipment(equipped: Equipped, owned: readonly InventoryItem[]): boolean {
+  return JSON.stringify(sanitize(equipped, owned)) === JSON.stringify(equipped);
+}
+
+export function toDecor(equipped: Equipped, owned: readonly InventoryItem[]): RoomDecor {
+  const byId = (id: string | null) => owned.find((i) => i.id === id);
+  const pieces = (ids: string[]) => ids.flatMap((id) => {
+    const item = byId(id);
+    return item ? [piece(item)] : [];
+  });
+  return {
+    wall: byId(equipped.wall)?.color ?? null,
+    floor: byId(equipped.floor)?.color ?? null,
+    wallImage: byId(equipped.wall)?.image ?? null,
+    floorImage: byId(equipped.floor)?.image ?? null,
+    furniture: pieces(equipped.furniture),
+    decor: pieces(equipped.decor),
+  };
+}
+
+const piece = (item: InventoryItem): DecorPiece => (item.image ? { icon: item.icon, image: item.image } : { icon: item.icon });
+
+/** El accesorio puesto (imagen y emoji de respaldo), o null. */
+export function equippedAccessory(equipped: Equipped, owned: readonly InventoryItem[]): DecorPiece | null {
+  const item = owned.find((i) => i.id === equipped.accessory);
+  return item ? piece(item) : null;
+}
+
+/* ----------------------------------------------------------- fuentes */
+
+/** Objetos de muestra para probar la interfaz (`?demo=1` en la URL). No son NFT. */
+export const DEMO_ITEMS: readonly InventoryItem[] = [
+  { id: 'demo:sombrero', kind: 'accessory', name: 'Sombrero', icon: '🎩', image: 'items/accessories/sombrero.png' },
+  { id: 'demo:corona', kind: 'accessory', name: 'Corona', icon: '👑', image: 'items/accessories/corona.png' },
+  { id: 'demo:moño', kind: 'accessory', name: 'Moño', icon: '🎀', image: 'items/accessories/mono.png' },
+  { id: 'demo:pared-rosa', kind: 'wall', name: 'Pared rosa', icon: '🟪', color: 0xf3a6c8, image: 'items/walls/rosa.png' },
+  { id: 'demo:pared-azul', kind: 'wall', name: 'Pared turquesa', icon: '🟦', color: 0x8fd3d6, image: 'items/walls/turquesa.png' },
+  { id: 'demo:piso-barro', kind: 'floor', name: 'Piso de barro', icon: '🟧', color: 0xc0643c, image: 'items/floors/barro.png' },
+  { id: 'demo:piso-pasto', kind: 'floor', name: 'Pasto', icon: '🟩', color: 0x6fae4f, image: 'items/floors/pasto.png' },
+  { id: 'demo:sillon', kind: 'furniture', name: 'Sillón', icon: '🛋️', category: 'Asiento', image: 'items/furniture/sillon.png' },
+  { id: 'demo:planta', kind: 'furniture', name: 'Planta', icon: '🪴', category: 'Planta', image: 'items/furniture/planta.png' },
+  { id: 'demo:lampara', kind: 'furniture', name: 'Lámpara', icon: '🪔', category: 'Iluminación', image: 'items/furniture/lampara.png' },
+  { id: 'demo:cuadro', kind: 'decor', name: 'Cuadro', icon: '🖼️', category: 'Colgante', image: 'items/decor/cuadro.png' },
+  { id: 'demo:reloj', kind: 'decor', name: 'Reloj', icon: '🕰️', category: 'Repisa', image: 'items/decor/reloj.png' },
+];
+
+/**
+ * Fuente actual: lo comprado en la tienda (`purchased`) y, con `demo`, los objetos de muestra.
+ * Reemplazar por la fuente de NFT cuando exista el contrato.
+ */
+export function createLocalInventory(demo: boolean, purchased: () => readonly InventoryItem[]): InventorySource {
+  return { list: async () => [...purchased(), ...(demo ? DEMO_ITEMS : [])] };
+}
+
+/* ------------------------------------------------- lo que tiene puesto */
+
+const KEY = 'tamagotchi-polkadot-equipped-v1';
+let memory: string | null = null;
+
+export function loadEquipped(): Equipped {
+  let raw = memory;
+  try { raw = localStorage.getItem(KEY); } catch { /* sin localStorage */ }
+  try {
+    const d = raw ? (JSON.parse(raw) as Partial<Equipped>) : null;
+    const id = (v: unknown) => (typeof v === 'string' ? v : null);
+    const ids = (v: unknown) => (Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []);
+    return d ? { accessory: id(d.accessory), wall: id(d.wall), floor: id(d.floor), furniture: ids(d.furniture), decor: ids(d.decor) } : { ...NOTHING_EQUIPPED };
+  } catch {
+    return { ...NOTHING_EQUIPPED };
+  }
+}
+
+export function saveEquipped(equipped: Equipped): void {
+  memory = JSON.stringify(equipped);
+  try { localStorage.setItem(KEY, memory); } catch { /* se queda en memoria */ }
+}
+
+/** Nueva mascota: empieza sin nada puesto (los objetos pertenecen a la mascota que los compró). */
+export function clearEquipped(): void {
+  saveEquipped({ ...NOTHING_EQUIPPED });
+}

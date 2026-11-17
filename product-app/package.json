@@ -1,0 +1,22 @@
+{
+  "name": "tamagotchiaxolotl-product",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0",
+    "build": "tsc --noEmit && vite build"
+  },
+  "dependencies": {
+    "@parity/product-sdk": "0.42.0",
+    "@parity/product-sdk-descriptors": "0.14.0",
+    "phaser": "4.2.1"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "8.3.1"
+  },
+  "overrides": {
+    "rollup": "4.67.2"
+  }
+}
