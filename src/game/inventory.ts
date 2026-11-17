@@ -158,7 +158,7 @@ export const DEMO_ITEMS: readonly InventoryItem[] = [
   { id: 'demo:moño', kind: 'accessory', name: 'Moño', icon: '🎀' },
   { id: 'demo:charro', kind: 'accessory', name: 'Sombrero charro', icon: 'cloth:charro' },
   { id: 'demo:poncho', kind: 'outfit', name: 'Poncho', icon: 'cloth:poncho' },
-  { id: 'demo:paliacate', kind: 'outfit', name: 'Paliacate', icon: 'cloth:paliacate' },
+  { id: 'demo:paliacate', kind: 'accessory', name: 'Paliacate', icon: 'cloth:paliacate' },
   { id: 'demo:rebozo', kind: 'outfit', name: 'Rebozo', icon: 'cloth:rebozo' },
   { id: 'demo:pared-rosa', kind: 'wall', name: 'Pared rosa', icon: '🟪', color: 0xf3a6c8 },
   { id: 'demo:pared-azul', kind: 'wall', name: 'Pared turquesa', icon: '🟦', color: 0x8fd3d6 },

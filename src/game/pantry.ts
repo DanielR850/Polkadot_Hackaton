@@ -23,13 +23,13 @@ export interface SpecialFood {
 }
 
 export const FOOD_CATALOG: readonly SpecialFood[] = [
-  { id: 'food:tamal', articleId: 25, name: 'Tamal', icon: '🫔', price: 30, utility: 'life', value: 20 },
-  { id: 'food:pan-de-muerto', articleId: 26, name: 'Pan de muerto', icon: '🍞', price: 25, utility: 'satiety', value: 25 },
-  { id: 'food:elote', articleId: 27, name: 'Elote', icon: '🌽', price: 20, utility: 'satiety', value: 15 },
-  { id: 'food:jamaica', articleId: 28, name: 'Agua de jamaica', icon: '🧃', price: 15, utility: 'satiety', value: 20 },
-  { id: 'food:chocolate', articleId: 29, name: 'Chocolate caliente', icon: '☕', price: 45, utility: 'life', value: 30 },
-  { id: 'food:mole', articleId: 30, name: 'Mole de la abuela', icon: '🍛', price: 0, utility: 'life', value: 50, dropOnly: true },
-  { id: 'food:elixir', articleId: 31, name: 'Elixir de ajolote', icon: '🧪', price: 0, utility: 'satiety', value: 60, dropOnly: true },
+  { id: 'food:tamal', articleId: 53, name: 'Tamal', icon: '🫔', price: 30, utility: 'life', value: 20 },
+  { id: 'food:pan-de-muerto', articleId: 54, name: 'Pan de muerto', icon: '🍞', price: 25, utility: 'satiety', value: 25 },
+  { id: 'food:elote', articleId: 55, name: 'Elote', icon: '🌽', price: 20, utility: 'satiety', value: 15 },
+  { id: 'food:jamaica', articleId: 56, name: 'Agua de jamaica', icon: '🧃', price: 15, utility: 'satiety', value: 20 },
+  { id: 'food:chocolate', articleId: 57, name: 'Chocolate caliente', icon: '☕', price: 45, utility: 'life', value: 30 },
+  { id: 'food:mole', articleId: 58, name: 'Mole de la abuela', icon: '🍛', price: 0, utility: 'life', value: 50, dropOnly: true },
+  { id: 'food:elixir', articleId: 59, name: 'Elixir de ajolote', icon: '🧪', price: 0, utility: 'satiety', value: 60, dropOnly: true },
 ];
 
 export const findFood = (id: string) => FOOD_CATALOG.find((f) => f.id === id);

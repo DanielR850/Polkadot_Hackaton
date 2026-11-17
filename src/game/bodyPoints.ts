@@ -94,7 +94,8 @@ export type Slot = 'head' | 'headSide' | 'eyes' | 'neck';
 const SLOTS: Readonly<Record<string, Slot>> = {
   'shop:corona': 'head', 'demo:corona': 'head',
   'shop:mono': 'headSide', 'demo:moño': 'headSide', 'shop:flor': 'headSide', 'shop:estrella': 'headSide',
-  'shop:lentes': 'eyes',
+  'shop:lentes': 'eyes', 'shop:audifonos': 'head',
+  'shop:paliacate': 'neck', 'demo:paliacate': 'neck',
   'shop:medalla': 'neck', 'shop:cinta': 'neck', 'shop:amuleto': 'neck',
 };
 

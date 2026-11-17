@@ -6,9 +6,9 @@ const { ethers } = hre;
 
 // Colección de comida, utilidad y drops de PolkaPetsItems v2.
 const SOMBRERO = 1;
-const TAMAL = 25; // Vida +20
-const PAN = 26; // Saciedad +25
-const MOLE = 30; // solo drop
+const TAMAL = 53; // Vida +20
+const PAN = 54; // Saciedad +25
+const MOLE = 58; // solo drop
 const UTIL = { Ninguna: 0, Pesitos: 1, Felicidad: 2, Vida: 3, Saciedad: 4 };
 
 describe("PolkaPetsItems: comida, utilidad y drops", () => {
@@ -27,7 +27,7 @@ describe("PolkaPetsItems: comida, utilidad y drops", () => {
     const s = await items.articulo(SOMBRERO);
     expect(s.utilidad).to.equal(UTIL.Pesitos);
     expect(s.valor).to.equal(5);
-    for (let id = 1; id <= 35; id++) expect((await items.articulo(id)).utilidad).to.not.equal(UTIL.Ninguna);
+    for (const id of [...Array.from({ length: 61 }, (_, i) => i + 1)]) expect((await items.articulo(id)).utilidad).to.not.equal(UTIL.Ninguna);
     await items.comprar(1, SOMBRERO);
     const json = JSON.parse(Buffer.from((await items.tokenURI(1)).split(",")[1], "base64").toString("utf8"));
     expect(json.attributes.find((a: { trait_type: string }) => a.trait_type === "Utilidad").value).to.equal("+5% pesitos");
@@ -86,7 +86,7 @@ describe("PolkaPetsItems: comida, utilidad y drops", () => {
     expect(await items.dropsDisponibles(1)).to.equal(0);
     const [tokens, articulos] = await items.despensaDe(1);
     expect(tokens.length).to.equal(2);
-    for (const a of articulos) expect(Number(a)).to.be.within(25, 31);
+    for (const a of articulos) expect(Number(a)).to.be.within(53, 59);
   });
 
   it("solo el dueño del contrato cambia el intervalo de drops", async () => {
@@ -100,11 +100,11 @@ describe("PolkaPetsItems: comida, utilidad y drops", () => {
 
   it("ropa mexicana: una prenda del cuerpo junto a un accesorio, pero no dos prendas", async () => {
     const { items } = await desplegar(12, 0);
-    for (const id of [32, 33, 34]) await items.comprar(1, id); // charro, poncho, paliacate
-    await items.validarEquipo(1, [32, 33]); // sombrero charro + poncho: válido
-    await expect(items.validarEquipo(1, [33, 34])).to.be.revertedWithCustomError(items, "LugarRepetido");
+    for (const id of [25, 60, 61]) await items.comprar(1, id); // charro, poncho, rebozo
+    await items.validarEquipo(1, [25, 60]); // sombrero charro + poncho: válido
+    await expect(items.validarEquipo(1, [60, 61])).to.be.revertedWithCustomError(items, "LugarRepetido");
     await time.increase(200);
-    await items.sellarLegado(1, 100, [32, 34]);
+    await items.sellarLegado(1, 100, [25, 61]);
     const json = JSON.parse(Buffer.from((await items.tokenURI(2)).split(",")[1], "base64").toString("utf8"));
     expect(json.name).to.equal("Poncho");
     expect(json.attributes.find((a: { trait_type: string }) => a.trait_type === "Tipo").value).to.equal("Ropa");

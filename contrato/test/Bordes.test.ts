@@ -26,7 +26,7 @@ describe("Casos límite v2", () => {
   it("la vida curada nunca pasa de 100", async () => {
     const { pets, items } = await todo();
     await pets.mint("X", 0, 12, 1);
-    await items.comprar(1, 29); // chocolate +30 vida
+    await items.comprar(1, 57); // chocolate +30 vida
     await items.usar(1);
     expect((await pets.verMascota(1)).vida).to.equal(100);
   });
@@ -34,7 +34,7 @@ describe("Casos límite v2", () => {
   it("una pacífica cura con operador aunque lleve días sin cuidados", async () => {
     const { pets, items } = await todo();
     await pets.mint("Paz", 0, 1, 0);
-    await items.comprar(1, 31 - 6); // tamal (25)
+    await items.comprar(1, 53); // tamal
     await time.increase(10 * DIA);
     expect((await pets.verMascota(1)).vida).to.equal(1);
     await items.usar(1);
@@ -47,13 +47,13 @@ describe("Casos límite v2", () => {
     await time.increase(3 * 3600);
     expect(await items.dropsDisponibles(1)).to.equal(0);
     await expect(items.reclamarDrop(1)).to.be.revertedWithCustomError(items, "MascotaMuerta");
-    await expect(items.comprar(1, 25)).to.be.revertedWithCustomError(items, "MascotaMuerta");
+    await expect(items.comprar(1, 53)).to.be.revertedWithCustomError(items, "MascotaMuerta");
   });
 
   it("la comida no cuenta para los logros de colección", async () => {
     const { pets, items } = await todo();
     await pets.mint("X", 0, 12, 1);
-    for (let i = 0; i < 4; i++) await items.comprar(1, 27);
+    for (let i = 0; i < 4; i++) await items.comprar(1, 55);
     await expect(items.reclamarLogro(1, 7)).to.be.revertedWithCustomError(items, "LogroNoAlcanzado");
   });
 
@@ -61,7 +61,7 @@ describe("Casos límite v2", () => {
     const { pets, items, ana } = await todo();
     await pets.mint("Mia", 0, 12, 1);
     await pets.connect(ana).mint("Suya", 0, 12, 1);
-    await items.comprar(1, 25);
+    await items.comprar(1, 53);
     await expect(items.connect(ana).usar(1)).to.be.revertedWithCustomError(items, "NoEresDueno");
   });
 

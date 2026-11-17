@@ -341,7 +341,7 @@ async function main() {
     await page.waitForSelector('.game-screen:not([hidden])');
     await clickText(page, '.extras button', 'Accesorios');
     check((await text(page, 'dialog[open]')).includes('ROPA'), 'Accesorios muestra la sección Ropa');
-    await clickText(page, 'dialog[open] .inv-item', 'Sombrero charro');
+    await clickText(page, 'dialog[open] .inv-item', 'Sombrero de charro');
     await clickText(page, 'dialog[open] .inv-item', 'Poncho');
     await page.locator('dialog[open] .dialog-close').click();
     const worn = JSON.parse(await storage(page, 'tamagotchi-polkadot-equipped-v1'));
@@ -410,7 +410,7 @@ async function main() {
     // Usar el Tamal NFT: se quema y cura en la cadena.
     await clickText(page, '.extras button', 'Despensa');
     await until(async () => (await page.locator('dialog[open] .inv-item', { hasText: 'Tamal' }).count()) >= 1, 'el Tamal aparece en la despensa');
-    const tamales = async () => (await read('items', 'despensaDe', [1n]))[1].filter((a) => Number(a) === 25).length;
+    const tamales = async () => (await read('items', 'despensaDe', [1n]))[1].filter((a) => Number(a) === 53).length;
     const tamalesAntes = await tamales(); // el regalo pudo ser otro Tamal
     const vidaAntes = (await read('pets', 'verMascota', [1n])).vida;
     await clickText(page, 'dialog[open] .inv-item', 'Tamal');

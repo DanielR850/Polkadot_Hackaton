@@ -108,6 +108,8 @@ export async function reclamarLogroMascota(firmante: Firmante, mascotaId: bigint
 /** Firma la compra de un objeto: el contrato crea un NFT ligado a esa mascota. */
 export async function comprarArticulo(firmante: Firmante, mascotaId: bigint, articuloId: number, onPaso?: (p: PasoTx) => void): Promise<void> {
   await verificarItems();
+  // El contrato v1 (52 objetos) no tiene la comida ni la ropa del cuerpo de v2 (53 en adelante).
+  if (articuloId > ARTICULOS_V1 && (await versionItems()) < 2) throw new Error("SoloV2");
   const token = await publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "tokenComprado", args: [mascotaId, articuloId] });
   if (token !== 0n) throw new Error("YaComprado");
   await escribirLlamada(firmante, { functionName: "comprar", args: [mascotaId, articuloId], destino: destino() }, onPaso);
@@ -126,6 +128,9 @@ export async function sellarLegadoMascota(
   const duracion = BigInt(Math.max(1, Math.floor(duracionSeg)));
   await escribirLlamada(firmante, { functionName: "sellarLegado", args: [mascotaId, duracion, equipados], destino: destino() }, onPaso);
 }
+
+/** Objetos del contrato v1 desplegado en TestNet (catálogo de Ana). */
+export const ARTICULOS_V1 = 52;
 
 let versionItemsCache: number | null = null;
 
@@ -193,6 +198,7 @@ export async function cambiarIntervaloDrop(firmante: Firmante, segundos: number,
 
 /** Mensaje en español para los errores propios de los objetos; null si no es uno de ellos. */
 export function errorItems(e: unknown): string | null {
+  if (e instanceof Error && e.message === "SoloV2") return "Este objeto llega con los contratos v2; todavía no está en TestNet.";
   if (e instanceof Error && e.message === "YaComprado") return "Esta mascota ya compró ese objeto.";
   if (e instanceof Error && e.message === "LogroYaReclamado") return "Esta mascota ya reclamó ese trofeo.";
   if (e instanceof Error && e.message === "LegadoYaSellado") return "El legado de esta mascota ya está guardado.";

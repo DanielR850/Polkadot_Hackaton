@@ -86,9 +86,9 @@ describe('despensa y regalos', () => {
     expect(computeStats(after, 3 * HOUR, config).health).toBeGreaterThan(computeStats(pet, 3 * HOUR, config).health);
   });
 
-  it('los ids de comida coinciden con el contrato (25 a 31) y no chocan con la tienda', () => {
+  it('los ids de comida coinciden con el contrato (53 a 59) y no chocan con la tienda (1 a 52 de Ana, 60-61 ropa)', () => {
     const ids = FOOD_CATALOG.map((f) => f.articleId);
-    expect(ids).toEqual([25, 26, 27, 28, 29, 30, 31]);
+    expect(ids).toEqual([53, 54, 55, 56, 57, 58, 59]);
     for (const item of SHOP_CATALOG) expect(ids).not.toContain(item.articleId);
     expect(SHOP_CATALOG.every((i) => i.bonus && (i.bonus.coins || i.bonus.happiness))).toBe(true);
   });

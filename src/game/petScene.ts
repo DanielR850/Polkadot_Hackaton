@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import type { PetAnim } from './animations.ts';
-import { assetUrl, BACKGROUNDS, backgroundUrl, spriteKey, SPRITES } from './assets.ts';
+import { assetUrl, BACKGROUNDS, backgroundUrl, spriteKey, SPRITES, type SpriteSheet } from './assets.ts';
 import { findPet } from './catalog.ts';
 import { scrubProgress, spongeTouchesPet } from './sponge.ts';
 import type { PetId, Stage } from './types.ts';
@@ -8,7 +8,7 @@ import type { RoomDecor } from './inventory.ts';
 import { ICON_SIZE, pixelIconCanvas } from '../ui/pixelArt.ts';
 import { closeEyes, EYES } from './sleepFace.ts';
 import { BALL_SECONDS, BALL_TARGET, type MiniGameResult } from './minigames/rules.ts';
-import { buildCloth, clothColor } from './clothes.ts';
+import { buildCloth, CLOTH_SLOT, clothColor } from './clothes.ts';
 import { bodyPoints, placeAccessory as placeOnBody, type Slot } from './bodyPoints.ts';
 import { PIXEL_STYLE, toRealPixelArt } from './pixelStyle.ts';
 import { findVariant, recolorPixels, SPECIES_RAMPS, variantOutline } from './variants.ts';
@@ -111,16 +111,23 @@ const BITES = [180, 520, 860];
 
 /** La hoja del ajolote bebé trae un fondo granate en cada cuadro. Se elimina
  * al cargarla para que el personaje comparta la habitación con las demás edades. */
+const AXOLOTL_SHEET_MARGIN = 2;
+const AXOLOTL_SHEET_SPACING = 2;
+
+/**
+ * Limpia el fondo y reconstruye la hoja con separación transparente entre cuadros.
+ * La separación evita que WebGL muestree las patas del cuadro vecino cuando el sprite se escala.
+ */
 function transparentAxolotlSheet(source: HTMLImageElement | HTMLCanvasElement, frameWidth: number, frameHeight: number): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.width = source.width;
-  canvas.height = source.height;
-  const context = canvas.getContext('2d', { willReadFrequently: true })!;
+  const columns = Math.floor(source.width / frameWidth);
+  const rows = Math.floor(source.height / frameHeight);
+  const clean = document.createElement('canvas');
+  clean.width = source.width;
+  clean.height = source.height;
+  const context = clean.getContext('2d', { willReadFrequently: true })!;
   context.drawImage(source, 0, 0);
-  const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+  const pixels = context.getImageData(0, 0, clean.width, clean.height);
   const data = pixels.data;
-  const columns = Math.floor(canvas.width / frameWidth);
-  const rows = Math.floor(canvas.height / frameHeight);
   const frameSize = frameWidth * frameHeight;
   const visited = new Uint8Array(frameSize);
   const queue = new Int32Array(frameSize);
@@ -130,11 +137,10 @@ function transparentAxolotlSheet(source: HTMLImageElement | HTMLCanvasElement, f
     const background = (local: number) => {
       const x = column * frameWidth + local % frameWidth;
       const y = row * frameHeight + Math.floor(local / frameWidth);
-      const i = (y * canvas.width + x) * 4;
+      const i = (y * clean.width + x) * 4;
       const red = data[i], green = data[i + 1], blue = data[i + 2];
-      // El fondo es rojo oscuro con un gradiente; la piel, branquias y contorno
-      // tienen otra paleta. Solo se borran píxeles conectados al borde del cuadro.
-      return red < 180 && green >= 12 && green < 105 && blue < 125 && red > green * 1.2;
+      // El fondo es rojo oscuro con un gradiente; solo se borran sus píxeles conectados al borde.
+      return data[i + 3] > 0 && red < 180 && green >= 12 && green < 105 && blue < 125 && red > green * 1.2;
     };
     const enqueue = (local: number) => {
       if (visited[local] || !background(local)) return;
@@ -147,7 +153,7 @@ function transparentAxolotlSheet(source: HTMLImageElement | HTMLCanvasElement, f
       const local = queue[head++];
       const x = local % frameWidth;
       const y = Math.floor(local / frameWidth);
-      const i = ((row * frameHeight + y) * canvas.width + column * frameWidth + x) * 4;
+      const i = ((row * frameHeight + y) * clean.width + column * frameWidth + x) * 4;
       data[i + 3] = 0;
       if (x > 0) enqueue(local - 1);
       if (x + 1 < frameWidth) enqueue(local + 1);
@@ -156,7 +162,23 @@ function transparentAxolotlSheet(source: HTMLImageElement | HTMLCanvasElement, f
     }
   }
   context.putImageData(pixels, 0, 0);
-  return canvas;
+
+  const sheet = document.createElement('canvas');
+  sheet.width = columns * frameWidth + (columns - 1) * AXOLOTL_SHEET_SPACING + AXOLOTL_SHEET_MARGIN * 2;
+  sheet.height = rows * frameHeight + (rows - 1) * AXOLOTL_SHEET_SPACING + AXOLOTL_SHEET_MARGIN * 2;
+  const sheetContext = sheet.getContext('2d')!;
+  for (let row = 0; row < rows; row++) for (let column = 0; column < columns; column++) {
+    const x = AXOLOTL_SHEET_MARGIN + column * (frameWidth + AXOLOTL_SHEET_SPACING);
+    const y = AXOLOTL_SHEET_MARGIN + row * (frameHeight + AXOLOTL_SHEET_SPACING);
+    sheetContext.drawImage(clean, column * frameWidth, row * frameHeight, frameWidth, frameHeight, x, y, frameWidth, frameHeight);
+  }
+  return sheet;
+}
+
+function spriteSheetConfig(sheet: SpriteSheet): { frameWidth: number; frameHeight: number; margin?: number; spacing?: number } {
+  return sheet.petId === 0 && sheet.stage === 'baby'
+    ? { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight, margin: AXOLOTL_SHEET_MARGIN, spacing: AXOLOTL_SHEET_SPACING }
+    : { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight };
 }
 
 export function createPetScene(parent: HTMLElement, onScrub: (progress: number) => void): PetSceneHandle {
@@ -235,7 +257,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
             const key = spriteKey(0, 'baby', sheet.anim);
             this.textures.remove(key);
             // Phaser admite canvas en tiempo de ejecución, aunque su tipo solo declara imágenes.
-            this.textures.addSpriteSheet(key, clean as unknown as HTMLImageElement, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
+            this.textures.addSpriteSheet(key, clean as unknown as HTMLImageElement, spriteSheetConfig(sheet));
           }
         }
       }
@@ -381,7 +403,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       };
       const rotation = this.sprite.rotation + Phaser.Math.DegToRad(points.angle);
       const tinted = this.sprite.isTinted;
-      for (const [image, point] of [[this.hat, points.head], [this.outfit, points.neck]] as const) {
+      const hatPoint = this.wear && this.wear.kind !== 'top-hat' && CLOTH_SLOT[this.wear.kind] === 'neck' ? points.neck : points.head;
+      for (const [image, point] of [[this.hat, hatPoint], [this.outfit, points.neck]] as const) {
         if (!image.visible) continue;
         // El sombrero charro va en la cabeza aunque esté en la capa de cuerpo y viceversa: decide su lugar.
         const at = toScene(point.x, point.y);
@@ -937,7 +960,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
           ctx.putImageData(pixels, 0, 0);
           bySource.set(cacheId, canvas);
         }
-        this.textures.addSpriteSheet(vkey, canvas as unknown as HTMLImageElement, { frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight });
+        this.textures.addSpriteSheet(vkey, canvas as unknown as HTMLImageElement, spriteSheetConfig(sheet));
       }
       this.anims.create({ key: vkey, frames: this.anims.generateFrameNumbers(vkey, {
         ...(sheet.firstFrame === undefined ? {} : { start: sheet.firstFrame }),

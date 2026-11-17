@@ -72,9 +72,11 @@ export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2
  * locales (sin NFT) y no se ofrece guardar el legado. Pega aquí la dirección que imprime
  * `npm run deploy:items:testnet` desde contrato/ (debe estar ligado a PETS_ADDRESS).
  */
+// TestNet: contrato de 52 objetos que desplegó Ana (rama avance-polkapets, 2026-11-16). Es la
+// versión 1 (sin comida ni ropa del cuerpo): la app lo detecta y esos objetos v2 se piden al desplegar v2.
 export const ITEMS_ADDRESS: `0x${string}` | null = LOCAL
   ? "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-  : "0x1beBe6e86473E58f321068413f6eafA410C5FF20";
+  : "0xaff0769c371fACc2bA4e164d55ba6e07b9af4b73";
 
 /** Ranking: filas por página y máximo de mascotas que se leen. */
 export const RANKING_PAGINA = 50;

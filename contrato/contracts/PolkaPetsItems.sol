@@ -246,14 +246,54 @@ contract PolkaPetsItems is ERC721, Ownable {
         _util(19, Utilidad.Pesitos, 5);
         _util(20, Utilidad.Felicidad, 5);
         // Ropa mexicana: sombrero charro (accesorio) y prendas del cuerpo.
-        _definir(32, Tipo.Accesorio, 0); // Sombrero charro
-        _definir(33, Tipo.Ropa, 0); // Poncho
-        _definir(34, Tipo.Ropa, 0); // Paliacate
-        _definir(35, Tipo.Ropa, 0); // Rebozo
-        _util(32, Utilidad.Pesitos, 10);
-        _util(33, Utilidad.Felicidad, 10);
-        _util(34, Utilidad.Pesitos, 6);
-        _util(35, Utilidad.Felicidad, 8);
+        // Objetos 25-52 de Ana (ya desplegados en TestNet con estos ids, tipos y categorías).
+        _definir(25, Tipo.Accesorio, 0); // Sombrero de charro
+        _definir(26, Tipo.Accesorio, 0); // Gorro de fiesta
+        _definir(27, Tipo.Accesorio, 0); // Paliacate (va en el cuello)
+        _definir(28, Tipo.Accesorio, 0); // Audífonos
+        _definir(29, Tipo.Accesorio, 0); // Gorro de lana
+        _definir(30, Tipo.Accesorio, 0); // Corona de flores
+        _definir(31, Tipo.Accesorio, 0); // Gorra
+        for (uint16 id = 32; id <= 36; id++) _definir(id, Tipo.Pared, 0); // Ladrillo, floral, madera, talavera, noche
+        for (uint16 id = 37; id <= 40; id++) _definir(id, Tipo.Piso, 0); // Duela, ajedrez, mosaico, arena
+        _definir(41, Tipo.Mueble, 1); // Puf (asiento)
+        _definir(42, Tipo.Mueble, 4); // Hamaca (cama)
+        _definir(43, Tipo.Mueble, 5); // Mesita (mesa)
+        _definir(44, Tipo.Mueble, 6); // Librero (almacenamiento)
+        _definir(45, Tipo.Mueble, 7); // Tele retro (entretenimiento)
+        _definir(46, Tipo.Mueble, 3); // Lámpara de pie (iluminación)
+        _definir(47, Tipo.Mueble, 2); // Girasol (planta)
+        _definir(48, Tipo.Adorno, 1); // Póster Polkadot (colgante)
+        _definir(49, Tipo.Adorno, 1); // Espejo (colgante)
+        _definir(50, Tipo.Adorno, 2); // Florero (repisa)
+        _definir(51, Tipo.Adorno, 3); // Velas (ofrenda)
+        _definir(52, Tipo.Adorno, 4); // Foquitos (guirnalda)
+        _util(25, Utilidad.Pesitos, 12);
+        _util(26, Utilidad.Felicidad, 10);
+        _util(27, Utilidad.Pesitos, 6);
+        _util(28, Utilidad.Felicidad, 12);
+        _util(29, Utilidad.Felicidad, 8);
+        _util(30, Utilidad.Felicidad, 14);
+        _util(31, Utilidad.Pesitos, 8);
+        for (uint16 id = 32; id <= 36; id++) _util(id, Utilidad.Felicidad, 3);
+        for (uint16 id = 37; id <= 40; id++) _util(id, Utilidad.Pesitos, 3);
+        _util(41, Utilidad.Felicidad, 4);
+        _util(42, Utilidad.Felicidad, 7);
+        _util(43, Utilidad.Pesitos, 4);
+        _util(44, Utilidad.Pesitos, 6);
+        _util(45, Utilidad.Felicidad, 9);
+        _util(46, Utilidad.Pesitos, 5);
+        _util(47, Utilidad.Felicidad, 4);
+        _util(48, Utilidad.Felicidad, 3);
+        _util(49, Utilidad.Pesitos, 4);
+        _util(50, Utilidad.Felicidad, 3);
+        _util(51, Utilidad.Felicidad, 4);
+        _util(52, Utilidad.Pesitos, 4);
+        // Ropa del cuerpo (v2): una prenda a la vez, junto a un accesorio.
+        _definir(60, Tipo.Ropa, 0); // Poncho
+        _definir(61, Tipo.Ropa, 0); // Rebozo
+        _util(60, Utilidad.Felicidad, 10);
+        _util(61, Utilidad.Felicidad, 8);
         // Exclusivos: solo se ganan con un logro (`recompensa`).
         _exclusivo(21); // Medalla
         _exclusivo(22); // Estrella
@@ -264,14 +304,14 @@ contract PolkaPetsItems is ERC721, Ownable {
         _util(23, Utilidad.Pesitos, 20);
         _util(24, Utilidad.Pesitos, 15);
         // Colección de comida (consumible). Debe coincidir con FOOD_CATALOG de src/game/shop.ts.
-        _comida(25, Utilidad.Vida, 20, false); // Tamal
-        _comida(26, Utilidad.Saciedad, 25, false); // Pan de muerto
-        _comida(27, Utilidad.Saciedad, 15, false); // Elote
-        _comida(28, Utilidad.Saciedad, 20, false); // Agua de jamaica
-        _comida(29, Utilidad.Vida, 30, false); // Chocolate caliente
-        _comida(30, Utilidad.Vida, 50, true); // Mole de la abuela (solo drop)
-        _comida(31, Utilidad.Saciedad, 60, true); // Elixir de ajolote (solo drop)
-        _poolDrop = [25, 26, 27, 28, 29, 30, 31];
+        _comida(53, Utilidad.Vida, 20, false); // Tamal
+        _comida(54, Utilidad.Saciedad, 25, false); // Pan de muerto
+        _comida(55, Utilidad.Saciedad, 15, false); // Elote
+        _comida(56, Utilidad.Saciedad, 20, false); // Agua de jamaica
+        _comida(57, Utilidad.Vida, 30, false); // Chocolate caliente
+        _comida(58, Utilidad.Vida, 50, true); // Mole de la abuela (solo drop)
+        _comida(59, Utilidad.Saciedad, 60, true); // Elixir de ajolote (solo drop)
+        _poolDrop = [53, 54, 55, 56, 57, 58, 59];
         // Debe coincidir con ACHIEVEMENTS de src/game/achievements.ts (id, segundos, objetos, recompensa).
         _logro(1, 10 minutes, 0, 0); // Primeros pasos
         _logro(2, 1 hours, 0, 0); // Adolescente
@@ -613,43 +653,30 @@ contract PolkaPetsItems is ERC721, Ownable {
         );
     }
 
-    /** Nombre, emoji y color de cada objeto. Van en el código (no en el almacenamiento). */
+    /**
+     * Nombre, emoji y color de cada objeto (ids 1-61), empacados en el código para que el contrato
+     * quepa en 24 KB: nombres y emoji separados por "|" y el color en 3 bytes por objeto (0 = emoji).
+     * Deben coincidir con src/game/shop.ts y src/game/pantry.ts.
+     */
+    bytes private constant NOMBRES = unicode"Sombrero|Moño|Lentes|Flor|Corona|Pared rosa mexicano|Pared turquesa|Pared cempasúchil|Piso de barro|Pasto|Piedra|Sillón|Silla|Planta|Cactus|Lámpara|Camita|Cuadro|Reloj|Calaverita|Medalla|Estrella|Cinta de campeón|Amuleto|Sombrero de charro|Gorro de fiesta|Paliacate|Audífonos|Gorro de lana|Corona de flores|Gorra|Ladrillo|Papel tapiz floral|Pared de madera|Azulejo de talavera|Noche estrellada|Duela clara|Ajedrez|Mosaico|Arena|Puf|Hamaca|Mesita|Librero|Tele retro|Lámpara de pie|Girasol|Póster Polkadot|Espejo|Florero|Velas|Foquitos|Tamal|Pan de muerto|Elote|Agua de jamaica|Chocolate caliente|Mole de la abuela|Elixir de ajolote|Poncho|Rebozo";
+    bytes private constant ICONOS = unicode"🎩|🎀|🕶️|🌺|👑|🟪|🟦|🟨|🟧|🟩|⬜|🛋️|🪑|🪴|🌵|🪔|🛏️|🖼️|🕰️|💀|🏅|⭐|🎗️|🧿|👒|🥳|🧣|🎧|🧶|💐|🧢|🧱|🌸|🪵|🔷|🌌|🟫|♟️|🔹|🏖️|🟣|🌈|🍽️|📚|📺|💡|🌻|🩷|🪞|🏺|🕯️|✨|🫔|🍞|🌽|🧃|☕|🍛|🧪|🧥|🧣";
+    bytes private constant COLORES = hex"000000000000000000000000000000f3a6c88fd3d6f6c453c0643c6fae4f9aa0a8000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000b5533cfff3d6a8703ff7f3ea1f2a5ad9a86cf4f1e8f7f3eae9cf94000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000";
+
     function _visualArticulo(uint16 id) private pure returns (Visual memory) {
-        if (id == 1) return Visual(unicode"Sombrero", unicode"🎩", 0);
-        if (id == 2) return Visual(unicode"Moño", unicode"🎀", 0);
-        if (id == 3) return Visual(unicode"Lentes", unicode"🕶️", 0);
-        if (id == 4) return Visual(unicode"Flor", unicode"🌺", 0);
-        if (id == 5) return Visual(unicode"Corona", unicode"👑", 0);
-        if (id == 6) return Visual(unicode"Pared rosa mexicano", unicode"🟪", 0xf3a6c8);
-        if (id == 7) return Visual(unicode"Pared turquesa", unicode"🟦", 0x8fd3d6);
-        if (id == 8) return Visual(unicode"Pared cempasúchil", unicode"🟨", 0xf6c453);
-        if (id == 9) return Visual(unicode"Piso de barro", unicode"🟧", 0xc0643c);
-        if (id == 10) return Visual(unicode"Pasto", unicode"🟩", 0x6fae4f);
-        if (id == 11) return Visual(unicode"Piedra", unicode"⬜", 0x9aa0a8);
-        if (id == 12) return Visual(unicode"Sillón", unicode"🛋️", 0);
-        if (id == 13) return Visual(unicode"Silla", unicode"🪑", 0);
-        if (id == 14) return Visual(unicode"Planta", unicode"🪴", 0);
-        if (id == 15) return Visual(unicode"Cactus", unicode"🌵", 0);
-        if (id == 16) return Visual(unicode"Lámpara", unicode"🪔", 0);
-        if (id == 17) return Visual(unicode"Camita", unicode"🛏️", 0);
-        if (id == 18) return Visual(unicode"Cuadro", unicode"🖼️", 0);
-        if (id == 19) return Visual(unicode"Reloj", unicode"🕰️", 0);
-        if (id == 20) return Visual(unicode"Calaverita", unicode"💀", 0);
-        if (id == 21) return Visual(unicode"Medalla", unicode"🏅", 0);
-        if (id == 22) return Visual(unicode"Estrella", unicode"⭐", 0);
-        if (id == 23) return Visual(unicode"Cinta de campeón", unicode"🎗️", 0);
-        if (id == 24) return Visual(unicode"Amuleto", unicode"🧿", 0);
-        if (id == 25) return Visual(unicode"Tamal", unicode"🫔", 0);
-        if (id == 26) return Visual(unicode"Pan de muerto", unicode"🍞", 0);
-        if (id == 27) return Visual(unicode"Elote", unicode"🌽", 0);
-        if (id == 28) return Visual(unicode"Agua de jamaica", unicode"🧃", 0);
-        if (id == 29) return Visual(unicode"Chocolate caliente", unicode"☕", 0);
-        if (id == 30) return Visual(unicode"Mole de la abuela", unicode"🍛", 0);
-        if (id == 32) return Visual(unicode"Sombrero charro", unicode"👒", 0);
-        if (id == 33) return Visual(unicode"Poncho", unicode"🧥", 0);
-        if (id == 34) return Visual(unicode"Paliacate", unicode"🧣", 0);
-        if (id == 35) return Visual(unicode"Rebozo", unicode"🧣", 0);
-        return Visual(unicode"Elixir de ajolote", unicode"🧪", 0);
+        uint256 k = id == 0 || id > 61 ? 60 : id - 1;
+        uint24 color = (uint24(uint8(COLORES[k * 3])) << 16) | (uint24(uint8(COLORES[k * 3 + 1])) << 8) | uint24(uint8(COLORES[k * 3 + 2]));
+        return Visual(_segmento(NOMBRES, k), _segmento(ICONOS, k), color);
+    }
+
+    /** El texto número `k` (desde 0) de una lista separada por "|". */
+    function _segmento(bytes memory lista, uint256 k) private pure returns (string memory) {
+        uint256 i = 0;
+        for (uint256 n = 0; n < k; i++) if (lista[i] == "|") n++;
+        uint256 fin = i;
+        while (fin < lista.length && lista[fin] != "|") fin++;
+        bytes memory out = new bytes(fin - i);
+        for (uint256 j = 0; j < out.length; j++) out[j] = lista[i + j];
+        return string(out);
     }
 
     function _textoUtilidad(Articulo memory a) private pure returns (string memory) {
