@@ -25,9 +25,9 @@ export function validateName(raw: string): NameResult {
   return { ok: true, value };
 }
 
-export function createPet(petId: PetId, name: string, now: number): PetState {
+export function createPet(petId: PetId, name: string, now: number, options: { variant?: string | null } = {}): PetState {
   const needs = Object.fromEntries(NEED_KEYS.map((key) => [key, START_VALUE])) as Needs;
-  return { version: 2, petId, name, bornAt: now, updatedAt: now, needs, sleeping: false, diedAt: null };
+  return { version: 2, petId, name, variant: options.variant ?? null, bornAt: now, updatedAt: now, needs, sleeping: false, diedAt: null };
 }
 
 /** Avanza las necesidades `minutes` minutos, dormida o despierta. */

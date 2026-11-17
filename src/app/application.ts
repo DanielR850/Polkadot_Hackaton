@@ -45,6 +45,8 @@ import { createMusic, loadSoundPrefs, saveSoundPrefs } from '../infrastructure/a
 import { createRankingDialog } from '../ui/rankingDialog.ts';
 import { createRenameDialog } from '../ui/renameDialog.ts';
 import { createSelectScreen } from '../ui/selectScreen.ts';
+import { say, type Moment } from '../game/voice.ts';
+import { headWearFor, loadHatPalette } from '../game/wearables.ts';
 import { createStartScreen } from '../ui/startScreen.ts';
 import { applyTheme, buildTheme, DEFAULT_THEME_COLOR } from '../ui/theme.ts';
 
@@ -59,6 +61,7 @@ type Screen = 'start' | 'select' | 'mint' | 'game';
 let pet: PetState | null = loadPet();
 let nft: PetNft | null = pet ? loadNft() : null;
 let draftPetId = 0;
+let draftVariant: string | null = null;
 let minter: NftMinter | null = null;
 let mintBusy = false;
 let mintAccount: MintAccount | null = null;
@@ -83,8 +86,9 @@ const startScreen = createStartScreen((name) => {
   showScreen('select');
 });
 
-const selectScreen = createSelectScreen((petId) => {
+const selectScreen = createSelectScreen((petId, variant) => {
   draftPetId = petId;
+  draftVariant = variant;
   useTheme(petId);
   mintScreen.reset(draftName, petId);
   showScreen('mint');
@@ -93,7 +97,7 @@ const selectScreen = createSelectScreen((petId) => {
 
 /** Crea la partida local y entra a la habitación, con o sin NFT. */
 function startGame(minted: PetNft | null) {
-  pet = createPet(draftPetId, draftName, Date.now());
+  pet = createPet(draftPetId, draftName, Date.now(), { variant: draftVariant });
   savePet(pet);
   resetBelongings();
   nft = minted;
@@ -397,6 +401,7 @@ let purchases = loadPurchases();
 const inventory = createLocalInventory(params.get('demo') === '1', () => SHOP_CATALOG.filter((i) => purchases.includes(i.id)));
 let owned: InventoryItem[] = [];
 let equipped: Equipped = loadEquipped();
+let hatPalette = loadHatPalette();
 /** Trofeos que esta mascota ya tiene (ids de logro) y los que ya se avisaron como disponibles. */
 let claimed: number[] = loadClaimed();
 const notified = new Set<number>();
@@ -417,7 +422,9 @@ async function loadInventory(): Promise<boolean> {
 function applyInventory() {
   saveEquipped(equipped);
   scene?.setDecor(toDecor(equipped, owned));
-  scene?.setAccessory(equippedAccessory(equipped, owned));
+  scene?.setAccessory(equippedAccessory(equipped, owned),
+    equipped.accessory === 'shop:sombrero' || equipped.accessory === 'shop:charro'
+      ? headWearFor(equipped.accessory, hatPalette) : null);
 }
 
 /**
@@ -886,15 +893,15 @@ function commit(next: PetState, message: string, reaction?: { anim: 'eat' | 'pla
   render();
 }
 
-const MOOD: Partial<Record<PetAnim, { icon: string; text: string }>> = {
-  dead: { icon: '🕊️', text: 'Descansa en paz.' },
-  sleep: { icon: '☾', text: 'Zzz… está soñando.' },
-  bath: { icon: '🫧', text: '¡Burbujas por todas partes!' },
-  eat: { icon: '😋', text: '¡Ñam, ñam!' },
-  play: { icon: '😄', text: '¡Otra vez, otra vez!' },
+const MOOD: Partial<Record<PetAnim, { icon: string; moment: Moment }>> = {
+  dead: { icon: '🕊️', moment: 'dead' },
+  sleep: { icon: '☾', moment: 'sleeping' },
+  bath: { icon: '🫧', moment: 'bath' },
+  eat: { icon: '😋', moment: 'eating' },
+  play: { icon: '😄', moment: 'playing' },
 };
-const NEED_MOOD: Record<NeedKey, string> = {
-  hunger: 'Tengo hambre…', thirst: 'Tengo sed…', energy: 'Tengo sueño…', happiness: 'Quiero jugar…', cleanliness: 'Necesito un baño…',
+const NEED_MOOD: Record<NeedKey, Moment> = {
+  hunger: 'hungry', thirst: 'thirsty', energy: 'sleepy', happiness: 'bored', cleanliness: 'dirty',
 };
 
 function render() {
@@ -907,13 +914,15 @@ function render() {
   const asleep = isAsleep(pet, now, config);
   const anim = pickAnimation({ dead, sleeping: asleep, bathing, action, low, now });
   const mode: GameMode = dead ? 'dead' : asleep ? 'sleep' : bathing ? 'bath' : 'normal';
-  const mood = MOOD[anim] ?? (low.length ? { icon: '☹', text: NEED_MOOD[low[0]] } : { icon: '☺', text: '¡Qué bonito día!' });
+  const moodDef = MOOD[anim];
+  const moment = moodDef?.moment ?? (low.length ? NEED_MOOD[low[0]] : 'happy');
+  const mood = { icon: moodDef?.icon ?? (low.length ? '☹' : '☺'), text: say(moment, Math.floor(now / 20_000) + pet.bornAt) };
   gameScreen.update({
     name: pet.name, stageLabel: STAGE_LABEL[stage], ageLabel: formatDuration(ageMs(pet, now)),
     // Mientras hay una firma pendiente no se puede pedir otro cuidado.
     stats, mode, bathProgress, mood, busy: (action !== null && now < action.until) || pendingSign !== null,
   });
-  scene?.show({ petId: pet.petId, stage, anim });
+  scene?.show({ petId: pet.petId, stage, anim, variant: pet.variant, style: params.get('pixel') === '1' ? 'pixel' : 'original' });
 }
 
 /** Cada segundo: detecta muerte y cambio de etapa, y refresca las barras. */

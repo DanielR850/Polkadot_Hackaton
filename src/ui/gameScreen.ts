@@ -1,5 +1,5 @@
-import { assetUrl } from '../game/assets.ts';
 import type { Stats } from '../game/types.ts';
+import { pixelIcon } from './pixelArt.ts';
 import { h } from './dom.ts';
 import { BAR_INFO, barLevel } from './format.ts';
 
@@ -82,13 +82,13 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
     const fill = h('div', { class: 'meter-fill' });
     const track = h('div', { class: 'meter-track', role: 'progressbar', 'aria-label': info.label, 'aria-valuemin': 0, 'aria-valuemax': 100 }, fill);
     const row = h('div', { class: `meter-row${info.key === 'health' ? ' health' : ''}` },
-      h('div', { class: 'meter-label' }, h('span', { 'aria-hidden': 'true' }, info.icon), h('b', {}, info.label), value), track);
+      h('div', { class: 'meter-label' }, pixelIcon(info.icon, 'meter-icon'), h('b', {}, info.label), value), track);
     return { info, row, value, fill, track };
   });
 
   const action = (icon: string, label: string, onClick: () => void) => {
     const text = h('b', {}, label);
-    const iconEl = h('span', { 'aria-hidden': 'true' }, icon);
+    const iconEl = pixelIcon(icon, 'action-icon');
     const button = h('button', { type: 'button' }, iconEl, text);
     button.addEventListener('click', onClick);
     return { button, text, iconEl };
@@ -102,10 +102,9 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const actions = h('div', { class: 'actions' }, ...[feedBtn, playBtn, sleepBtn, bathBtn, renameBtn, rankingBtn].map((a) => a.button));
   // Inventario: accesorios de la mascota y decoración de la habitación.
   // Iconos en public/assets/ui/icons/: reemplaza el PNG para cambiarlos.
-  const extra = (icon: string, fallback: string, label: string, onClick: () => void) => {
-    const img = h('img', { src: assetUrl(`ui/icons/${icon}.png`), alt: '', width: 32, height: 32, draggable: 'false' });
-    img.addEventListener('error', () => img.replaceWith(h('span', { class: 'extra-emoji' }, fallback)), { once: true });
-    const button = h('button', { type: 'button', class: 'ghost extra-button' }, h('span', { class: 'extra-icon', 'aria-hidden': 'true' }, img), h('b', {}, label));
+  const extra = (_icon: string, fallback: string, label: string, onClick: () => void) => {
+    const iconEl = pixelIcon(fallback, 'extra-icon');
+    const button = h('button', { type: 'button', class: 'ghost extra-button' }, iconEl, h('b', {}, label));
     button.addEventListener('click', onClick);
     return button;
   };
@@ -181,7 +180,11 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
       }
       const sleeping = view.mode === 'sleep';
       sleepBtn.text.textContent = sleeping ? 'Despertar' : 'Dormir';
-      sleepBtn.iconEl.textContent = sleeping ? '☀️' : '🌙';
+      const wanted = sleeping ? '☀' : '🌙';
+      if (sleepBtn.iconEl.dataset.icon !== wanted) {
+        sleepBtn.iconEl.dataset.icon = wanted;
+        sleepBtn.iconEl.replaceChildren(...pixelIcon(wanted).childNodes);
+      }
       for (const a of [feedBtn, playBtn, bathBtn]) a.button.disabled = view.mode !== 'normal' || view.busy;
       sleepBtn.button.disabled = view.mode === 'dead' || view.busy;
       renameBtn.button.disabled = view.mode === 'dead';

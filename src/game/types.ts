@@ -21,6 +21,8 @@ export interface PetState {
   version: 2;
   petId: PetId;
   name: string;
+  /** Variante visual elegida para esta mascota; ausente en partidas antiguas. */
+  variant?: string | null;
   bornAt: number;
   updatedAt: number;
   needs: Needs;

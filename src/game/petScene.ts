@@ -5,6 +5,11 @@ import { findPet } from './catalog.ts';
 import { scrubProgress, spongeTouchesPet } from './sponge.ts';
 import type { PetId, Stage } from './types.ts';
 import { EMPTY_DECOR, type DecorPiece, type RoomDecor } from './inventory.ts';
+import { closeEyes, EYES } from './sleepFace.ts';
+import { findVariant, recolorPixels, SPECIES_RAMPS } from './variants.ts';
+import { PIXEL_STYLE, toRealPixelArt } from './pixelStyle.ts';
+import { buildCloth, clothColor } from './clothes.ts';
+import { BLOCK, buildTopHat, colorOf, findPalette, HAT_SIZES, HEAD_ANCHORS, type HeadWear, wearKey } from './wearables.ts';
 
 /** Lugares de los muebles (en el piso) y adornos (en la pared). */
 const FURNITURE_X = [104, 332, 446];
@@ -24,7 +29,7 @@ const darker = (c: number, f = 0.82) =>
 // Escena de la habitación. Solo dibuja y anima; las reglas viven en petState.ts.
 // Si no hay sprite para la mascota, etapa y animación, dibuja el marcador temporal con formas.
 
-export interface SceneView { petId: PetId; stage: Stage; anim: PetAnim }
+export interface SceneView { petId: PetId; stage: Stage; anim: PetAnim; variant?: string | null; style?: 'original' | 'pixel' }
 
 export interface PetSceneHandle {
   show(view: SceneView): void;
@@ -39,8 +44,8 @@ export interface PetSceneHandle {
   setRoomColors(colors: RoomColors): void;
   /** Decoración del inventario: color de pared y piso, muebles en el piso y adornos en la pared. */
   setDecor(decor: RoomDecor): void;
-  /** Accesorio que lleva la mascota sobre la cabeza (pixel art, o su emoji si no carga), o null. */
-  setAccessory(accessory: DecorPiece | null): void;
+  /** Accesorio pixel art generado o imagen/emoji del inventario. */
+  setAccessory(accessory: DecorPiece | null, wear?: HeadWear | null): void;
 }
 
 export interface RoomColors { wall: number; stripe: number }
@@ -166,6 +171,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private decorLayer!: Phaser.GameObjects.Container;
     private accessory!: Phaser.GameObjects.Container;
     private accessoryPiece: DecorPiece | null = null;
+    private accessoryWear: HeadWear | null = null;
     /** Azulejos de pared y piso de "Mi espacio" (debajo del dibujo de la habitación). */
     private wallTile: Phaser.GameObjects.TileSprite | null = null;
     private floorTile: Phaser.GameObjects.TileSprite | null = null;
@@ -251,7 +257,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
 
       this.ready = true;
       this.setDecor(this.decor);
-      this.setAccessory(this.accessoryPiece);
+      this.setAccessory(this.accessoryPiece, this.accessoryWear);
       if (this.view) this.apply(this.view);
     }
 
@@ -263,8 +269,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.loadImages([d.wallImage, d.floorImage, ...d.furniture.map((p) => p.image), ...d.decor.map((p) => p.image)], () => this.refreshRoom());
     }
 
-    setAccessory(accessory: DecorPiece | null) {
+    setAccessory(accessory: DecorPiece | null, wear: HeadWear | null = null) {
       this.accessoryPiece = accessory;
+      this.accessoryWear = wear;
       if (!this.ready) return;
       this.drawAccessory();
       this.loadImages([accessory?.image], () => this.drawAccessory());
@@ -319,7 +326,38 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
 
     private drawAccessory() {
       this.accessory.removeAll(true);
-      if (this.accessoryPiece) this.accessory.add(this.pieceObject(this.accessoryPiece, 0, 0, ART_SCALE.accessory, 40, 1));
+      const wear = this.accessoryWear;
+      const anchor = this.view ? HEAD_ANCHORS[this.view.petId]?.[this.view.stage] : null;
+      if (wear && anchor) {
+        const block = anchor.block ?? BLOCK;
+        const key = `${wearKey(wear, anchor.size, anchor.outline)}-${block}`;
+        const art = wear.kind === 'top-hat' ? buildTopHat(HAT_SIZES[anchor.size]) : buildCloth(wear.kind, anchor.size);
+        if (!this.textures.exists(key)) {
+          const canvas = document.createElement('canvas');
+          canvas.width = art.width * block;
+          canvas.height = art.height * block;
+          const context = canvas.getContext('2d');
+          if (context) {
+            const palette = findPalette(wear.palette);
+            for (let i = 0; i < art.pixels.length; i++) {
+              const color = wear.kind === 'top-hat'
+                ? colorOf(art.pixels[i], palette, anchor.outline)
+                : clothColor(art.pixels[i], palette, anchor.outline);
+              if (color === null) continue;
+              context.fillStyle = `#${color.toString(16).padStart(6, '0')}`;
+              context.fillRect((i % art.width) * block, Math.floor(i / art.width) * block, block, block);
+            }
+            this.textures.addCanvas(key, canvas);
+          }
+        }
+        if (this.textures.exists(key)) {
+          this.accessory.add(this.add.image(0, 0, key)
+            .setOrigin(art.pivot.x / art.width, art.pivot.y / art.height)
+            .setScale(this.sprite.visible ? this.sprite.scaleX : 0.5));
+        }
+      } else if (this.accessoryPiece) {
+        this.accessory.add(this.pieceObject(this.accessoryPiece, 0, 0, ART_SCALE.accessory, 40, 1));
+      }
       this.placeAccessory();
     }
 
@@ -420,7 +458,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (view.anim === 'dead') { this.bob.pause(); this.bobber.y = 0; } else { this.bob.resume(); }
       this.bob.timeScale = view.anim === 'sleep' ? 0.45 : 1;
 
-      const key = `${view.petId}|${view.stage}|${view.anim}`;
+      const key = `${view.petId}|${view.stage}|${view.anim}|${view.variant ?? ''}|${view.style ?? 'original'}`;
       if (key === this.drawnKey) return;
       this.drawnKey = key;
       // Accesorio: sobre la cabeza; se oculta muerta y durante el baño.
@@ -431,14 +469,15 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.sprite.setVisible(spriteAnim !== null);
       this.placeholder.setVisible(spriteAnim === null);
       if (spriteAnim) {
-        this.sprite.play(spriteAnim.key);
+        this.sprite.play(this.variantAnim(spriteAnim.key, view));
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
         const scale = (BODY.ry * 3) / spriteAnim.frameHeight;
         this.animateSprite(view, scale);
+        this.drawAccessory();
         this.placeAccessory();
         this.clearEat();
         if (view.anim === 'eat') {
-          const hasFrames = spriteAnim.key === spriteKey(view.petId, view.stage, 'eat');
+          const hasFrames = this.findSprite({ ...view, anim: 'eat' }) !== null;
           this.playEat(view, scale, hasFrames);
         }
         return;
@@ -559,6 +598,47 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       }
       if (petId === 4) this.tweens.add({ targets: this.sprite, y: -5, angle: 2, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       else this.tweens.add({ targets: this.sprite, scaleY: scale * 1.025, duration: 1000, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    }
+
+    /** Crea una textura derivada una sola vez para variantes de color, ojos dormidos y pixel real. */
+    private variantAnim(key: string, view: SceneView): string {
+      const sheet = SPRITES.find((entry) => spriteKey(entry.petId, entry.stage, entry.anim) === key);
+      if (!sheet) return key;
+      const variant = findVariant(view.petId, view.variant);
+      const eyes = view.anim === 'sleep' && sheet.anim !== 'sleep' ? EYES[view.petId]?.[sheet.stage] : undefined;
+      const pixel = view.style === 'pixel';
+      if (!variant && !eyes && !pixel) return key;
+      const derivedKey = `${key}${variant ? `@${variant.id}` : ''}${eyes ? '~sleep' : ''}${pixel ? '#pixel' : ''}`;
+      if (this.anims.exists(derivedKey)) return derivedKey;
+      if (!this.textures.exists(derivedKey)) {
+        const source = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+        const canvas = document.createElement('canvas');
+        canvas.width = source.width;
+        canvas.height = source.height;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) return key;
+        context.drawImage(source, 0, 0);
+        const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+        let data: Uint8ClampedArray = new Uint8ClampedArray(pixels.data);
+        const ramp = SPECIES_RAMPS[view.petId];
+        if (ramp && variant) data = recolorPixels(data, canvas.width, canvas.height, ramp, variant);
+        if (eyes) data = closeEyes(data, canvas.width, canvas.height, eyes);
+        if (pixel) data = toRealPixelArt(data, canvas.width, canvas.height, {
+          ...PIXEL_STYLE, block: sheet.frameWidth < 600 ? 4 : PIXEL_STYLE.block,
+        });
+        pixels.data.set(data);
+        context.putImageData(pixels, 0, 0);
+        this.textures.addSpriteSheet(derivedKey, canvas as unknown as HTMLImageElement, {
+          frameWidth: sheet.frameWidth, frameHeight: sheet.frameHeight,
+        });
+      }
+      if (!this.anims.exists(derivedKey)) {
+        this.anims.create({ key: derivedKey, frames: this.anims.generateFrameNumbers(derivedKey, {
+          ...(sheet.firstFrame === undefined ? {} : { start: sheet.firstFrame }),
+          ...(sheet.lastFrame === undefined ? {} : { end: sheet.lastFrame }),
+        }), frameRate: sheet.fps, repeat: sheet.loop === false ? 0 : -1 });
+      }
+      return derivedKey;
     }
 
     private findSprite(view: SceneView): { key: string; frameHeight: number } | null {
@@ -921,6 +1001,6 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     resetBath: () => scene.resetBath(),
     setRoomColors: (colors) => scene.setRoomColors(colors),
     setDecor: (decor) => scene.setDecor(decor),
-    setAccessory: (icon) => scene.setAccessory(icon),
+    setAccessory: (icon, wear) => scene.setAccessory(icon, wear),
   };
 }

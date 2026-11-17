@@ -556,3 +556,18 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   .dialog { max-height: 92dvh; }
 }
 .item-bonus { color: var(--good) !important; }
+
+/* Mejoras visuales portadas de polkapets-v2: variantes, prendas y pixel art generado. */
+.choice-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.choice { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; font: 20px var(--body); background: var(--light); border: 3px solid var(--ink); box-shadow: 3px 3px 0 var(--ink); cursor: pointer; }
+.choice[aria-pressed="true"] { background: var(--accent-soft); outline: var(--px) solid var(--accent); outline-offset: 2px; transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }
+.choice-swatch { width: 18px; height: 18px; display: inline-block; border: 3px solid var(--ink); }
+.pet-options { display: grid; gap: 8px; margin-top: 16px; text-align: left; }
+.px-icon { display: inline-flex; align-items: center; justify-content: center; line-height: 1; }
+.px-icon img, .meter-icon img, .action-icon img, .extra-icon img, .inv-icon img { display: block; image-rendering: pixelated; image-rendering: crisp-edges; object-fit: contain; }
+.px-icon img { width: 28px; height: 28px; }
+.meter-icon img { width: 22px; height: 22px; }
+.action-icon img { width: 30px; height: 30px; margin: 0 auto 2px; }
+.extra-icon img { width: 30px; height: 30px; }
+.inv-icon img { width: 48px; height: 48px; }
+@media (max-width: 560px) { .choice { font-size: 18px; padding: 6px 10px; } }

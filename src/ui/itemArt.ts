@@ -2,6 +2,7 @@
 // o el emoji si la imagen no existe o no carga.
 import { assetUrl } from '../game/assets.ts';
 import type { InventoryItem } from '../game/inventory.ts';
+import { pixelIcon } from './pixelArt.ts';
 import { h } from './dom.ts';
 
 const hex = (n: number) => `#${n.toString(16).padStart(6, '0')}`;
@@ -13,9 +14,8 @@ export function itemArt(item: InventoryItem | null): HTMLElement {
     const tile = item.image ? `url("${assetUrl(item.image)}") 0 0 / 20px 20px repeat, ` : '';
     return h('span', { class: 'inv-swatch', style: `background:${tile}${hex(item.color ?? 0xcccccc)}`, 'aria-hidden': 'true' });
   }
-  const emoji = () => h('span', { class: 'inv-icon', 'aria-hidden': 'true' }, item.icon);
-  if (!item.image) return emoji();
-  const img = h('img', { class: 'inv-art', src: assetUrl(item.image), alt: '', width: 48, height: 48, draggable: 'false' }) as HTMLImageElement;
-  img.addEventListener('error', () => img.replaceWith(emoji()), { once: true });
-  return img;
+  // El arte de objetos se genera con la misma paleta pixel que los sprites. Conservamos la imagen
+  // del azulejo porque paredes y pisos necesitan repetirse en la habitación.
+  if (!item.image) return pixelIcon(item.icon, 'inv-icon');
+  return pixelIcon(item.icon, 'inv-icon');
 }

@@ -18,6 +18,7 @@ export function parsePetState(raw: string | null): PetState | null {
       version: 2,
       petId: data.petId,
       name: data.name,
+      variant: typeof data.variant === 'string' ? data.variant : null,
       bornAt: data.bornAt,
       updatedAt: data.updatedAt,
       needs: { ...data.needs! },
