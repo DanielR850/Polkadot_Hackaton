@@ -20,13 +20,8 @@ export interface InventoryItem {
   id: string;
   kind: InventoryKind;
   name: string;
-  /** Emoji de respaldo (textos y NFT); se dibuja solo si falta la imagen. */
+  /** Emoji que representa el objeto; la UI lo transforma en pixel art. */
   icon: string;
-  /**
-   * Pixel art del objeto, relativo a `public/assets/` (por ejemplo `items/furniture/sillon.png`).
-   * Pared y piso: un azulejo que se repite. Reemplaza el PNG para cambiar cómo se ve.
-   */
-  image?: string;
   /** Color de la pared o del piso (0xRRGGBB). Con imagen, se usa como color base. */
   color?: number;
   /**
@@ -67,17 +62,13 @@ export const SPACE_SECTIONS: ReadonlyArray<{ kind: Exclude<InventoryKind, 'acces
 export interface RoomDecor {
   wall: number | null;
   floor: number | null;
-  /** Azulejo de la pared y del piso (ruta en `public/assets/`), o null para el dibujado. */
-  wallImage: string | null;
-  floorImage: string | null;
   furniture: DecorPiece[];
   decor: DecorPiece[];
 }
 
-/** Un objeto que se dibuja: su imagen y el emoji de respaldo si la imagen no carga. */
-export interface DecorPiece { icon: string; image?: string }
+export interface DecorPiece { icon: string }
 
-export const EMPTY_DECOR: RoomDecor = { wall: null, floor: null, wallImage: null, floorImage: null, furniture: [], decor: [] };
+export const EMPTY_DECOR: RoomDecor = { wall: null, floor: null, furniture: [], decor: [] };
 
 export const NOTHING_EQUIPPED: Equipped = { accessory: null, wall: null, floor: null, furniture: [], decor: [] };
 
@@ -153,14 +144,12 @@ export function toDecor(equipped: Equipped, owned: readonly InventoryItem[]): Ro
   return {
     wall: byId(equipped.wall)?.color ?? null,
     floor: byId(equipped.floor)?.color ?? null,
-    wallImage: byId(equipped.wall)?.image ?? null,
-    floorImage: byId(equipped.floor)?.image ?? null,
     furniture: pieces(equipped.furniture),
     decor: pieces(equipped.decor),
   };
 }
 
-const piece = (item: InventoryItem): DecorPiece => (item.image ? { icon: item.icon, image: item.image } : { icon: item.icon });
+const piece = (item: InventoryItem): DecorPiece => ({ icon: item.icon });
 
 /** El accesorio puesto (imagen y emoji de respaldo), o null. */
 export function equippedAccessory(equipped: Equipped, owned: readonly InventoryItem[]): DecorPiece | null {
@@ -172,18 +161,18 @@ export function equippedAccessory(equipped: Equipped, owned: readonly InventoryI
 
 /** Objetos de muestra para probar la interfaz (`?demo=1` en la URL). No son NFT. */
 export const DEMO_ITEMS: readonly InventoryItem[] = [
-  { id: 'demo:sombrero', kind: 'accessory', name: 'Sombrero', icon: '🎩', image: 'items/accessories/sombrero.png' },
-  { id: 'demo:corona', kind: 'accessory', name: 'Corona', icon: '👑', image: 'items/accessories/corona.png' },
-  { id: 'demo:moño', kind: 'accessory', name: 'Moño', icon: '🎀', image: 'items/accessories/mono.png' },
-  { id: 'demo:pared-rosa', kind: 'wall', name: 'Pared rosa', icon: '🟪', color: 0xf3a6c8, image: 'items/walls/rosa.png' },
-  { id: 'demo:pared-azul', kind: 'wall', name: 'Pared turquesa', icon: '🟦', color: 0x8fd3d6, image: 'items/walls/turquesa.png' },
-  { id: 'demo:piso-barro', kind: 'floor', name: 'Piso de barro', icon: '🟧', color: 0xc0643c, image: 'items/floors/barro.png' },
-  { id: 'demo:piso-pasto', kind: 'floor', name: 'Pasto', icon: '🟩', color: 0x6fae4f, image: 'items/floors/pasto.png' },
-  { id: 'demo:sillon', kind: 'furniture', name: 'Sillón', icon: '🛋️', category: 'Asiento', image: 'items/furniture/sillon.png' },
-  { id: 'demo:planta', kind: 'furniture', name: 'Planta', icon: '🪴', category: 'Planta', image: 'items/furniture/planta.png' },
-  { id: 'demo:lampara', kind: 'furniture', name: 'Lámpara', icon: '🪔', category: 'Iluminación', image: 'items/furniture/lampara.png' },
-  { id: 'demo:cuadro', kind: 'decor', name: 'Cuadro', icon: '🖼️', category: 'Colgante', image: 'items/decor/cuadro.png' },
-  { id: 'demo:reloj', kind: 'decor', name: 'Reloj', icon: '🕰️', category: 'Repisa', image: 'items/decor/reloj.png' },
+  { id: 'demo:sombrero', kind: 'accessory', name: 'Sombrero', icon: '🎩' },
+  { id: 'demo:corona', kind: 'accessory', name: 'Corona', icon: '👑' },
+  { id: 'demo:moño', kind: 'accessory', name: 'Moño', icon: '🎀' },
+  { id: 'demo:pared-rosa', kind: 'wall', name: 'Pared rosa', icon: '🟪', color: 0xf3a6c8 },
+  { id: 'demo:pared-azul', kind: 'wall', name: 'Pared turquesa', icon: '🟦', color: 0x8fd3d6 },
+  { id: 'demo:piso-barro', kind: 'floor', name: 'Piso de barro', icon: '🟧', color: 0xc0643c },
+  { id: 'demo:piso-pasto', kind: 'floor', name: 'Pasto', icon: '🟩', color: 0x6fae4f },
+  { id: 'demo:sillon', kind: 'furniture', name: 'Sillón', icon: '🛋️', category: 'Asiento' },
+  { id: 'demo:planta', kind: 'furniture', name: 'Planta', icon: '🪴', category: 'Planta' },
+  { id: 'demo:lampara', kind: 'furniture', name: 'Lámpara', icon: '🪔', category: 'Iluminación' },
+  { id: 'demo:cuadro', kind: 'decor', name: 'Cuadro', icon: '🖼️', category: 'Colgante' },
+  { id: 'demo:reloj', kind: 'decor', name: 'Reloj', icon: '🕰️', category: 'Repisa' },
 ];
 
 /**

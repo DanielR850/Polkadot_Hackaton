@@ -10,17 +10,13 @@ import { findVariant, recolorPixels, SPECIES_RAMPS } from './variants.ts';
 import { PIXEL_STYLE, toRealPixelArt } from './pixelStyle.ts';
 import { buildCloth, clothColor } from './clothes.ts';
 import { BLOCK, buildTopHat, colorOf, findPalette, HAT_SIZES, HEAD_ANCHORS, type HeadWear, wearKey } from './wearables.ts';
+import { pixelIconCanvas } from '../ui/pixelArt.ts';
 
 /** Lugares de los muebles (en el piso) y adornos (en la pared). */
 const FURNITURE_X = [104, 332, 446];
 const DECOR_SPOTS = [{ x: 216, y: 92 }, { x: 300, y: 70 }];
-/**
- * Escala del pixel art de objetos (public/assets/items/). Con la cámara a PIXEL = 0.4, 2.5 hace
- * que cada píxel del dibujo ocupe exactamente un píxel del lienzo.
- */
-const ART_SCALE = { tile: 2.5, furniture: 2.5, decor: 2.5, accessory: 2 } as const;
-/** Llave de textura de una imagen de `public/assets/`. */
-const texKey = (file: string) => `asset:${file}`;
+/** Escala del pixel art generado para muebles, adornos y accesorios. */
+const ART_SCALE = { furniture: 2.5, decor: 2.5, accessory: 2 } as const;
 
 /** Oscurece un color 0xRRGGBB (para las franjas y tablas). */
 const darker = (c: number, f = 0.82) =>
@@ -172,19 +168,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private accessory!: Phaser.GameObjects.Container;
     private accessoryPiece: DecorPiece | null = null;
     private accessoryWear: HeadWear | null = null;
-    /** Azulejos de pared y piso de "Mi espacio" (debajo del dibujo de la habitación). */
-    private wallTile: Phaser.GameObjects.TileSprite | null = null;
-    private floorTile: Phaser.GameObjects.TileSprite | null = null;
-    /** Imágenes que no cargaron: se dibuja su emoji o el color base. */
-    private failedFiles = new Set<string>();
 
     constructor() { super('room'); }
 
     preload() {
-      // Sin el archivo se usa el marcador (mascota), el emoji (objetos) o el color (pared y piso).
-      this.load.on('loaderror', (file: Phaser.Loader.File) => {
-        if (file.key.startsWith('asset:')) this.failedFiles.add(file.key.slice('asset:'.length));
-      });
       for (const s of SPRITES) {
         this.load.spritesheet(spriteKey(s.petId, s.stage, s.anim), assetUrl(s.file), { frameWidth: s.frameWidth, frameHeight: s.frameHeight });
       }
@@ -223,9 +210,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (this.textures.exists('bg-room')) {
         background.push(this.add.image(W / 2, H / 2, 'bg-room').setDisplaySize(W, H));
       } else {
-        this.wallTile = this.add.tileSprite(0, 0, W, floorY, '__DEFAULT').setOrigin(0).setTileScale(ART_SCALE.tile).setVisible(false);
-        this.floorTile = this.add.tileSprite(0, floorY + 5, W, H - floorY - 5, '__DEFAULT').setOrigin(0).setTileScale(ART_SCALE.tile).setVisible(false);
-        background.push(this.wallTile, this.floorTile, this.drawRoom());
+        background.push(this.drawRoom());
       }
       this.roomLayer = this.add.container(0, 0, [
         ...background, this.drawMaracas(), this.drawGuitar(), this.drawToys(), this.drawPinata(),
@@ -265,8 +250,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.decor = decor;
       if (!this.ready) return;
       this.refreshRoom();
-      const d = this.decor;
-      this.loadImages([d.wallImage, d.floorImage, ...d.furniture.map((p) => p.image), ...d.decor.map((p) => p.image)], () => this.refreshRoom());
+      this.drawDecor();
     }
 
     setAccessory(accessory: DecorPiece | null, wear: HeadWear | null = null) {
@@ -274,38 +258,20 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.accessoryWear = wear;
       if (!this.ready) return;
       this.drawAccessory();
-      this.loadImages([accessory?.image], () => this.drawAccessory());
     }
 
-    /** true si la imagen ya está cargada como textura. */
-    private hasImage(file: string | null | undefined): file is string {
-      return !!file && this.textures.exists(texKey(file));
-    }
-
-    /** Carga las imágenes que falten y luego llama a `done` (también si alguna no carga). */
-    private loadImages(files: ReadonlyArray<string | null | undefined>, done: () => void) {
-      const missing = [...new Set(files)].filter((f): f is string => !!f && !this.hasImage(f) && !this.failedFiles.has(f));
-      if (missing.length === 0) return;
-      for (const file of missing) this.load.image(texKey(file), assetUrl(file));
-      this.load.once(Phaser.Loader.Events.COMPLETE, done);
-      if (!this.load.isLoading()) this.load.start();
-    }
-
-    /** El pixel art del objeto o, si no está, su emoji. */
+    /** Pixel art generado del objeto o, si no hay canvas disponible, su emoji. */
     private pieceObject(piece: DecorPiece, x: number, y: number, scale: number, fontSize: number, originY: number) {
-      return this.hasImage(piece.image)
-        ? this.add.image(x, y, texKey(piece.image)).setOrigin(0.5, originY).setScale(scale)
-        : this.add.text(x, y, piece.icon, { fontSize: `${fontSize}px` }).setOrigin(0.5, originY);
+      const canvas = pixelIconCanvas(piece.icon);
+      if (canvas) {
+        const key = `icon:${piece.icon}`;
+        if (!this.textures.exists(key)) this.textures.addCanvas(key, canvas);
+        return this.add.image(x, y, key).setOrigin(0.5, originY).setScale(scale);
+      }
+      return this.add.text(x, y, piece.icon, { fontSize: `${fontSize}px` }).setOrigin(0.5, originY);
     }
 
     private refreshRoom() {
-      const tile = (sprite: Phaser.GameObjects.TileSprite | null, file: string | null) => {
-        if (!sprite) return;
-        if (this.hasImage(file)) sprite.setTexture(texKey(file)).setVisible(true);
-        else sprite.setVisible(false);
-      };
-      tile(this.wallTile, this.decor.wallImage);
-      tile(this.floorTile, this.decor.floorImage);
       if (this.roomGfx) this.paintRoom(this.roomGfx.clear());
       this.drawDecor();
     }
@@ -721,12 +687,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       // Pared con franjas: color del tema, o el de la pared elegida en "Mi espacio".
       const wall = this.decor.wall ?? this.roomColors.wall;
       const stripe = this.decor.wall === null ? this.roomColors.stripe : darker(this.decor.wall, 0.92);
-      // Con el azulejo de "Mi espacio" cargado, la pared y el piso son ese pixel art (wallTile/floorTile).
-      if (!this.hasImage(this.decor.wallImage)) {
-        g.fillStyle(wall, 1); g.fillRect(0, 0, W, floorY);
-        g.fillStyle(stripe, 1);
-        for (let x = 0; x < W; x += 40) g.fillRect(x, 0, 20, floorY);
-      }
+      // La habitación usa colores sólidos y pixel art generado, sin azulejos PNG externos.
+      g.fillStyle(wall, 1); g.fillRect(0, 0, W, floorY);
+      g.fillStyle(stripe, 1);
+      for (let x = 0; x < W; x += 40) g.fillRect(x, 0, 20, floorY);
       // Ventana con atardecer.
       const wx = Math.round(W * 0.08), wy = 46;
       g.fillStyle(INK, 1); g.fillRect(wx, wy, 112, 92);
@@ -741,11 +705,9 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       g.fillStyle(INK, 1); g.fillRect(0, tileY - 4, W, 4); g.fillRect(0, floorY, W, 5);
       // Piso de tablas: madera, o el piso elegido en "Mi espacio".
       const floor = this.decor.floor ?? 0x8e5a3a;
-      if (!this.hasImage(this.decor.floorImage)) {
-        g.fillStyle(floor, 1); g.fillRect(0, floorY + 5, W, H);
-        g.fillStyle(darker(floor), 1);
-        for (let y = floorY + 25; y < H; y += 22) g.fillRect(0, y, W, 3);
-      }
+      g.fillStyle(floor, 1); g.fillRect(0, floorY + 5, W, H);
+      g.fillStyle(darker(floor), 1);
+      for (let y = floorY + 25; y < H; y += 22) g.fillRect(0, y, W, 3);
       // Tapete de sarape debajo de la mascota.
       const rx = 150, ry = floorY + 16, rw = 220, rh = 52;
       // Franjas negro, rojo, verde, rosa y verde, repetidas dos veces.

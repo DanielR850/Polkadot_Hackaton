@@ -100,8 +100,7 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const renameBtn = action('✏️', 'Nombre', intents.rename);
   const rankingBtn = action('🏆', 'Ranking', intents.ranking);
   const actions = h('div', { class: 'actions' }, ...[feedBtn, playBtn, sleepBtn, bathBtn, renameBtn, rankingBtn].map((a) => a.button));
-  // Inventario: accesorios de la mascota y decoración de la habitación.
-  // Iconos en public/assets/ui/icons/: reemplaza el PNG para cambiarlos.
+  // Inventario: accesorios y decoración representados con pixel art generado.
   const extra = (_icon: string, fallback: string, label: string, onClick: () => void) => {
     const iconEl = pixelIcon(fallback, 'extra-icon');
     const button = h('button', { type: 'button', class: 'ghost extra-button' }, iconEl, h('b', {}, label));
