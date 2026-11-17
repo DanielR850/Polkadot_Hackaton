@@ -68,6 +68,9 @@ export interface PetSceneHandle {
 
 export interface RoomColors { wall: number; stripe: number }
 
+/** Un paso de animación encadenada (sin `targets`: se aplica a la ilustración). */
+type Step = Omit<Phaser.Types.Tweens.TweenBuilderConfig, 'targets'>;
+
 const W = 520;
 const H = 360;
 /** La escena se dibuja a esta fracción de resolución y se amplía sin suavizado: píxeles grandes. */
@@ -203,6 +206,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     /** Última posición y escala aplicadas a la mascota (para no reasignarlas cada segundo). */
     private placeKey = '';
     private bobPace = 1;
+    /** Hoja de la ilustración visible (para parpadear con los ojos cerrados por código). */
+    private spriteKeyNow = '';
+    /** Estado anterior: al salir del baño se sacude el agua. */
+    private lastAnim: PetAnim | null = null;
 
     constructor() { super('room'); }
 
@@ -577,12 +584,13 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.sprite.setVisible(spriteAnim !== null);
       this.placeholder.setVisible(spriteAnim === null);
       if (spriteAnim) {
+        this.spriteKeyNow = spriteAnim.key;
         this.sprite.play(this.variantAnim(spriteAnim.key, view));
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
         const scale = (BODY.ry * 3) / spriteAnim.frameHeight;
+        this.clearEat();
         this.animateSprite(view, scale);
         this.dressHat();
-        this.clearEat();
         if (view.anim === 'eat') {
           const hasFrames = spriteAnim.key === spriteKey(view.petId, view.stage, 'eat');
           this.playEat(view, scale, hasFrames);
@@ -672,6 +680,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private animateSprite(view: SceneView, scale: number) {
       const { anim, petId } = view;
       const sprite = this.sprite;
+      const previous = this.lastAnim;
+      this.lastAnim = anim;
       this.tweens.killTweensOf(sprite);
       sprite.clearTint().setAlpha(1).setScale(scale);
       // Cada estado tiene una pose (posición e inclinación). Se llega a ella con una transición
@@ -684,28 +694,56 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       };
       const loop = (props: Record<string, number>, duration: number) =>
         this.tweens.add({ targets: sprite, ...props, duration, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      /** Repite `act` cada `min`–`max` ms mientras siga en este estado. */
+      const every = (min: number, max: number, act: () => void) => {
+        const next = () => this.eatTimers.push(this.time.delayedCall(Phaser.Math.Between(min, max), () => {
+          if (this.view?.anim !== anim) return;
+          // Lo que ya terminó se destruyó solo: no se acumula aunque pase horas en el mismo estado.
+          this.eatObjects = this.eatObjects.filter((o) => o.active);
+          this.eatTimers = this.eatTimers.filter((t) => t.getProgress() < 1);
+          act();
+          next();
+        }));
+        next();
+      };
       if (anim === 'dead') {
         sprite.setTint(0x888888);
         pose({ y: 25, angle: 75 }, 650);
         return;
       }
       if (anim === 'sad') {
+        // Cabizbaja: suspira, tiembla un poco y le salen lágrimas.
         sprite.setTint(0xb8c5dd);
-        pose({ y: 8 }, 300, () => loop({ y: 12 }, 1100));
+        pose({ y: 8, angle: -4 }, 300, () => loop({ y: 12 }, 1100));
+        every(1200, 2000, () => this.tear());
+        every(2600, 4200, () => this.chainOn([
+          { scaleY: scale * 0.94, scaleX: scale * 1.03, duration: 380, ease: 'Sine.inOut' },
+          { scaleY: scale, scaleX: scale, duration: 520, ease: 'Sine.inOut' },
+        ]));
+        every(3500, 6000, () => this.shiver(scale));
         return;
       }
       if (anim === 'sleep') {
-        // Se acomoda despacio y respira lento.
+        // Se acomoda despacio, respira lento, a veces se acomoda otra vez y ronca.
         pose({ y: 8, angle: -9 }, 700, () => loop({ scaleY: scale * 1.04 }, 1550));
+        every(5000, 9000, () => this.tweens.add({ targets: sprite, angle: Phaser.Math.Between(-12, -5), duration: 900, ease: 'Sine.inOut' }));
+        every(2400, 3600, () => this.snore());
         return;
       }
       if (anim === 'play') {
-        // Cada especie conserva una forma reconocible de jugar.
+        // Saltos con estirón al subir y aplastón al caer; estrellas y notas al aterrizar.
         pose({}, 180, () => {
-          if (petId === 4) loop({ x: 12, y: -5, angle: 5 }, 470);
-          else if (petId === 2) loop({ y: 7, scaleY: scale * 0.92 }, 260);
-          else if (petId === 3) loop({ x: 11, angle: -5 }, 190);
-          else loop({ y: -16, angle: 7 }, 230);
+          const hop = () => {
+            if (this.view?.anim !== 'play') return;
+            const high = petId === 4 ? -10 : petId === 2 ? -14 : -24;
+            this.chainOn([
+              { scaleY: scale * 0.86, scaleX: scale * 1.1, y: 4, duration: 110, ease: 'Quad.Out' },
+              { scaleY: scale * 1.1, scaleX: scale * 0.92, y: high, angle: Phaser.Math.Between(-9, 9), duration: 220, ease: 'Quad.Out' },
+              { scaleY: scale, scaleX: scale, y: 0, angle: 0, duration: 200, ease: 'Quad.In' },
+              { scaleY: scale * 0.9, scaleX: scale * 1.07, duration: 80, yoyo: true, ease: 'Quad.Out' },
+            ], () => { this.sparkle(2, ['♪', '✦', '★']); hop(); });
+          };
+          hop();
         });
         return;
       }
@@ -715,13 +753,151 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         return;
       }
       if (anim === 'bath') {
+        // Se mece en la tina, le salen burbujas y de vez en cuando se sacude.
         pose({}, 200, () => loop({ angle: 4 }, 360));
+        every(250, 500, () => this.bathBubble());
+        every(2500, 4000, () => this.shakeOff(scale, false));
         return;
       }
+      // Normal: respira, parpadea, mira hacia atrás, da saltitos y se estira.
       pose({}, 450, () => {
         if (petId === 4) loop({ y: -5, angle: 2 }, 1500);
         else loop({ scaleY: scale * 1.025 }, 1000);
       });
+      if (previous === 'bath') this.shakeOff(scale, true);
+      every(2200, 4200, () => this.blink());
+      every(3500, 6500, () => {
+        const act = Phaser.Math.Between(0, 3);
+        if (act === 0) this.turnAround(scale);
+        else if (act === 1) this.chainOn([
+          { y: -14, scaleY: scale * 1.06, duration: 180, ease: 'Quad.Out' },
+          { y: 0, scaleY: scale, duration: 160, ease: 'Quad.In' },
+          { scaleY: scale * 0.93, scaleX: scale * 1.05, duration: 80, yoyo: true },
+        ]);
+        else if (act === 2) this.chainOn([
+          { angle: -6, scaleY: scale * 1.07, duration: 420, ease: 'Sine.inOut' },
+          { angle: 0, scaleY: scale, duration: 380, ease: 'Sine.inOut' },
+        ]);
+        else this.chainOn([{ angle: 5, duration: 90 }, { angle: -5, duration: 120 }, { angle: 4, duration: 110 }, { angle: 0, duration: 100 }]);
+      });
+    }
+
+    /* ------------------------------------------------ efectos de las interacciones */
+
+    /** Encadena pasos sobre la ilustración. */
+    private chainOn(steps: Step[], then?: () => void) {
+      const anim = this.view?.anim;
+      this.tweens.chain({
+        targets: this.sprite, tweens: steps as Phaser.Types.Tweens.TweenBuilderConfig[],
+        onComplete: then ? () => { if (this.view?.anim === anim) then(); } : undefined,
+      });
+    }
+
+    /** Punto del cuerpo (ojos, cabeza o cuello) en coordenadas del contenedor de la mascota. */
+    private petPoint(part: 'eyes' | 'head' | 'neck'): { x: number; y: number; span: number } {
+      const frame = this.sprite.frame;
+      const p = this.view ? bodyPoints(this.view.petId, this.view.stage, Number(frame.name) || 0) : null;
+      const sx = this.sprite.scaleX;
+      const sy = this.sprite.scaleY;
+      if (!p) return { x: this.sprite.x, y: this.sprite.y - 30, span: 30 };
+      const at = part === 'eyes' ? p.eyes : part === 'head' ? p.head : p.neck;
+      return { x: this.sprite.x + (at.x - frame.width / 2) * sx, y: this.sprite.y + (at.y - frame.height / 2) * sy, span: p.eyes.span * Math.abs(sx) };
+    }
+
+    /** Píxel cuadrado con contorno, como el resto del dibujo. Se limpia al cambiar de estado. */
+    private pixel(x: number, y: number, size: number, color: number) {
+      const r = this.add.rectangle(x, y, size, size, color).setStrokeStyle(1, INK);
+      this.bobber.add(r);
+      this.eatObjects.push(r);
+      return r;
+    }
+
+    /** Parpadeo: un instante con los ojos cerrados por código (ilustraciones de una sola imagen). */
+    private blink() {
+      const view = this.view;
+      if (!view || !this.spriteKeyNow || !EYES[view.petId]?.[view.stage]) return;
+      const open = this.variantAnim(this.spriteKeyNow, view);
+      const closed = this.variantAnim(this.spriteKeyNow, { ...view, anim: 'sleep' });
+      if (closed === open) return;
+      this.sprite.play(closed);
+      this.eatTimers.push(this.time.delayedCall(140, () => {
+        if (this.view && this.view.anim === view.anim) this.sprite.play(this.variantAnim(this.spriteKeyNow, this.view));
+      }));
+    }
+
+    /** Se voltea a ver hacia atrás y regresa (la ropa y los accesorios se voltean con ella). */
+    private turnAround(scale: number) {
+      this.chainOn([
+        { scaleX: -scale, duration: 160, ease: 'Sine.inOut' },
+        { scaleX: -scale, duration: 700 },
+        { scaleX: scale, duration: 160, ease: 'Sine.inOut' },
+      ]);
+    }
+
+    private shiver(scale: number) {
+      this.chainOn([{ x: -2, duration: 40 }, { x: 2, duration: 40 }, { x: -2, duration: 40 }, { x: 2, duration: 40 }, { x: 0, scaleX: scale, duration: 40 }]);
+    }
+
+    /** Lágrima que sale de un ojo y cae. */
+    private tear() {
+      const e = this.petPoint('eyes');
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const d = this.pixel(e.x + side * e.span * 0.35, e.y + 6, 5, 0x6fb6ff);
+      this.tweens.add({ targets: d, y: d.y + 42, alpha: 0, duration: 900, ease: 'Quad.In', onComplete: () => d.destroy() });
+    }
+
+    /** "z" que sale de la cabeza al roncar. */
+    private snore() {
+      const hd = this.petPoint('head');
+      const z = this.add.text(hd.x + 20, hd.y, 'z', {
+        fontFamily: 'system-ui, sans-serif', fontSize: '18px', fontStyle: 'bold', color: '#fff6d8', stroke: '#302b43', strokeThickness: 3,
+      }).setOrigin(0.5);
+      this.bobber.add(z);
+      this.eatObjects.push(z);
+      this.tweens.add({ targets: z, x: z.x + 26, y: z.y - 40, scale: 1.6, alpha: 0, duration: 1500, ease: 'Sine.out', onComplete: () => z.destroy() });
+    }
+
+    /** Estrellas o notas que saltan de la cabeza. */
+    private sparkle(count: number, glyphs: string[]) {
+      const hd = this.petPoint('head');
+      const colors = ['#ffd23f', '#ff8cc6', '#7fe0d8'];
+      for (let i = 0; i < count; i++) {
+        const t = this.add.text(hd.x + Phaser.Math.Between(-30, 30), hd.y + 10, Phaser.Utils.Array.GetRandom(glyphs), {
+          fontFamily: 'system-ui, sans-serif', fontSize: '18px', fontStyle: 'bold', color: Phaser.Utils.Array.GetRandom(colors), stroke: '#302b43', strokeThickness: 3,
+        }).setOrigin(0.5);
+        this.bobber.add(t);
+        this.eatObjects.push(t);
+        this.tweens.add({ targets: t, y: t.y - Phaser.Math.Between(30, 55), x: t.x + Phaser.Math.Between(-20, 20), alpha: 0, duration: 800, ease: 'Sine.out', onComplete: () => t.destroy() });
+      }
+    }
+
+    /** Burbuja que sube del cuerpo en la tina. */
+    private bathBubble() {
+      const n = this.petPoint('neck');
+      const b = this.add.circle(n.x + Phaser.Math.Between(-60, 60), n.y + Phaser.Math.Between(-10, 40), Phaser.Math.Between(4, 10), 0xffffff, 0.85)
+        .setStrokeStyle(1.5, 0x9fd3dc);
+      this.bobber.add(b);
+      this.eatObjects.push(b);
+      this.tweens.add({ targets: b, y: b.y - Phaser.Math.Between(50, 90), x: b.x + Phaser.Math.Between(-12, 12), alpha: 0, duration: 1400, ease: 'Sine.out', onComplete: () => b.destroy() });
+    }
+
+    /** Se sacude el agua: vibra de lado a lado y salen gotas; al salir del baño, además brilla. */
+    private shakeOff(scale: number, clean: boolean) {
+      const steps: Step[] = [];
+      for (let i = 0; i < 6; i++) steps.push({ angle: i % 2 ? -8 : 8, scaleX: scale * (i % 2 ? 0.97 : 1.03), duration: 55 });
+      steps.push({ angle: 0, scaleX: scale, duration: 80 });
+      this.chainOn(steps);
+      const c = this.petPoint('neck');
+      for (let i = 0; i < 10; i++) {
+        const d = this.pixel(c.x, c.y - 10, 5, i % 3 ? 0x8fd3d6 : 0xffffff);
+        const a = Phaser.Math.DegToRad(Phaser.Math.Between(200, 340));
+        const r = Phaser.Math.Between(50, 95);
+        this.tweens.add({
+          targets: d, x: c.x + Math.cos(a) * r, y: c.y - 10 + Math.sin(a) * r * 0.7, duration: 260, ease: 'Quad.Out',
+          onComplete: () => this.tweens.add({ targets: d, y: d.y + 40, alpha: 0, duration: 380, ease: 'Quad.In', onComplete: () => d.destroy() }),
+        });
+      }
+      if (clean) this.eatTimers.push(this.time.delayedCall(450, () => this.sparkle(4, ['✦', '✧'])));
     }
 
     /**
