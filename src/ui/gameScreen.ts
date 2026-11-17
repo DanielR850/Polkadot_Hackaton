@@ -115,16 +115,17 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const rankingBtn = action('🏆', 'Ranking', intents.ranking);
   const actions = h('div', { class: 'actions' }, ...[feedBtn, playBtn, sleepBtn, bathBtn, renameBtn, rankingBtn].map((a) => a.button));
   // Inventario: accesorios de la mascota y decoración de la habitación.
-  const accessoriesBtn = h('button', { type: 'button', class: 'ghost' }, 'Accesorios');
-  accessoriesBtn.addEventListener('click', () => intents.accessories?.());
-  const spaceBtn = h('button', { type: 'button', class: 'ghost' }, 'Mi espacio');
-  spaceBtn.addEventListener('click', () => intents.space?.());
-  const shopBtn = h('button', { type: 'button', class: 'ghost' }, 'Tienda');
-  shopBtn.addEventListener('click', () => intents.shop?.());
-  const trophiesBtn = h('button', { type: 'button', class: 'ghost' }, 'Trofeos');
-  trophiesBtn.addEventListener('click', () => intents.trophies?.());
-  const pantryBtn = h('button', { type: 'button', class: 'ghost' }, 'Despensa');
-  pantryBtn.addEventListener('click', () => intents.pantry?.());
+  // Botones con ícono de pixel art (idea de Ana en avance-polkapets).
+  const extra = (icon: string, label: string, onClick: () => void) => {
+    const button = h('button', { type: 'button', class: 'ghost extra-button' }, pixelIcon(icon, 'extra-icon'), h('b', {}, label));
+    button.addEventListener('click', onClick);
+    return button;
+  };
+  const shopBtn = extra('🛒', 'Tienda', () => intents.shop?.());
+  const accessoriesBtn = extra('🎩', 'Accesorios', () => intents.accessories?.());
+  const spaceBtn = extra('🏠', 'Mi espacio', () => intents.space?.());
+  const pantryBtn = extra('🧺', 'Despensa', () => intents.pantry?.());
+  const trophiesBtn = extra('🏆', 'Trofeos', () => intents.trophies?.());
   const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, pantryBtn, trophiesBtn);
   /** Modo y dificultad de la partida (p. ej. "⚔️ Competencia · 7 h"). */
   const badge = h('span', { class: 'mode-badge' });

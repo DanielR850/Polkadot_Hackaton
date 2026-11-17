@@ -28,3 +28,13 @@ La rama `main` añadió cinco JPEG de acciones (beber, jugar y dormir) a los ori
 Coloca cada hoja de sprites en `public/assets/pets/<slug>/` y agrega sus datos a `SPRITES` en `src/game/assets.ts`: especie, etapa, acción, dimensiones de cuadro y FPS. Si varias acciones comparten una hoja, indica `firstFrame` y `lastFrame`. Especies o etapas sin sprite siguen usando el marcador dibujado por Phaser. La selección comparte los archivos de la escena; las especies están en `src/game/catalog.ts` y sus IDs persistidos (0–4) no deben cambiar.
 
 Los fondos opcionales van en `public/assets/backgrounds/` y se configuran en `BACKGROUNDS`. Mantén los archivos ligeros y registra aquí su fuente y licencia. No distribuyas imágenes, música, modelos o fuentes sin confirmar que sus términos lo permiten.
+
+## Variantes y pixel art
+
+Las variantes de color se generan sobre las ilustraciones originales en `src/game/variants.ts`. El filtro conserva la transparencia, sombras y rasgos de cada animal. `src/game/sleepFace.ts` genera los ojos cerrados (dormir y parpadear) para las etapas que no tienen una hoja de sueño.
+
+`src/game/wearables.ts` y `src/game/clothes.ts` generan sombreros y ropa como pixel art, sin PNG externos. `src/ui/pixelArt.ts` convierte los íconos de objetos, botones y acciones a la paleta del juego, así que el bundle no necesita `public/assets/items/` ni `public/assets/ui/icons/`. La opción del Menú "Dibujo: Pixel real" aplica el filtro de pixel art a los sprites.
+
+## Recursos necesarios para el bundle
+
+La versión web solo carga desde `public/`: `app-logo.jpeg` (inicio y favicon), `assets/pets/` (mascotas y animaciones) y `assets/ui/fonts/` (fuentes). La decoración, los accesorios y los íconos se dibujan en runtime y conservan los `articleId` del contrato NFT.

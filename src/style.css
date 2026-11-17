@@ -615,3 +615,13 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
 .pet-record .record-time { font-size: 17px; line-height: 1.15; color: var(--mx-green); font-family: var(--body); }
 .inv-grid .inv-section { grid-column: 1 / -1; margin: 6px 0 0; }
 .inv-icon img, .item-icon img, .px-icon img { object-fit: contain; }
+/* Botones de Mis cosas con ícono de pixel art (de avance-polkapets de Ana). */
+.extra-button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 64px; padding: 6px 4px; color: var(--ink); }
+.extra-icon { flex: none; display: grid; place-items: center; width: 34px; height: 34px; background: var(--panel-2); border: 3px solid var(--ink); }
+.extra-icon img { width: 26px; height: 26px; image-rendering: pixelated; }
+.extra-button b { font-weight: 400; font-size: 8px; line-height: 1.4; white-space: nowrap; }
+@media (max-width: 560px) {
+  .extra-button { flex-direction: row; min-height: 0; padding: 4px 6px; }
+  .extra-icon { width: 30px; height: 30px; }
+  .extra-icon img { width: 24px; height: 24px; }
+}
