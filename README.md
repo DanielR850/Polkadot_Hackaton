@@ -2,6 +2,13 @@
 
 Juego web con ajolote, lobo, oso grizzly, tlacuache y manatí. Cada especie tiene ilustraciones de bebé, adolescente y adulto, con movimiento para los estados del juego. Se publica como app de Polkadot en `polka-pets.dot`.
 
+## Integrantes del proyecto
+
+- Ana Lucia Alonso Martínez
+- Daniel Reyna Burnes
+- Santiago Ernesto Diaz Rodriguez
+- Guillermo Daniel Bonilla Morales
+
 ## Ejecutar
 
 Desde la raíz del repositorio, con [pnpm](https://pnpm.io) 12.6.0 (las versiones del Product SDK están fijadas en `package.json` y `pnpm-workspace.yaml`):
