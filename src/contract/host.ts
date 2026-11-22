@@ -1,5 +1,5 @@
 /*
- * Adaptador del Host de Polkadot (Polkadot Desktop o la Polkadot App) con el Product SDK 0.39.0.
+ * Adaptador del Host de Polkadot (Polkadot Desktop o la Polkadot App) con el Product SDK 0.45.0 (TrUAPI 0.31).
  * Sigue la integración del Host definida en este cliente.
  *
  * - Dentro del Host la cuenta la entrega el Host: es una cuenta derivada de `polka-pets.dot`,
@@ -80,6 +80,7 @@ export function textoError(error: unknown): string {
 
 const PAGO = /Invalid\.?\s*Payment/i;
 const SESION = /Invalid\.?\s*(Stale|Future|AncientBirthBlock|BadProof|BadSigner)|\bnonce\b|outdated/i;
+const PIPELINE = /pipeline|txExtVersion|transaction-extension|extension version/i;
 const CONEXION = /disconnect|not connected|websocket|socket|Host provider|connection (closed|lost)|ECONN/i;
 
 /**
@@ -135,9 +136,18 @@ async function abrirCadena(): Promise<Cadena> {
 
 /* ------------------------------------------------------------------ cuenta */
 
+/**
+ * Pipeline de extensiones con el que se firma en Asset Hub. Desde el runtime 2005005 (5-nov-2026)
+ * el 0 cobra la comisión en PAS y el 1 en PGAS, que es lo que el Host asigna a la cuenta del Product:
+ * con `getSigner()` (pipeline 0) una cuenta con solo PGAS falla con `Invalid.Payment`.
+ */
+const TX_EXT_VERSION = 1;
+
 interface Firma {
   manager: WalletSdk.SignerManager;
   cuenta: WalletSdk.SignerAccount;
+  /** Firmante de Asset Hub en el pipeline pedido (1 = PGAS; 0 = PAS, solo si el Host rechaza el 1). */
+  firmante(version: 0 | 1): ReturnType<WalletSdk.SignerAccount["getSigner"]>;
 }
 
 async function abrirFirma(productId: string): Promise<Firma> {
@@ -154,7 +164,16 @@ async function abrirFirma(productId: string): Promise<Firma> {
     if (!conectado.ok) throw conectado.error;
     const cuenta = await conPlazo(manager.getProductAccount(productId, DERIVATION_INDEX), HOST_CONNECT_TIMEOUT_MS, "Cuenta del Product");
     if (!cuenta.ok) throw cuenta.error;
-    return { manager, cuenta: cuenta.value };
+    const { getAccountsProvider } = await host();
+    const proveedor = await getAccountsProvider();
+    const firmante = (version: 0 | 1) =>
+      (proveedor
+        ? proveedor.getProductAccountSigner(
+            { dotNsIdentifier: productId, derivationIndex: DERIVATION_INDEX, publicKey: cuenta.value.publicKey },
+            { txExtVersion: version },
+          )
+        : cuenta.value.getSigner()) as ReturnType<WalletSdk.SignerAccount["getSigner"]>;
+    return { manager, cuenta: cuenta.value, firmante };
   } catch (e) {
     manager.destroy();
     throw e;
@@ -238,11 +257,12 @@ export async function conectarHost(): Promise<SesionHost> {
   }
 
   let mapeada = false;
+  let pipeline: 0 | 1 = TX_EXT_VERSION;
 
   const contrato = (destino?: LlamadaHost["destino"]): ContratoSdk =>
     cadena.contracts.createContract(cadena.runtime, destino?.address ?? PETS_ADDRESS, (destino?.abi as ContractsSdk.AbiEntry[] | undefined) ?? abi, {
       defaultOrigin: firma.cuenta.address,
-      defaultSigner: firma.cuenta.getSigner(),
+      defaultSigner: firma.firmante(pipeline),
     }) as unknown as ContratoSdk;
 
   /** pallet-revive exige que la cuenta SS58 esté vinculada a su 0x… antes de llamar contratos. */
@@ -253,7 +273,7 @@ export async function conectarHost(): Promise<SesionHost> {
       mapeada = true;
       return;
     }
-    const m = await cadena.contracts.ensureContractAccountMapped(cadena.runtime, firma.cuenta.address, firma.cuenta.getSigner(), {
+    const m = await cadena.contracts.ensureContractAccountMapped(cadena.runtime, firma.cuenta.address, firma.firmante(pipeline), {
       timeoutMs: HOST_SIGN_TIMEOUT_MS,
     });
     if (!m.ok) throw m.error;
@@ -297,7 +317,10 @@ export async function conectarHost(): Promise<SesionHost> {
           const t = textoError(e);
           console.warn("[polkapets] tx Host", t);
           // Una sola recuperación automática, como la app de referencia.
-          if (PAGO.test(t)) {
+          if (PIPELINE.test(t) && pipeline === 1) {
+            // El Host no acepta el pipeline 1: se rearma el firmante en el 0 (comisión en PAS) y se reintenta.
+            pipeline = 0;
+          } else if (PAGO.test(t)) {
             if ((await pedirGas()) === "Rejected") throw e;
           } else if (SESION.test(t) || CONEXION.test(t)) {
             await reconectar();
