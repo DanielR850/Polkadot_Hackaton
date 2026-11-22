@@ -232,6 +232,10 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
     private spriteKeyNow = '';
     /** Estado anterior: al salir del baño se sacude el agua. */
     private lastAnim: PetAnim | null = null;
+    /** Escala base de la ilustración actual (la usan las reacciones al tocarla). */
+    private spriteScale = 1;
+    private lastTapAt = 0;
+    private tapCount = 0;
 
     constructor() { super('room'); }
 
@@ -511,7 +515,119 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (anim === 'dead' || anim === 'bath' || anim === 'sleep') return;
       if (!this.sprite.getBounds().contains(x, y)) return;
       this.react('❤️');
+      this.tapReaction(anim);
       this.petHandler?.();
+    }
+
+    /**
+     * Al tocar a la mascota hace algo propio de su especie (y sigue con lo que hacía). Los toques
+     * seguidos van cambiando de gracia; si la tocan muchas veces rápido, se emociona y da un salto
+     * grande. Todo por código: la ilustración no se modifica.
+     */
+    private tapReaction(anim: PetAnim) {
+      if (anim === 'eat') return;
+      const view = this.view;
+      if (!view) return;
+      const now = this.time.now;
+      this.tapCount = now - this.lastTapAt < 1600 ? this.tapCount + 1 : 1;
+      this.lastTapAt = now;
+      const scale = this.spriteScale;
+      const species = view.petId;
+      const kind = (this.tapCount - 1) % 3;
+      if (this.tapCount >= 5) {
+        this.tapCount = 0;
+        this.sparkle(4, ['★', '♪', '✦', '❤']);
+        this.say('¡Qué felicidad!');
+        this.chainOn([
+          { scaleY: scale * 0.8, scaleX: scale * 1.15, duration: 100, ease: 'Quad.Out' },
+          { scaleY: scale * 1.15, scaleX: scale * 0.9, y: -34, angle: 14, duration: 240, ease: 'Quad.Out' },
+          { scaleY: scale * 1.05, scaleX: scale * 0.95, y: -34, angle: -14, duration: 200, ease: 'Sine.inOut' },
+          { scaleY: scale, scaleX: scale, y: 0, angle: 0, duration: 260, ease: 'Bounce.Out' },
+        ]);
+        return;
+      }
+      if (species === 1) {
+        // Lobo: menea el cuerpo, aúlla y se emociona.
+        if (kind === 0) {
+          this.say('¡Guau!');
+          this.chainOn([{ angle: 7, duration: 70 }, { angle: -7, duration: 70 }, { angle: 6, duration: 70 }, { angle: -6, duration: 70 }, { angle: 0, duration: 80 }]);
+        } else if (kind === 1) {
+          this.say('¡Auuuu!');
+          this.chainOn([
+            { angle: -14, scaleY: scale * 1.1, y: -4, duration: 260, ease: 'Sine.out' },
+            { angle: -14, duration: 600 },
+            { angle: 0, scaleY: scale, y: 0, duration: 260, ease: 'Sine.inOut' },
+          ]);
+          this.sparkle(2, ['♪', '♫']);
+        } else {
+          this.chainOn([{ y: -18, scaleY: scale * 1.08, duration: 150, ease: 'Quad.Out' }, { y: 0, scaleY: scale, duration: 150, ease: 'Quad.In' }, { y: -10, duration: 110, ease: 'Quad.Out' }, { y: 0, duration: 110, ease: 'Quad.In' }]);
+        }
+      } else if (species === 2) {
+        // Oso: se infla de ganas de abrazo, ruge suave o se ríe.
+        if (kind === 0) {
+          this.say('¡Grrr!');
+          this.chainOn([{ scaleY: scale * 1.14, scaleX: scale * 1.02, y: -8, duration: 220, ease: 'Sine.out' }, { scaleY: scale * 1.14, duration: 380 }, { scaleY: scale, scaleX: scale, y: 0, duration: 220, ease: 'Sine.inOut' }]);
+        } else if (kind === 1) {
+          this.say('¡Abrazo!');
+          this.chainOn([{ scaleX: scale * 1.12, scaleY: scale * 0.9, duration: 140, ease: 'Quad.Out' }, { scaleX: scale, scaleY: scale, duration: 140, yoyo: true, repeat: 1 }]);
+          this.sparkle(3, ['❤', '✦']);
+        } else {
+          this.chainOn([{ angle: -6, duration: 120 }, { angle: 6, duration: 120 }, { angle: -6, duration: 120 }, { angle: 0, duration: 120 }]);
+          this.say('¡Jo jo!');
+        }
+      } else if (species === 3) {
+        // Tlacuache: se hace el muerto, voltea o pega un brinco asustado.
+        if (kind === 0) {
+          this.say('…');
+          this.chainOn([
+            { angle: 80, y: 22, duration: 220, ease: 'Quad.Out' },
+            { angle: 80, y: 22, duration: 900 },
+            { angle: 0, y: 0, duration: 200, ease: 'Back.Out' },
+          ], () => this.say('¡Bu!'));
+        } else if (kind === 1) {
+          this.turnAround(scale);
+          this.sparkle(2, ['✦', '❤']);
+        } else {
+          this.say('¡Ay!');
+          this.chainOn([{ y: -26, scaleY: scale * 1.15, scaleX: scale * 0.88, duration: 140, ease: 'Quad.Out' }, { y: 0, scaleY: scale, scaleX: scale, duration: 180, ease: 'Bounce.Out' }]);
+        }
+      } else if (species === 4) {
+        // Manatí: suelta burbujas, rueda despacio y canta.
+        if (kind === 0) {
+          this.say('¡Glub glub!');
+          for (let i = 0; i < 5; i++) this.time.delayedCall(i * 90, () => this.bathBubble());
+        } else if (kind === 1) {
+          this.chainOn([{ angle: 10, y: -6, duration: 360, ease: 'Sine.inOut' }, { angle: -10, y: -2, duration: 520, ease: 'Sine.inOut' }, { angle: 0, y: 0, duration: 360, ease: 'Sine.inOut' }]);
+          this.sparkle(2, ['♪', '♫']);
+        } else {
+          this.say('¡Mmm!');
+          this.chainOn([{ scaleX: scale * 1.08, scaleY: scale * 0.94, duration: 200, ease: 'Sine.inOut' }, { scaleX: scale, scaleY: scale, duration: 260, ease: 'Sine.inOut' }]);
+        }
+      } else {
+        // Ajolote: mueve las branquias, da una vuelta o burbujea.
+        if (kind === 0) {
+          this.say('¡Blub!');
+          this.chainOn([{ angle: -5, duration: 60 }, { angle: 5, duration: 60 }, { angle: -5, duration: 60 }, { angle: 5, duration: 60 }, { angle: 0, duration: 70 }]);
+        } else if (kind === 1) {
+          this.turnAround(scale);
+          this.sparkle(2, ['✦', '♪']);
+        } else {
+          this.chainOn([{ y: -16, scaleY: scale * 1.08, duration: 160, ease: 'Quad.Out' }, { y: 0, scaleY: scale, duration: 160, ease: 'Quad.In' }]);
+          this.sparkle(2, ['❤', '★']);
+        }
+      }
+    }
+
+    /** Globito de texto corto que sube de la cabeza de la mascota. */
+    private say(text: string) {
+      const hd = this.petPoint('head');
+      const t = this.add.text(hd.x + 8, hd.y - 24, text, {
+        fontFamily: 'system-ui, sans-serif', fontSize: '17px', fontStyle: 'bold', color: '#fff6d8', stroke: '#302b43', strokeThickness: 4,
+      }).setOrigin(0.5).setAlpha(0);
+      this.bobber.add(t);
+      this.eatObjects.push(t);
+      this.tweens.add({ targets: t, alpha: 1, y: t.y - 14, duration: 180, ease: 'Sine.out' });
+      this.tweens.add({ targets: t, alpha: 0, y: t.y - 36, delay: 900, duration: 500, onComplete: () => t.destroy() });
     }
 
     /** Textura de pixel art de un emoji (src/ui/pixelArt.ts), o null si no se pudo dibujar. */
@@ -612,6 +728,7 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
         const scale = (BODY.ry * 3) / spriteAnim.frameHeight;
         this.clearEat();
+        this.spriteScale = scale;
         this.animateSprite(view, scale);
         this.dressHat();
         if (view.anim === 'eat') {
