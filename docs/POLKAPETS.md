@@ -49,27 +49,18 @@ misma fórmula con las reglas puras de `src/game/petState.ts` y guarda el progre
 
 ## Estructura
 
-```
+```text
 .
-├── contrato/                   # Smart contract (Solidity + Hardhat)
-│   ├── contracts/PolkaPets.sol  # ERC-721 con la lógica del juego y el ranking
-│   ├── scripts/
-│   │   ├── deploy.ts            # despliega y guarda la dirección en deployments/
-│   │   ├── exportAbi.ts         # copia la ABI a game/src/contract/
-│   │   ├── balance.ts           # cuenta de despliegue y saldo (no imprime la llave)
-│   │   └── probar.ts            # prueba de humo contra la testnet
-│   ├── test/PolkaPets.test.ts   # 13 tests
-│   └── hardhat.config.ts        # red polkadotHubTestnet (chainId 420420417)
-│
-└── game/                       # Cliente de los contratos (lo usa la app de la raíz)
-    └── src/
-        ├── contract/            # config, ABI, wallets (EIP-6963), viem, Host SDK y ranking
-        ├── engine/              # lógica pura: tiempo, salud, ranking (+ tests)
-        ├── hub/                 # estado del modo NFT con firma por cuidado
-        └── lib/                 # formato y traducción de errores (+ tests)
+├── src/                        # aplicación web: UI, Phaser, reglas, mint y cliente de contratos
+│   ├── contract/               # viem, Host SDK, ABI, wallets, ranking y objetos
+│   ├── game/                   # reglas locales, catálogo, inventario y escena Phaser
+│   ├── ui/                     # pantallas y diálogos
+│   └── polkadot/               # adaptador del flujo NFT
+├── contrato/                   # Solidity + Hardhat, pruebas y despliegue
+└── public/                     # sprites, logo y fuentes usadas por la web
 ```
 
-Las pantallas viven en `src/ui/` de la raíz; `game/` ya no tiene frontend propio.
+Las pantallas viven en `src/ui/`; el cliente NFT y el contrato forman parte del mismo proyecto web.
 
 ## Puesta en marcha
 
@@ -77,19 +68,24 @@ Requisitos: Node.js 18+, una wallet con **PAS** de prueba
 ([faucet](https://faucet.polkadot.io/)) y, solo para desplegar, la clave privada en
 `contrato/.env` (copia `contrato/.env.example`; nunca la subas al repo).
 
-Cada carpeta se instala por separado (la raíz del repo es el prototipo con Phaser):
+```bash
+pnpm install
+pnpm dev
+pnpm build
+```
+
+Para probar los contratos:
 
 ```bash
 cd contrato
 npm install
-npm test                   # tests del contrato
-npm run deploy:testnet     # despliega; pega la dirección en game/src/contract/config.ts
-npm run abi                # exporta la ABI al frontend
+npm test
+```
 
-cd ../game
-npm install
-npm test                   # tests del frontend
-npm run dev                # http://127.0.0.1:5173
+Para ejecutar las pruebas del cliente NFT:
+
+```bash
+pnpm test
 ```
 
 ## Despliegue actual

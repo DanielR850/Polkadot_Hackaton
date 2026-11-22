@@ -2,13 +2,13 @@ import hre from "hardhat";
 import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
-/** PolkaPets ya desplegado en Polkadot Hub TestNet (game/src/contract/config.ts → PETS_ADDRESS). */
+/** PolkaPets ya desplegado en Polkadot Hub TestNet (src/contract/config.ts → PETS_ADDRESS). */
 const PETS_TESTNET = "0x758425A3b756079B34FF97cB9C7A764fD44C008a";
 
 /**
  * Despliega PolkaPetsItems ligado a un PolkaPets existente.
  *  - Dirección de PolkaPets: variable de entorno PETS_ADDRESS o, si no, la de TestNet.
- *  - Imprime la dirección para pegarla en game/src/contract/config.ts (ITEMS_ADDRESS).
+ *  - Imprime la dirección para pegarla en src/contract/config.ts (ITEMS_ADDRESS).
  */
 async function main() {
   const red = hre.network.name;
@@ -26,7 +26,7 @@ async function main() {
 
   const address = await contrato.getAddress();
   console.log(`\n✅ PolkaPetsItems desplegado en: ${address}`);
-  console.log(`\nCopia esta dirección en game/src/contract/config.ts (ITEMS_ADDRESS).`);
+  console.log(`\nCopia esta dirección en src/contract/config.ts (ITEMS_ADDRESS).`);
 
   const salida = join(__dirname, "..", "deployments", `${red}-items.json`);
   if (!existsSync(dirname(salida))) mkdirSync(dirname(salida), { recursive: true });

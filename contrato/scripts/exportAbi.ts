@@ -4,7 +4,7 @@ import { dirname, join } from "node:path";
 
 /**
  * Exporta la ABI compilada de PolkaPets al cliente activo:
- *   game/src/contract/polkapets.abi.json
+ *   src/contract/polkapets.abi.json
  * Regenera con `npm run abi` cada vez que cambie el contrato.
  */
 async function main() {

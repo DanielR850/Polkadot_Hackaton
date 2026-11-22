@@ -1,13 +1,13 @@
 // Adaptador del mint del NFT para el juego local. Es la única firma del juego: adoptar.
-// Los cuidados siguen siendo locales y gratis. Reutiliza el cliente de game/src/contract:
+// Los cuidados siguen siendo locales y gratis. Reutiliza el cliente de src/contract:
 // dentro de Polkadot Desktop o la Polkadot App firma el Host; en un navegador, una wallet EVM.
-import { EXPLORER_URL, PETS_ADDRESS } from '../../game/src/contract/config.ts';
-import { conectarHost, dentroDelHost } from '../../game/src/contract/host.ts';
-import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
-import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../../game/src/contract/wallets.ts';
-import { mensajeError } from '../../game/src/lib/txErrors.ts';
-import { comprarArticulo, errorItems, itemsActivo, reclamarLogroMascota, sellarLegadoMascota } from '../../game/src/contract/items.ts';
-import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../../game/src/contract/ranking.ts';
+import { EXPLORER_URL, PETS_ADDRESS } from '../contract/config.ts';
+import { conectarHost, dentroDelHost } from '../contract/host.ts';
+import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, type Firmante, type PasoTx } from '../contract/pets.ts';
+import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../contract/wallets.ts';
+import { mensajeError } from '../lib/txErrors.ts';
+import { comprarArticulo, errorItems, itemsActivo, reclamarLogroMascota, sellarLegadoMascota } from '../contract/items.ts';
+import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../contract/ranking.ts';
 
 export type { FilaLeaderboard, Partida };
 

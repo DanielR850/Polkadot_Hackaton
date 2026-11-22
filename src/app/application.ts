@@ -12,7 +12,7 @@ import {
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
 import type { RankingSource } from '../game/ranking.ts';
-import { ITEMS_ADDRESS, RANKING_ADDRESS } from '../../game/src/contract/config.ts';
+import { ITEMS_ADDRESS, RANKING_ADDRESS } from '../contract/config.ts';
 import { createRecordDialog } from '../ui/recordDialog.ts';
 import { createSignDialog } from '../ui/signDialog.ts';
 import { createMiniGameDialog } from '../ui/miniGameDialog.ts';

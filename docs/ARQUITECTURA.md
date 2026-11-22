@@ -9,7 +9,7 @@ Una sola app web (Vite + TypeScript + Phaser) en la raíz, publicada en `polka-p
 - **Firmas:** solo dos, ambas opcionales: adoptar (`mint` en PolkaPets) y, al morir la mascota,
   registrar la partida (`registrarMuerte` en PolkaPetsRanking).
 - **Accesorios y muebles (NFT):** con un NFT de mascota y `ITEMS_ADDRESS` configurado
-  (`game/src/contract/config.ts`), comprar en la tienda firma `comprar(mascotaId, articuloId)` en
+  (`src/contract/config.ts`), comprar en la tienda firma `comprar(mascotaId, articuloId)` en
   `PolkaPetsItems`. El contrato crea un NFT ligado a esa mascota (no transferible) y los pesitos 🪙,
   que son locales, solo se descuentan si la firma se confirma. Qué está puesto no es una
   transacción por cambio: se guarda en el dispositivo y se declara una sola vez al morir con
@@ -45,7 +45,7 @@ src/
 ├── infrastructure/audio/music.ts   # música original con Web Audio
 └── polkadot/nftMint.ts              # adaptador de mint, ranking y objetos
 
-game/src/contract/                  # cliente viem, Host SDK, ABI y direcciones
+src/contract/                      # cliente viem, Host SDK, ABI y direcciones
 contrato/                           # Hardhat: Solidity, pruebas y scripts
 ```
 
@@ -56,7 +56,7 @@ flowchart LR
     APP --> SCENE[game / Phaser]
     APP --> STORE[game / storage local]
     APP --> PORT[polkadot / nftMint.ts]
-    PORT --> CLIENT[game/src/contract]
+    PORT --> CLIENT[src/contract]
     CLIENT -- MetaMask / viem --> CHAIN[Polkadot Hub TestNet]
     CLIENT -- Product SDK --> HOST[Polkadot App / Desktop]
     HOST --> CHAIN
