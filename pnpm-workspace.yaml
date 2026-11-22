@@ -1,0 +1,28 @@
+# Versiones de Products Devnet: product-sdk 0.45.0 (TrUAPI 0.31), la que hablan los Hosts del 17-nov-2026
+# (Polkadot App y Desktop). Antes: product-sdk 0.39.0 con TrUAPI 0.25 (polkadot-products-devnet, 2026-10-23).
+allowBuilds:
+  esbuild: false
+
+# Los descriptores del devnet son una publicación reciente: se excluyen de la espera mínima de pnpm.
+minimumReleaseAgeExclude:
+  - '@polkadot-community-foundation/product-sdk-descriptors@0.14.0-pcf.1'
+
+# Los Hosts de Products Devnet (iOS, Android, Desktop y dev-dot.li) hablan TrUAPI 0.31 desde el 17-nov-2026.
+# @parity/truapi y polkadot-api se fijan para que la app use una sola versión de cada uno.
+# Cada override va acotado al paquete del SDK que trae la dependencia: así no se aplica a
+# herramientas que se corren con `pnpm dlx` dentro del repo (por ejemplo pad).
+overrides:
+  '@parity/product-sdk-host@0.34.0>@parity/truapi': 0.31.0
+  '@parity/product-sdk-renderer@0.12.0>@parity/truapi': 0.31.0
+  '@parity/product-sdk-chain-client@0.13.10>@parity/product-sdk-descriptors': npm:@polkadot-community-foundation/product-sdk-descriptors@0.14.0-pcf.1
+  '@parity/product-sdk-cloud-storage@0.13.10>@parity/product-sdk-descriptors': npm:@polkadot-community-foundation/product-sdk-descriptors@0.14.0-pcf.1
+  '@parity/product-sdk@0.45.0>polkadot-api': 3.2.1
+  '@parity/product-sdk-chain-client@0.13.10>polkadot-api': 3.2.1
+  '@parity/product-sdk-cloud-storage@0.13.10>polkadot-api': 3.2.1
+  '@parity/product-sdk-contracts@0.11.10>polkadot-api': 3.2.1
+  '@parity/product-sdk-host@0.34.0>polkadot-api': 3.2.1
+  '@parity/product-sdk-individuality@0.11.7>polkadot-api': 3.2.1
+  '@parity/product-sdk-keys@0.5.10>polkadot-api': 3.2.1
+  '@parity/product-sdk-signer@0.17.10>polkadot-api': 3.2.1
+  '@parity/product-sdk-tx@0.5.10>polkadot-api': 3.2.1
+  '@polkadot-community-foundation/product-sdk-descriptors@0.14.0-pcf.1>polkadot-api': 3.2.1

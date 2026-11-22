@@ -1,0 +1,33 @@
+{
+  "name": "contrato",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Contrato ERC-721 PolkaPets (Tamagotchi NFT) para Polkadot Hub.",
+  "scripts": {
+    "compile": "hardhat compile",
+    "test": "hardhat test",
+    "node": "hardhat node",
+    "deploy:local": "hardhat run scripts/deploy.ts --network localhost",
+    "deploy:testnet": "hardhat run scripts/deploy.ts --network polkadotHubTestnet",
+    "deploy:items:local": "hardhat run scripts/deployItems.ts --network localhost",
+    "deploy:items:testnet": "hardhat run scripts/deployItems.ts --network polkadotHubTestnet",
+    "abi": "hardhat run scripts/exportAbi.ts",
+    "balance": "hardhat run scripts/balance.ts --network polkadotHubTestnet",
+    "probar": "hardhat run scripts/pruebaFuncional.ts --network polkadotHubTestnet",
+    "deploy:v2:local": "hardhat run scripts/deployV2.ts --network localhost",
+    "deploy:v2:testnet": "hardhat run scripts/deployV2.ts --network polkadotHubTestnet",
+    "aplicar:testnet": "hardhat run scripts/aplicarDespliegue.ts --no-compile",
+    "verificar": "hardhat run scripts/verificarTestnet.ts --network polkadotHubTestnet",
+    "deploy:pagos:testnet": "hardhat run scripts/deployPagos.ts --network polkadotHubTestnet",
+    "transferir:testnet": "hardhat run scripts/transferirAdmin.ts --network polkadotHubTestnet"
+  },
+  "license": "MIT",
+  "devDependencies": {
+    "@nomicfoundation/hardhat-toolbox": "^5.0.0",
+    "@openzeppelin/contracts": "^5.1.0",
+    "dotenv": "^16.4.5",
+    "hardhat": "^2.22.0",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.6.3"
+  }
+}
