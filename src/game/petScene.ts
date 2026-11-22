@@ -706,7 +706,14 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       const previous = this.lastAnim;
       this.lastAnim = anim;
       this.tweens.killTweensOf(sprite);
+      // Al despertar, la ilustración se estira de nuevo en vez de saltar a su tamaño.
+      const wasLying = previous === 'sleep' && anim !== 'sleep';
+      const from = { x: sprite.scaleX, y: sprite.scaleY };
       sprite.clearTint().setAlpha(1).setScale(scale);
+      if (wasLying) {
+        sprite.setScale(from.x, from.y);
+        this.tweens.add({ targets: sprite, scaleX: scale, scaleY: scale, duration: 450, ease: 'Sine.out' });
+      }
       // Cada estado tiene una pose (posición e inclinación). Se llega a ella con una transición
       // corta desde la pose anterior en vez de saltar de golpe; después empieza su movimiento.
       const pose = (to: { x?: number; y?: number; angle?: number }, duration: number, then?: () => void) => {
@@ -747,9 +754,19 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
         return;
       }
       if (anim === 'sleep') {
-        // Se acomoda despacio, respira lento, a veces se acomoda otra vez y ronca.
-        pose({ y: 8, angle: -9 }, 700, () => loop({ scaleY: scale * 1.04 }, 1550));
-        every(5000, 9000, () => this.tweens.add({ targets: sprite, angle: Phaser.Math.Between(-12, -5), duration: 900, ease: 'Sine.inOut' }));
+        // Se echa en el piso como el ajolote bebé (cuerpo aplastado y ancho, ojos cerrados), respira
+        // lento, a veces se acomoda otra vez y ronca. El manatí flota, así que solo se hunde un poco.
+        // La ilustración no se toca: solo se le da otra proporción por código.
+        const framed = this.spriteKeyNow === spriteKey(view.petId, view.stage, 'sleep'); // el ajolote bebé ya trae su cuadro
+        const lie = framed ? { sx: 1, sy: 1 } : petId === 4 ? { sx: 1.04, sy: 0.9 } : { sx: 1.12, sy: 0.74 };
+        const drop = framed ? 8 : ((1 - lie.sy) / 2) * BODY.ry * 3 + 14;
+        this.tweens.add({
+          targets: sprite, x: 0, y: drop, angle: -3, scaleX: scale * lie.sx, scaleY: scale * lie.sy, duration: 900, ease: 'Sine.inOut',
+          onComplete: () => { if (this.view?.anim === 'sleep') loop({ scaleY: scale * lie.sy * 1.05 }, 1550); },
+        });
+        every(5000, 9000, () => this.chainOn([
+          { angle: Phaser.Math.Between(-7, 1), x: Phaser.Math.Between(-4, 4), duration: 900, ease: 'Sine.inOut' },
+        ]));
         every(2400, 3600, () => this.snore());
         return;
       }
