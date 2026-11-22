@@ -20,8 +20,5 @@ Los otros estados y especies usan animación de código sobre su ilustración.
 
 La animación y las imágenes viven en el frontend. El contrato guarda el ID de
 especie, propietario, nivel y necesidades; calcula la etapa al consultar y no
-guarda fotogramas. El Solidity de
-esta rama admite IDs 0–4, pero el contrato EVM ya desplegado aún responde
-`NUM_ESPECIES = 1`. El frontend EVM consulta ese valor y desactiva los NFT que
-esa dirección todavía no puede crear. El Product PolkaVM admitirá los cinco
-cuando se despliegue y se instale su dirección real en `cdm.json`.
+ guarda fotogramas. El Solidity de esta rama admite IDs 0–4, pero el contrato EVM ya desplegado aún responde
+`NUM_ESPECIES = 1`. El frontend consulta ese valor y desactiva los NFT que esa dirección todavía no puede crear.

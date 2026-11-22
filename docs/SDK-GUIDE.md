@@ -53,9 +53,7 @@ Product](https://docs.polkadot.com/apps/product-sdk/contracts/)
   según las capacidades reales para evitar dependencias innecesarias.
 - `createFakeApp` sirve para probar wallet y almacenamiento local. No trae un cliente de cadena falso
   por defecto; la lectura de cadena requiere una interfaz nuestra y pruebas específicas de integración.
-- La página actual de Contracts cubre contratos `pallet-revive` en Asset Hub. El cliente toma la
-  dirección y ABI desde `cdm.json`; las lecturas `query` entregan `success`, las escrituras `tx`
-  requieren firma, y una cuenta nueva debe mapearse a H160 antes de enviar.
+- La página actual de Contracts cubre contratos `pallet-revive` en Asset Hub. En este repositorio el cliente activo usa la dirección y ABI de `game/src/contract/config.ts` y `game/src/contract/polkapets.abi.json`; las lecturas y escrituras pasan por el adaptador viem/Host del proyecto.
 - Por eso aún no agrego dependencias ni código de contrato: primero hay que confirmar si el proyecto
   seguirá el devnet del taller o el flujo actual del Product SDK. Los dos ejemplos pueden usar
   herramientas, manifiestos y redes diferentes.
