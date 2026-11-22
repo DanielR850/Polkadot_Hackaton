@@ -12,7 +12,7 @@ const LOCAL = (import.meta as { env?: Record<string, string | undefined> }).env?
 /** Dirección del contrato PolkaPets desplegado. */
 export const PETS_ADDRESS: `0x${string}` = LOCAL
   ? "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-  : "0xAD517D892f40567200Ff698E031beA6B1995Ba74";
+  : "0x3E9707f04412974452543d8916DdCC8E893aDf55";
 
 /*
  * Versión 2 (dificultad, modos, comida NFT, drops y temporadas): `npm run deploy:v2:testnet` desde
@@ -64,7 +64,7 @@ export const RANKING_ADDRESS: `0x${string}` | null = LOCAL ? null : "0xf675957A8
  * Contrato PolkaPetsTemporadas (v2): Competencia semanal de lunes a viernes, podio y campeones.
  * null mientras no esté desplegado: la Competencia usa entonces el ranking v1 de arriba.
  */
-export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" : "0x8011Febe48d99d2DEfF732523151Ee9A7256835A";
+export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" : "0xfF560afc9E55634850dEE9A28ba218F25C7B1964";
 
 /**
  * Contrato PolkaPetsItems (contrato/contracts/PolkaPetsItems.sol): accesorios y muebles como NFT
@@ -75,13 +75,13 @@ export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2
 // TestNet: contratos v3 (cinco especies, color en el NFT, comida y ropa) desplegados el 2026-11-22.
 export const ITEMS_ADDRESS: `0x${string}` | null = LOCAL
   ? "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-  : "0x32CC55CCccBcb9F0113026929B65BB888f0B2B3d";
+  : "0xecBDf023dfaaf8D59A51C17f15fb3eAb544A63b8";
 
 /**
  * Contrato PolkaPetsPagos: la wallet de cobro de cada jugador y los premios pagados (con el hash de
  * cada pago), como en el Pac-Man. null mientras no esté desplegado: la sección de billetera se oculta.
  */
-export const PAGOS_ADDRESS: `0x${string}` | null = LOCAL ? "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" : null;
+export const PAGOS_ADDRESS: `0x${string}` | null = LOCAL ? "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" : "0xcB2a49343aA9680200Df159e93fc6258191B0174";
 
 /** Ranking: filas por página y máximo de mascotas que se leen. */
 export const RANKING_PAGINA = 50;

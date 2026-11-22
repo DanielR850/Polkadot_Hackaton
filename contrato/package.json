@@ -17,7 +17,9 @@
     "deploy:v2:local": "hardhat run scripts/deployV2.ts --network localhost",
     "deploy:v2:testnet": "hardhat run scripts/deployV2.ts --network polkadotHubTestnet",
     "aplicar:testnet": "hardhat run scripts/aplicarDespliegue.ts --no-compile",
-    "verificar": "hardhat run scripts/verificarTestnet.ts --network polkadotHubTestnet"
+    "verificar": "hardhat run scripts/verificarTestnet.ts --network polkadotHubTestnet",
+    "deploy:pagos:testnet": "hardhat run scripts/deployPagos.ts --network polkadotHubTestnet",
+    "transferir:testnet": "hardhat run scripts/transferirAdmin.ts --network polkadotHubTestnet"
   },
   "license": "MIT",
   "devDependencies": {

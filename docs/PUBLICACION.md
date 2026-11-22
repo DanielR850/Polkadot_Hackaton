@@ -4,11 +4,13 @@ Sigue el taller Products Devnet ([capítulos 5 y 6](https://github.com/BrandonFi
 con `pad` 0.22.1 y Product SDK 0.39.0.
 
 - Dominio: `polka-pets.dot` (Products Devnet, registrado).
-- Contratos (Polkadot Hub TestNet, chain id 420420417, desplegados el 2026-11-22, v3):
-  `PolkaPets` `0xAD517D892f40567200Ff698E031beA6B1995Ba74` (cinco especies, dificultad, modos y color en el NFT),
-  `PolkaPetsItems` `0x32CC55CCccBcb9F0113026929B65BB888f0B2B3d` (61 objetos, comida y ropa) y
-  `PolkaPetsTemporadas` `0x8011Febe48d99d2DEfF732523151Ee9A7256835A`. Direcciones en `src/contract/config.ts`
-  y `contrato/deployments/polkadotHubTestnet-v2.json`. Los contratos v1 anteriores (`0x7584…`) ya no se usan.
+- Contratos (Polkadot Hub TestNet, chain id 420420417, desplegados el 2026-11-22, v4/v3):
+  `PolkaPets` `0x3E9707f04412974452543d8916DdCC8E893aDf55` (cinco especies, dificultad, modos, color y sueño con hora),
+  `PolkaPetsItems` `0xecBDf023dfaaf8D59A51C17f15fb3eAb544A63b8` (61 objetos, precios y pesitos en la cadena),
+  `PolkaPetsTemporadas` `0xfF560afc9E55634850dEE9A28ba218F25C7B1964` y
+  `PolkaPetsPagos` `0xcB2a49343aA9680200Df159e93fc6258191B0174` (wallets de cobro y pagos con su hash).
+  Direcciones en `src/contract/config.ts` y `contrato/deployments/polkadotHubTestnet-v2.json`. Los anteriores
+  (`0x7584…`, `0xAD51…`) ya no se usan. Cómo se protege la economía: `docs/SEGURIDAD.md`.
 - Dentro de Polkadot Desktop o la Polkadot App, adoptar, cuidar y renombrar se firman con el Host
   (`src/contract/host.ts`). En un navegador normal se firma con MetaMask.
 - La cuenta del Host es una cuenta derivada de `polka-pets.dot`: es distinta de la de MetaMask, así
@@ -45,8 +47,9 @@ pega el CID nuevo con Resolve.
 
 Ya están desplegados (arriba). Para volver a desplegar: `contrato/.env` con la llave de una cuenta de
 pruebas con PAS (nunca se sube), `npm run deploy:v2:testnet` y `npm run aplicar:testnet` desde `contrato/`,
-y después `pnpm build` y `pad`. `npm run verificar` solo lee y `npm run probar` hace una adopción y compras
-reales con esa cuenta. El catálogo de objetos va empacado en el código del contrato: un constructor que
+y después `pnpm build` y `pad`. `npm run verificar` solo lee y `npm run probar` hace una adopción, sueño, cobro
+de pesitos, compras, wallet y pago reales con esa cuenta. `npm run deploy:pagos:testnet` vuelve a desplegar solo
+los pagos (registro limpio) y `npm run transferir:testnet` pasa la administración a otra cuenta. El catálogo de objetos va empacado en el código del contrato: un constructor que
 escribe los 61 objetos se queda sin gas en Polkadot Hub.
 
 ## Publicaciones
