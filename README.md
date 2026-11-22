@@ -32,8 +32,7 @@ La selección de cinco especies funciona en el modo local. La dirección TestNet
 
 - [Arquitectura](docs/ARQUITECTURA.md)
 - [PolkaPets y contrato](docs/POLKAPETS.md)
-- [Registro de assets](docs/ASSETS.md)
-- [Mascotas y animaciones](docs/ANIMACIONES.md)
+- [Registro de assets y animaciones](docs/ASSETS.md)
 - [Publicación en polka-pets.dot](docs/PUBLICACION.md)
 
 Los commits de las ramas integradas se conservan en `codex/integracion-total`.

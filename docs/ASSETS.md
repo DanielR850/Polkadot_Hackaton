@@ -36,3 +36,17 @@ La versión web desplegada solo carga estos recursos desde `public/`:
 - `public/assets/ui/fonts/` para las fuentes locales.
 
 El resto de la decoración, accesorios e iconos se dibuja en runtime para mantener el mismo estilo que `polkapets-v2` y conservar los `articleId` del contrato NFT actual.
+
+## Especies y animaciones
+
+Las cinco especies conservan el mismo ID en el juego local, el frontend NFT y el contrato:
+
+| ID | Especie | Bebé | Adolescente | Adulto |
+|---:|---|:---:|:---:|:---:|
+| 0 | Ajolote | ✓ | ✓ | ✓ |
+| 1 | Lobo | ✓ | ✓ | ✓ |
+| 2 | Oso grizzly | ✓ | ✓ | ✓ |
+| 3 | Tlacuache | ✓ | ✓ | ✓ |
+| 4 | Manatí | ✓ | ✓ | ✓ |
+
+La escena reproduce reposo, comer, jugar, dormir, baño, tristeza y muerte con tweens, variantes de color y filtros generados en runtime. El manatí flota, el oso se agacha y el tlacuache corre al jugar. El contrato guarda el ID de especie, propietario, nivel y necesidades, pero no guarda fotogramas. El contrato EVM desplegado responde `NUM_ESPECIES = 1`, así que el frontend usa el ajolote como especie NFT compatible cuando la dirección configurada no admite las demás.
