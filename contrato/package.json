@@ -13,10 +13,11 @@
     "deploy:items:testnet": "hardhat run scripts/deployItems.ts --network polkadotHubTestnet",
     "abi": "hardhat run scripts/exportAbi.ts",
     "balance": "hardhat run scripts/balance.ts --network polkadotHubTestnet",
-    "probar": "hardhat run scripts/probar.ts --network polkadotHubTestnet",
+    "probar": "hardhat run scripts/pruebaFuncional.ts --network polkadotHubTestnet",
     "deploy:v2:local": "hardhat run scripts/deployV2.ts --network localhost",
     "deploy:v2:testnet": "hardhat run scripts/deployV2.ts --network polkadotHubTestnet",
-    "aplicar:testnet": "hardhat run scripts/aplicarDespliegue.ts --no-compile"
+    "aplicar:testnet": "hardhat run scripts/aplicarDespliegue.ts --no-compile",
+    "verificar": "hardhat run scripts/verificarTestnet.ts --network polkadotHubTestnet"
   },
   "license": "MIT",
   "devDependencies": {

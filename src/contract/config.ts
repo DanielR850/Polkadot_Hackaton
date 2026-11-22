@@ -12,7 +12,7 @@ const LOCAL = (import.meta as { env?: Record<string, string | undefined> }).env?
 /** Dirección del contrato PolkaPets desplegado. */
 export const PETS_ADDRESS: `0x${string}` = LOCAL
   ? "0x5FbDB2315678afecb367f032d93F642f64180aa3"
-  : "0x758425A3b756079B34FF97cB9C7A764fD44C008a";
+  : "0xAD517D892f40567200Ff698E031beA6B1995Ba74";
 
 /*
  * Versión 2 (dificultad, modos, comida NFT, drops y temporadas): `npm run deploy:v2:testnet` desde
@@ -64,7 +64,7 @@ export const RANKING_ADDRESS: `0x${string}` | null = LOCAL ? null : "0xf675957A8
  * Contrato PolkaPetsTemporadas (v2): Competencia semanal de lunes a viernes, podio y campeones.
  * null mientras no esté desplegado: la Competencia usa entonces el ranking v1 de arriba.
  */
-export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" : null;
+export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0" : "0x8011Febe48d99d2DEfF732523151Ee9A7256835A";
 
 /**
  * Contrato PolkaPetsItems (contrato/contracts/PolkaPetsItems.sol): accesorios y muebles como NFT
@@ -72,11 +72,10 @@ export const TEMPORADAS_ADDRESS: `0x${string}` | null = LOCAL ? "0x9fE46736679d2
  * locales (sin NFT) y no se ofrece guardar el legado. Pega aquí la dirección que imprime
  * `npm run deploy:items:testnet` desde contrato/ (debe estar ligado a PETS_ADDRESS).
  */
-// TestNet: contrato de 52 objetos que desplegó Ana (rama avance-polkapets, 2026-11-16). Es la
-// versión 1 (sin comida ni ropa del cuerpo): la app lo detecta y esos objetos v2 se piden al desplegar v2.
+// TestNet: contratos v3 (cinco especies, color en el NFT, comida y ropa) desplegados el 2026-11-22.
 export const ITEMS_ADDRESS: `0x${string}` | null = LOCAL
   ? "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
-  : "0xaff0769c371fACc2bA4e164d55ba6e07b9af4b73";
+  : "0x32CC55CCccBcb9F0113026929B65BB888f0B2B3d";
 
 /** Ranking: filas por página y máximo de mascotas que se leen. */
 export const RANKING_PAGINA = 50;

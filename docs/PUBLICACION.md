@@ -4,10 +4,11 @@ Sigue el taller Products Devnet ([capítulos 5 y 6](https://github.com/BrandonFi
 con `pad` 0.22.1 y Product SDK 0.39.0.
 
 - Dominio: `polka-pets.dot` (Products Devnet, registrado).
-- Contrato: `0x758425A3b756079B34FF97cB9C7A764fD44C008a` en Polkadot Hub TestNet (chain id 420420417).
-  El despliegue tiene `NUM_ESPECIES = 1`: como NFT solo se adopta el ajolote. El Solidity de esta
-  rama ya declara cinco especies, pero no aplica hasta desplegar un contrato nuevo y cambiar la
-  dirección en `src/contract/config.ts`.
+- Contratos (Polkadot Hub TestNet, chain id 420420417, desplegados el 2026-11-22, v3):
+  `PolkaPets` `0xAD517D892f40567200Ff698E031beA6B1995Ba74` (cinco especies, dificultad, modos y color en el NFT),
+  `PolkaPetsItems` `0x32CC55CCccBcb9F0113026929B65BB888f0B2B3d` (61 objetos, comida y ropa) y
+  `PolkaPetsTemporadas` `0x8011Febe48d99d2DEfF732523151Ee9A7256835A`. Direcciones en `src/contract/config.ts`
+  y `contrato/deployments/polkadotHubTestnet-v2.json`. Los contratos v1 anteriores (`0x7584…`) ya no se usan.
 - Dentro de Polkadot Desktop o la Polkadot App, adoptar, cuidar y renombrar se firman con el Host
   (`src/contract/host.ts`). En un navegador normal se firma con MetaMask.
 - La cuenta del Host es una cuenta derivada de `polka-pets.dot`: es distinta de la de MetaMask, así
@@ -40,23 +41,13 @@ Después, en la Polkadot App o Desktop: `dotns.dot` → Profile → My Domains �
 Bulletin borra el contenido a los ~14 días: vuelve a publicar antes (por ejemplo, el día 11) y
 pega el CID nuevo con Resolve.
 
-## Contratos v3 en TestNet (para que la app sea funcional y no solo interfaz)
+## Contratos v3 en TestNet
 
-Los contratos de TestNet son v1 (una sola especie, 52 objetos de Ana). Los v3 agregan las cinco
-especies como NFT, dificultad y modos, temporadas semanales, comida, ropa y el color guardado en el
-NFT (`mint` con `variante`, `varianteDe`). La app detecta la versión y sigue funcionando con v1.
-
-1. En `contrato/`, copiar `.env.example` a `.env` y poner la llave de una cuenta **solo de pruebas** con
-   PAS del faucet (nunca subir el `.env`; Git lo ignora).
-2. `npm run deploy:v2:testnet` (despliega PolkaPets, PolkaPetsItems y PolkaPetsTemporadas, y autoriza a
-   Items como operador). Guarda las direcciones en `contrato/deployments/polkadotHubTestnet-v2.json`.
-3. `npm run aplicar:testnet` pega esas tres direcciones en `src/contract/config.ts`
-   (`PROBAR=1 npm run aplicar:testnet` muestra el cambio sin escribir).
-4. `pnpm build` y publicar con `pad` (ciclo de arriba). Dentro del Host se prueba con el `.dot`:
-   ningún Host se conecta a `localhost`.
-
-Esto reemplaza el contrato de objetos de Ana: sus ids 1 a 52 se conservan; se suman comida (53 a 59) y
-ropa (60 y 61). Las mascotas ya adoptadas en los contratos v1 no se mueven al v3.
+Ya están desplegados (arriba). Para volver a desplegar: `contrato/.env` con la llave de una cuenta de
+pruebas con PAS (nunca se sube), `npm run deploy:v2:testnet` y `npm run aplicar:testnet` desde `contrato/`,
+y después `pnpm build` y `pad`. `npm run verificar` solo lee y `npm run probar` hace una adopción y compras
+reales con esa cuenta. El catálogo de objetos va empacado en el código del contrato: un constructor que
+escribe los 61 objetos se queda sin gas en Polkadot Hub.
 
 ## Publicaciones
 

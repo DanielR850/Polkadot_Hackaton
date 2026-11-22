@@ -140,8 +140,17 @@ contract PolkaPetsItems is ERC721, Ownable {
     IPolkaPetsLectura public immutable pets;
 
     uint256 private _siguienteId = 1;
-    uint16 public totalArticulos;
-    mapping(uint16 => Articulo) private _catalogo;
+    /** @notice Cuántos objetos tiene el catálogo. */
+    function totalArticulos() external pure returns (uint16) {
+        return TOTAL_ARTICULOS;
+    }
+    /**
+     * Catálogo de objetos 1 a 61, empacado en el código (no en el almacenamiento) para que el
+     * despliegue quepa en el límite de gas de Polkadot Hub. 6 bytes por objeto: tipo, categoría,
+     * exclusivo, utilidad y valor (2 bytes). Debe coincidir con src/game/shop.ts y src/game/pantry.ts.
+     */
+    bytes private constant CATALOGO = hex"00000001000500000002000a00000001000800000002000800000001000f01000002000301000002000301000002000302000001000302000001000302000001000303010002000503010001000303020002000403020001000403030001000503040002000804010002000304020001000504030002000500000101000a00000102000f00000101001400000101000f00000001000c00000002000a00000001000600000002000c00000002000800000002000e00000001000801000002000301000002000301000002000301000002000301000002000302000001000302000001000302000001000302000001000303010002000403040002000703050001000403060001000603070002000903030001000503020002000404010002000304010001000404020002000304030002000404040001000405000003001405000004001905000004000f05000004001405000003001e05000103003205000104003c06000002000a060000020008";
+    uint16 private constant TOTAL_ARTICULOS = 61;
 
     /** NFT de objeto → id del catálogo y mascota a la que pertenece. */
     mapping(uint256 => uint16) public articuloDe;
@@ -203,114 +212,13 @@ contract PolkaPetsItems is ERC721, Ownable {
 
         // Debe coincidir con SHOP_CATALOG de src/game/shop.ts. Nombre, emoji y color de cada uno
         // están en `_visualArticulo`: no se guardan aquí para que el despliegue sea barato.
-        _definir(1, Tipo.Accesorio, 0); // Sombrero
-        _definir(2, Tipo.Accesorio, 0); // Moño
-        _definir(3, Tipo.Accesorio, 0); // Lentes
-        _definir(4, Tipo.Accesorio, 0); // Flor
-        _definir(5, Tipo.Accesorio, 0); // Corona
-        _definir(6, Tipo.Pared, 0); // Pared rosa mexicano
-        _definir(7, Tipo.Pared, 0); // Pared turquesa
-        _definir(8, Tipo.Pared, 0); // Pared cempasúchil
-        _definir(9, Tipo.Piso, 0); // Piso de barro
-        _definir(10, Tipo.Piso, 0); // Pasto
-        _definir(11, Tipo.Piso, 0); // Piedra
-        _definir(12, Tipo.Mueble, 1); // Sillón (asiento)
-        _definir(13, Tipo.Mueble, 1); // Silla (asiento)
-        _definir(14, Tipo.Mueble, 2); // Planta (planta)
-        _definir(15, Tipo.Mueble, 2); // Cactus (planta)
-        _definir(16, Tipo.Mueble, 3); // Lámpara (iluminación)
-        _definir(17, Tipo.Mueble, 4); // Camita (cama)
-        _definir(18, Tipo.Adorno, 1); // Cuadro (colgante)
-        _definir(19, Tipo.Adorno, 2); // Reloj (repisa)
-        _definir(20, Tipo.Adorno, 3); // Calaverita (ofrenda)
 
         // Utilidad de cada objeto (debe coincidir con `bonus` de SHOP_CATALOG en src/game/shop.ts).
-        _util(1, Utilidad.Pesitos, 5);
-        _util(2, Utilidad.Felicidad, 10);
-        _util(3, Utilidad.Pesitos, 8);
-        _util(4, Utilidad.Felicidad, 8);
-        _util(5, Utilidad.Pesitos, 15);
-        _util(6, Utilidad.Felicidad, 3);
-        _util(7, Utilidad.Felicidad, 3);
-        _util(8, Utilidad.Felicidad, 3);
-        _util(9, Utilidad.Pesitos, 3);
-        _util(10, Utilidad.Pesitos, 3);
-        _util(11, Utilidad.Pesitos, 3);
-        _util(12, Utilidad.Felicidad, 5);
-        _util(13, Utilidad.Pesitos, 3);
-        _util(14, Utilidad.Felicidad, 4);
-        _util(15, Utilidad.Pesitos, 4);
-        _util(16, Utilidad.Pesitos, 5);
-        _util(17, Utilidad.Felicidad, 8);
-        _util(18, Utilidad.Felicidad, 3);
-        _util(19, Utilidad.Pesitos, 5);
-        _util(20, Utilidad.Felicidad, 5);
         // Ropa mexicana: sombrero charro (accesorio) y prendas del cuerpo.
         // Objetos 25-52 de Ana (ya desplegados en TestNet con estos ids, tipos y categorías).
-        _definir(25, Tipo.Accesorio, 0); // Sombrero de charro
-        _definir(26, Tipo.Accesorio, 0); // Gorro de fiesta
-        _definir(27, Tipo.Accesorio, 0); // Paliacate (va en el cuello)
-        _definir(28, Tipo.Accesorio, 0); // Audífonos
-        _definir(29, Tipo.Accesorio, 0); // Gorro de lana
-        _definir(30, Tipo.Accesorio, 0); // Corona de flores
-        _definir(31, Tipo.Accesorio, 0); // Gorra
-        for (uint16 id = 32; id <= 36; id++) _definir(id, Tipo.Pared, 0); // Ladrillo, floral, madera, talavera, noche
-        for (uint16 id = 37; id <= 40; id++) _definir(id, Tipo.Piso, 0); // Duela, ajedrez, mosaico, arena
-        _definir(41, Tipo.Mueble, 1); // Puf (asiento)
-        _definir(42, Tipo.Mueble, 4); // Hamaca (cama)
-        _definir(43, Tipo.Mueble, 5); // Mesita (mesa)
-        _definir(44, Tipo.Mueble, 6); // Librero (almacenamiento)
-        _definir(45, Tipo.Mueble, 7); // Tele retro (entretenimiento)
-        _definir(46, Tipo.Mueble, 3); // Lámpara de pie (iluminación)
-        _definir(47, Tipo.Mueble, 2); // Girasol (planta)
-        _definir(48, Tipo.Adorno, 1); // Póster Polkadot (colgante)
-        _definir(49, Tipo.Adorno, 1); // Espejo (colgante)
-        _definir(50, Tipo.Adorno, 2); // Florero (repisa)
-        _definir(51, Tipo.Adorno, 3); // Velas (ofrenda)
-        _definir(52, Tipo.Adorno, 4); // Foquitos (guirnalda)
-        _util(25, Utilidad.Pesitos, 12);
-        _util(26, Utilidad.Felicidad, 10);
-        _util(27, Utilidad.Pesitos, 6);
-        _util(28, Utilidad.Felicidad, 12);
-        _util(29, Utilidad.Felicidad, 8);
-        _util(30, Utilidad.Felicidad, 14);
-        _util(31, Utilidad.Pesitos, 8);
-        for (uint16 id = 32; id <= 36; id++) _util(id, Utilidad.Felicidad, 3);
-        for (uint16 id = 37; id <= 40; id++) _util(id, Utilidad.Pesitos, 3);
-        _util(41, Utilidad.Felicidad, 4);
-        _util(42, Utilidad.Felicidad, 7);
-        _util(43, Utilidad.Pesitos, 4);
-        _util(44, Utilidad.Pesitos, 6);
-        _util(45, Utilidad.Felicidad, 9);
-        _util(46, Utilidad.Pesitos, 5);
-        _util(47, Utilidad.Felicidad, 4);
-        _util(48, Utilidad.Felicidad, 3);
-        _util(49, Utilidad.Pesitos, 4);
-        _util(50, Utilidad.Felicidad, 3);
-        _util(51, Utilidad.Felicidad, 4);
-        _util(52, Utilidad.Pesitos, 4);
         // Ropa del cuerpo (v2): una prenda a la vez, junto a un accesorio.
-        _definir(60, Tipo.Ropa, 0); // Poncho
-        _definir(61, Tipo.Ropa, 0); // Rebozo
-        _util(60, Utilidad.Felicidad, 10);
-        _util(61, Utilidad.Felicidad, 8);
         // Exclusivos: solo se ganan con un logro (`recompensa`).
-        _exclusivo(21); // Medalla
-        _exclusivo(22); // Estrella
-        _exclusivo(23); // Cinta de campeón
-        _exclusivo(24); // Amuleto
-        _util(21, Utilidad.Pesitos, 10);
-        _util(22, Utilidad.Felicidad, 15);
-        _util(23, Utilidad.Pesitos, 20);
-        _util(24, Utilidad.Pesitos, 15);
         // Colección de comida (consumible). Debe coincidir con FOOD_CATALOG de src/game/shop.ts.
-        _comida(53, Utilidad.Vida, 20, false); // Tamal
-        _comida(54, Utilidad.Saciedad, 25, false); // Pan de muerto
-        _comida(55, Utilidad.Saciedad, 15, false); // Elote
-        _comida(56, Utilidad.Saciedad, 20, false); // Agua de jamaica
-        _comida(57, Utilidad.Vida, 30, false); // Chocolate caliente
-        _comida(58, Utilidad.Vida, 50, true); // Mole de la abuela (solo drop)
-        _comida(59, Utilidad.Saciedad, 60, true); // Elixir de ajolote (solo drop)
         _poolDrop = [53, 54, 55, 56, 57, 58, 59];
         // Debe coincidir con ACHIEVEMENTS de src/game/achievements.ts (id, segundos, objetos, recompensa).
         _logro(1, 10 minutes, 0, 0); // Primeros pasos
@@ -335,7 +243,7 @@ contract PolkaPetsItems is ERC721, Ownable {
         IPolkaPetsLectura.MascotaView memory m = _mascotaDelSender(mascotaId);
         if (!m.viva) revert MascotaMuerta(mascotaId);
         if (_legados[mascotaId].sellado) revert LegadoYaSellado(mascotaId);
-        Articulo memory a = _catalogo[articuloId];
+        Articulo memory a = _articulo(articuloId);
         if (!a.existe) revert ArticuloInvalido(articuloId);
         if (a.exclusivo) revert SoloPorLogro(articuloId);
         if (a.tipo == Tipo.Comida) return _entregarComida(mascotaId, articuloId, msg.sender);
@@ -351,7 +259,7 @@ contract PolkaPetsItems is ERC721, Ownable {
         uint256 mascotaId = mascotaDe[tokenId];
         IPolkaPetsLectura.MascotaView memory m = _mascotaDelSender(mascotaId);
         if (!m.viva) revert MascotaMuerta(mascotaId);
-        Articulo memory a = _catalogo[articuloDe[tokenId]];
+        Articulo memory a = _articulo(articuloDe[tokenId]);
         if (a.tipo != Tipo.Comida || logroDe[tokenId] != 0 || _ownerOf(tokenId) == address(0)) revert NoEsComida(tokenId);
         _quitarDeDespensa(mascotaId, tokenId);
         _burn(tokenId);
@@ -463,8 +371,8 @@ contract PolkaPetsItems is ERC721, Ownable {
     }
 
     /** @notice Datos de un objeto del catálogo. */
-    function articulo(uint16 articuloId) external view returns (Articulo memory) {
-        return _catalogo[articuloId];
+    function articulo(uint16 articuloId) external pure returns (Articulo memory) {
+        return _articulo(articuloId);
     }
 
     /** @notice Objetos (ids del catálogo) que ha comprado una mascota. */
@@ -530,31 +438,23 @@ contract PolkaPetsItems is ERC721, Ownable {
         revert NoEsComida(tokenId);
     }
 
-    function _util(uint16 id, Utilidad u, uint16 valor) private {
-        _catalogo[id].utilidad = u;
-        _catalogo[id].valor = valor;
-    }
-
-    function _comida(uint16 id, Utilidad u, uint16 valor, bool soloDrop) private {
-        _catalogo[id] = Articulo(true, Tipo.Comida, 0, soloDrop, u, valor);
-        totalArticulos += 1;
-    }
-
     function _logro(uint16 id, uint32 minSegundos, uint16 minObjetos, uint16 recompensa) private {
         _catalogoLogros[id] = Logro(true, minSegundos, minObjetos, recompensa);
         totalLogros += 1;
     }
 
-    function _definir(uint16 id, Tipo tipo, uint8 categoria) private {
-        _catalogo[id] = Articulo(true, tipo, categoria, false, Utilidad.Ninguna, 0);
-        totalArticulos += 1;
+    /** Lee un objeto del catálogo empacado; id 0 o fuera de rango = no existe. */
+    function _articulo(uint16 id) private pure returns (Articulo memory a) {
+        if (id == 0 || id > TOTAL_ARTICULOS) return a;
+        uint256 o = (uint256(id) - 1) * 6;
+        a.existe = true;
+        a.tipo = Tipo(uint8(CATALOGO[o]));
+        a.categoria = uint8(CATALOGO[o + 1]);
+        a.exclusivo = CATALOGO[o + 2] != 0;
+        a.utilidad = Utilidad(uint8(CATALOGO[o + 3]));
+        a.valor = (uint16(uint8(CATALOGO[o + 4])) << 8) | uint16(uint8(CATALOGO[o + 5]));
     }
 
-    /** Accesorio exclusivo: no se compra, se gana con un logro. */
-    function _exclusivo(uint16 id) private {
-        _catalogo[id] = Articulo(true, Tipo.Accesorio, 0, true, Utilidad.Ninguna, 0);
-        totalArticulos += 1;
-    }
     /** La mascota debe existir y ser de quien llama. */
     function _mascotaDelSender(uint256 mascotaId) private view returns (IPolkaPetsLectura.MascotaView memory) {
         // ownerOf revierte si el NFT no existe.
@@ -579,7 +479,7 @@ contract PolkaPetsItems is ERC721, Ownable {
         for (uint256 i = 0; i < equipados.length; i++) {
             uint16 id = equipados[i];
             if (tokenComprado[mascotaId][id] == 0) revert NoComprado(mascotaId, id);
-            Articulo memory a = _catalogo[id];
+            Articulo memory a = _articulo(id);
             if (a.tipo == Tipo.Comida) revert NoSePonen(id);
             if (a.tipo == Tipo.Ropa) {
                 if (ropa) revert LugarRepetido(Tipo.Ropa);
@@ -626,7 +526,7 @@ contract PolkaPetsItems is ERC721, Ownable {
         bool esTrofeo = logroId != 0;
 
         Visual memory v = esTrofeo ? _visualLogro(logroId) : _visualArticulo(articuloDe[tokenId]);
-        string memory tipo = esTrofeo ? "Trofeo" : _nombreTipo(_catalogo[articuloDe[tokenId]].tipo);
+        string memory tipo = esTrofeo ? "Trofeo" : _nombreTipo(_articulo(articuloDe[tokenId]).tipo);
         IPolkaPetsLectura.MascotaView memory m = pets.verMascota(mascotaId);
         string memory mascota = _limpiar(m.nombre);
 
@@ -634,7 +534,7 @@ contract PolkaPetsItems is ERC721, Ownable {
             '{"name":"', v.nombre, '","description":"', tipo, " de ", mascota, unicode" · mascota #", Strings.toString(mascotaId),
             '","image":"data:image/svg+xml;base64,', Base64.encode(bytes(_svg(v, mascota))), '",'
         );
-        string memory utilidad = esTrofeo ? "Trofeo" : _textoUtilidad(_catalogo[articuloDe[tokenId]]);
+        string memory utilidad = esTrofeo ? "Trofeo" : _textoUtilidad(_articulo(articuloDe[tokenId]));
         string memory atributos = _atributos(tipo, mascota, mascotaId, _especie(m.especie), utilidad);
         return string.concat("data:application/json;base64,", Base64.encode(bytes(string.concat(cabecera, atributos))));
     }
