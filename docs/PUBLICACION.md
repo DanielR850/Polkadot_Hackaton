@@ -12,8 +12,6 @@ con `pad` 0.22.1 y Product SDK 0.39.0.
   (`game/src/contract/host.ts`). En un navegador normal se firma con MetaMask.
 - La cuenta del Host es una cuenta derivada de `polka-pets.dot`: es distinta de la de MetaMask, así
   que sus mascotas también son distintas.
-- `product-app/` y `tamagotchiaxolotl.paseo` son otra ruta (contrato PolkaVM en Paseo) y no se
-  publican con este ciclo. Su manifiesto todavía tiene la dirección provisional `0x000…000`.
 
 ## Ciclo de publicación
 

@@ -45,8 +45,7 @@ muestra cuánto vivió y se puede empezar una partida nueva.
 
 Nada se actualiza solo en la cadena. El contrato guarda los valores de la última interacción
 y calcula el estado actual al leer (`verMascota` y `ranking` son `view`). El frontend simula la
-misma fórmula cada segundo (`game/src/engine/tiempo.ts`) para que las barras bajen en vivo, y
-vuelve a leer la cadena cada 20 s.
+misma fórmula con las reglas puras de `src/game/petState.ts` y guarda el progreso local.
 
 ## Estructura
 

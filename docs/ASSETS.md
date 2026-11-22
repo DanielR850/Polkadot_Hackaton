@@ -27,11 +27,7 @@ Las variantes de color se generan sobre las ilustraciones originales en `src/gam
 
 El modo visual `?pixel=1` aplica el filtro de pixel art real a los sprites.
 
-## Recursos recibidos en `TomoDachi/`
-
-Las ilustraciones JPEG se conservan como referencias del equipo. No son spritesheets y actualmente la interfaz no las carga.
-
-## Recursos necesarios para el bundle
+`public/assets/pets/` contiene los sprites de las cinco especies. La interfaz no conserva material de referencia externo: todos los objetos e iconos se generan en runtime.
 
 La versión web desplegada solo carga estos recursos desde `public/`:
 

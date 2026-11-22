@@ -3,11 +3,9 @@ import { writeFileSync, mkdirSync, existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 
 /**
- * Exporta la ABI compilada de PolkaPets al frontend:
+ * Exporta la ABI compilada de PolkaPets al cliente activo:
  *   game/src/contract/polkapets.abi.json
- *
- * El wrapper tipado del juego (polkapets.ts) carga ese JSON. Regenera con `npm run abi`
- * cada vez que cambie el contrato.
+ * Regenera con `npm run abi` cada vez que cambie el contrato.
  */
 async function main() {
   await hre.run("compile");

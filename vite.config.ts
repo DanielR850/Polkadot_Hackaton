@@ -28,6 +28,6 @@ export default defineConfig({
   base: './',
   plugins: [soloDescriptorDevnet()],
   server: { host: '0.0.0.0', port: 5173 },
-  // product-app/ es otro proyecto con sus propias dependencias; no se escanea desde aquí.
+  // Vite solo procesa la aplicación principal de la raíz.
   optimizeDeps: { entries: ['index.html'] },
 });

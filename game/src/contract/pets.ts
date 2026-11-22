@@ -2,6 +2,37 @@
 // (MetaMask en un navegador normal, o el Host de Polkadot dentro de la Polkadot App/Desktop).
 // Antes de pedir una firma se simula la llamada: si el contrato la rechazaría, no se molesta al usuario.
 import { createPublicClient, createWalletClient, custom, defineChain, http, type Abi, type Address, type Hex } from "viem";
+import abiJson from "./polkapets.abi.json";
+
+/** ABI y tipos del contrato PolkaPets usados por el cliente activo. */
+export const polkaPetsAbi = abiJson as unknown as Abi;
+export type Accion = "alimentar" | "jugar" | "dormir" | "banar";
+export interface Mascota {
+  tokenId: bigint; nombre: string; especie: number; nacimiento: number; ultimaInteraccion: number;
+  vida: number; hambre: number; sed: number; energia: number; felicidad: number; limpieza: number;
+  nivel: number; xp: number; viva: boolean; etapa: number; duracion: number; muerte: number;
+}
+export interface FilaRanking { tokenId: bigint; dueno: Hex; nombre: string; especie: number; duracion: number; viva: boolean }
+const numero = (value: unknown) => Number(value ?? 0);
+const entero = (value: unknown) => BigInt((value as bigint | number | string | undefined) ?? 0);
+export function decodeMascota(raw: unknown): Mascota {
+  const o = (raw ?? {}) as Record<string, unknown>;
+  return {
+    tokenId: entero(o.tokenId), nombre: String(o.nombre ?? ""), especie: numero(o.especie),
+    nacimiento: numero(o.nacimiento), ultimaInteraccion: numero(o.ultimaInteraccion), vida: numero(o.vida),
+    hambre: numero(o.hambre), sed: numero(o.sed), energia: numero(o.energia), felicidad: numero(o.felicidad),
+    limpieza: numero(o.limpieza), nivel: numero(o.nivel), xp: numero(o.xp), viva: Boolean(o.viva),
+    etapa: numero(o.etapa), duracion: numero(o.duracion), muerte: numero(o.muerte),
+  };
+}
+export function decodeRanking(raw: unknown): FilaRanking[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.map((fila) => {
+    const o = (fila ?? {}) as Record<string, unknown>;
+    return { tokenId: entero(o.tokenId), dueno: String(o.dueno ?? "0x") as Hex, nombre: String(o.nombre ?? ""), especie: numero(o.especie), duracion: numero(o.duracion), viva: Boolean(o.viva) };
+  });
+}
+
 import {
   CHAIN_ID,
   CHAIN_NAME,
@@ -15,7 +46,6 @@ import {
   READ_TIMEOUT_MS,
   TX_TIMEOUT_MS,
 } from "./config";
-import { decodeMascota, decodeRanking, polkaPetsAbi, type Accion, type FilaRanking, type Mascota } from "./polkapets";
 import type { SesionHost } from "./host";
 import type { Eip1193Provider } from "./wallets";
 
