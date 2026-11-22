@@ -29,6 +29,10 @@ export function textoGenerico(mensaje: string, codigo?: unknown): string {
   if (/signingrejected|user (refused|closed)|\bcancel|\bdenied|\bdeclin/i.test(mensaje)) {
     return "No se aprobó la firma. Puedes intentarlo otra vez.";
   }
+  // El Host (la Polkadot App, Desktop o el visor del navegador) no tiene una cuenta conectada.
+  if (/NotConnected|product account request/i.test(mensaje)) {
+    return "Aquí no hay una cuenta de Polkadot conectada. Ábrela desde la Polkadot App o Polkadot Desktop con tu cuenta, o juega sin cartera.";
+  }
   if (/host provider|not connected|disconnect/i.test(mensaje)) {
     return "Se perdió la conexión con la Polkadot App. Cierra la app y vuelve a abrirla.";
   }

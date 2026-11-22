@@ -15,6 +15,11 @@ describe("textoGenerico y mensajeError", () => {
     expect(mensajeError({ code: 4001, message: "x" })).to.equal("Cancelaste la operación en la wallet.");
   });
 
+  it("explica cuando el Host no tiene una cuenta conectada", () => {
+    const m = mensajeError(new Error("Host rejected product account request: Domain → V1 → NotConnected"));
+    expect(m).to.include("no hay una cuenta de Polkadot conectada");
+  });
+
   it("reconoce falta de fondos", () => {
     expect(mensajeError(new Error("insufficient funds for gas"))).to.equal("No tienes PAS suficientes para pagar el gas.");
   });
