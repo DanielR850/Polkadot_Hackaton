@@ -12,7 +12,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
-import { createPublicClient, http } from 'viem';
+import { createPublicClient, encodeFunctionData, http } from 'viem';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = join(ROOT, 'e2e', 'out');
@@ -52,6 +52,20 @@ async function rpc(method, params = []) {
 }
 const chainNow = async () => parseInt((await rpc('eth_getBlockByNumber', ['latest', false])).timestamp, 16);
 async function travel(seconds) { await rpc('evm_increaseTime', [seconds]); await rpc('evm_mine', []); }
+/** Cuenta 0 de Hardhat (pública, solo para pruebas). */
+const ADMIN = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+const ACCOUNTS = [ADMIN, '0x70997970C51812dc3A010C7d01b50e0d17dc79C8', '0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC'];
+/** Firma una transacción directa al contrato con una cuenta desbloqueada del nodo (para preparar o comprobar estados). */
+async function chainSend(which, functionName, args, from = ADMIN) {
+  const data = encodeFunctionData({ abi: C[which].abi, functionName, args });
+  const hash = await rpc('eth_sendTransaction', [{ from, to: C[which].address, data }]);
+  for (let i = 0; i < 50; i++) {
+    const r = await rpc('eth_getTransactionReceipt', [hash]);
+    if (r) { if (r.status !== '0x1') throw new Error(`La transacción ${functionName} revirtió`); return hash; }
+    await new Promise((res) => setTimeout(res, 100));
+  }
+  throw new Error(`Sin recibo de ${functionName}`);
+}
 async function until(fn, what, ms = 20_000) {
   const t0 = Date.now();
   let last;
@@ -160,6 +174,7 @@ async function main() {
     pets: { address: d.pets, abi: artifact('PolkaPets') },
     items: { address: d.items, abi: artifact('PolkaPetsItems') },
     seasons: { address: d.temporadas, abi: artifact('PolkaPetsTemporadas') },
+    pagos: { address: d.pagos, abi: artifact('PolkaPetsPagos') },
   };
   console.log('Juego (vite --mode hardhat)…');
   await start(`node node_modules/vite/bin/vite.js --host 127.0.0.1 --port 5175 --strictPort --mode hardhat`, ROOT, /ready in/);
@@ -389,15 +404,31 @@ async function main() {
     await page.locator('dialog[open] form').evaluate((f) => f.requestSubmit());
     await until(async () => (await read('pets', 'verMascota', [1n])).xp === 10, 'el cuidado se firma (xp 10 en la cadena)');
     // Comida NFT.
-    await setStorage(page, 'tamagotchi-polkadot-purse-v1', JSON.stringify({ coins: 300, lastPlayAt: 0, best: { catch: 0, pong: 0 } }));
+    // Los pesitos viven en el contrato: editar el navegador no da dinero.
+    await setStorage(page, 'tamagotchi-polkadot-purse-v1', JSON.stringify({ coins: 9999, lastPlayAt: 0, best: { catch: 0, pong: 0 } }));
     await page.reload();
     await page.waitForSelector('.game-screen:not([hidden])');
+    await until(async () => (await text(page, '.coin-pill')).replace(/[^0-9]/g, '') === '0', 'los 9999 pesitos inventados en el navegador no cuentan: la cadena dice 0');
+    check(Number(await read('items', 'pesitos', [1n])) === 0, 'la mascota tiene 0 pesitos en el contrato');
+    await clickText(page, '.extras button', 'Tienda');
+    await clickText(page, 'dialog[open] [role=tab]', 'Comida');
+    await clickText(page, 'dialog[open] .shop-item', 'Tamal');
+    check(await page.locator('dialog[open] button', { hasText: 'Comprar por' }).first().isDisabled(), 'sin pesitos en la cadena el botón de comprar está desactivado');
+    check(/Te faltan/.test(await text(page, 'dialog[open]')), 'la tienda dice cuántos pesitos faltan');
+    await page.locator('dialog[open] .dialog-close').click().catch(() => {});
+    // Gana pesitos de verdad: el contrato los acredita (con su cupo) y la tienda ya puede cobrarlos.
+    await chainSend('items', 'cobrarPesitos', [1n, 60]);
+    check(Number(await read('items', 'pesitos', [1n])) === 60, 'cobrar suma 60 pesitos en el contrato');
+    await page.reload();
+    await page.waitForSelector('.game-screen:not([hidden])');
+    await until(async () => (await text(page, '.coin-pill')).replace(/[^0-9]/g, '') === '60', 'el juego muestra los pesitos de la cadena (60)');
     await clickText(page, '.extras button', 'Tienda');
     await clickText(page, 'dialog[open] [role=tab]', 'Comida');
     await clickText(page, 'dialog[open] .shop-item', 'Tamal');
     await clickText(page, 'dialog[open] button', 'Comprar por');
     await clickText(page, 'dialog[open] button', 'Wallet de prueba 0');
     await until(async () => (await read('items', 'despensaDe', [1n]))[0].length === 1, 'el Tamal es un NFT en la despensa de la cadena');
+    check(Number(await read('items', 'pesitos', [1n])) === 30, 'la compra cobra el precio (30) en el contrato');
     await until(async () => JSON.parse(await storage(page, 'tamagotchi-polkadot-pantry-v1')).items.filter((i) => i.foodId === 'food:tamal').length === 1, 'sin duplicados en la despensa local');
     await page.locator('dialog[open] .dialog-close').click().catch(() => {});
     // Regalo NFT: con la cadena 31 min adelante.
@@ -436,6 +467,76 @@ async function main() {
     await until(async () => (await text(page, 'dialog[open]')).includes('(tú)'), 'el ranking semanal muestra la partida propia');
     check((await text(page, 'dialog[open]')).includes('Abierta'), 'la temporada aparece abierta');
     await shot(page, '03-competencia-ranking');
+    check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
+  });
+
+  await scenario('Pesitos, sueño, vida y billetera en la cadena (Pacífico)', async () => {
+    const page = await newPage(2);
+    await createPet(page, { name: 'Dormilona', pet: 1, hours: 12 });
+    await clickText(page, '.chain-wallet', 'Wallet de prueba 2');
+    await page.waitForSelector('.mode-option');
+    await clickText(page, '.mode-option', 'pacífico');
+    await clickText(page, '.mint-screen .primary', 'ADOPTAR');
+    await page.waitForSelector('.mint-screen[data-step="done"]', { timeout: 30_000 });
+    await clickText(page, '.mint-screen .primary', 'ENTRAR');
+    await page.waitForSelector('.game-screen:not([hidden])');
+    const id = (await read('pets', 'mascotasDe', [ACCOUNTS[2]])).at(-1);
+    const nftKey = 'tamagotchi-polkadot-nft-v1';
+
+    // La vida y las necesidades las manda la cadena: inventarse datos en el navegador no sirve.
+    await travel(3 * 3600);
+    await page.evaluate(([k]) => { const p = JSON.parse(localStorage.getItem(k)); p.needs = { hunger: 100, thirst: 100, energy: 100, happiness: 100, cleanliness: 100 }; p.bornAt -= 999 * 3600_000; p.updatedAt = Date.now(); localStorage.setItem(k, JSON.stringify(p)); }, [PET]);
+    await page.reload();
+    await page.waitForSelector('.game-screen:not([hidden])');
+    const onChain = await read('pets', 'verMascota', [id]);
+    await until(async () => {
+      const saved = JSON.parse(await storage(page, PET));
+      return Math.abs(saved.needs.hunger - Number(onChain.hambre)) < 3 && saved.bornAt === Number(onChain.nacimiento) * 1000;
+    }, 'el juego vuelve a los datos de la cadena (hambre y edad) aunque se editó el navegador');
+
+    // Sueño: la cadena guarda cuándo se durmió y cuándo despertó.
+    await clickText(page, '.actions button', 'Dormir');
+    await clickText(page, 'dialog[open] button', 'Wallet de prueba 2').catch(() => {});
+    await until(async () => Number(await read('pets', 'durmiendoDesde', [id])) > 0, 'dormir guarda desde cuándo duerme en el contrato');
+    const desde = Number(await read('pets', 'durmiendoDesde', [id]));
+    await travel(120);
+    check(Number((await read('pets', 'verMascota', [id])).energia) > 0, 'la lectura ya cuenta la energía de lo dormido');
+    await clickText(page, '.actions button', 'Despertar').catch(async () => { await clickText(page, '.actions button', 'Dormir'); });
+    await clickText(page, 'dialog[open] button', 'Wallet de prueba 2').catch(() => {});
+    await until(async () => Number(await read('pets', 'durmiendoDesde', [id])) === 0, 'despertar queda registrado en la cadena');
+    check(desde > 0, 'la cadena guardó la hora en que se durmió');
+
+    // Pesitos: no hay forma de ponérselos; el cupo limita lo que se cobra.
+    check(Number(await read('items', 'pesitos', [id])) === 0, 'empieza con 0 pesitos en el contrato');
+    await chainSend('items', 'cobrarPesitos', [id, 60000], ACCOUNTS[2]);
+    check(Number(await read('items', 'pesitos', [id])) === 60, 'pedir 60000 solo da lo que permite el cupo (60)');
+    let rechazado = false;
+    try { await chainSend('items', 'cobrarPesitos', [id, 1], ACCOUNTS[2]); } catch { rechazado = true; }
+    check(rechazado, 'sin cupo el contrato rechaza cobrar más');
+    let ajeno = false;
+    try { await chainSend('items', 'cobrarPesitos', [id, 1], ACCOUNTS[1]); } catch { ajeno = true; }
+    check(ajeno, 'otra cuenta no puede cobrar pesitos de esta mascota');
+
+    // Billetera de cobro y pagos trackeables.
+    await page.reload();
+    await page.waitForSelector('.game-screen:not([hidden])');
+    await clickText(page, '.extras button', 'Billetera');
+    await until(async () => (await text(page, 'dialog[open]')).includes('Todavía no guardas una wallet'), 'avisa que falta la wallet de cobro');
+    await page.fill('dialog[open] input[placeholder^="0x"]', ACCOUNTS[1]);
+    await clickText(page, 'dialog[open] button', 'Guardar en la cadena');
+    await clickText(page, 'dialog[open] button', 'Wallet de prueba 2');
+    await until(async () => (await read('pagos', 'billeteraDe', [ACCOUNTS[2]])).toLowerCase() === ACCOUNTS[1].toLowerCase(), 'la wallet de cobro queda guardada en el contrato');
+    let sinWallet = false;
+    try { await chainSend('pagos', 'registrarPago', [0, 1, ACCOUNTS[0], 20n, '0x' + '11'.repeat(32)]); } catch { sinWallet = true; }
+    check(sinWallet, 'no se anota un pago a quien no registró su wallet');
+    const hash = '0x' + 'ab'.repeat(32);
+    await chainSend('pagos', 'registrarPago', [0, 1, ACCOUNTS[2], 20n, hash]);
+    check((await read('pagos', 'pagoDe', [0, 1])).txHash === hash, 'el pago queda en el contrato con su hash');
+    await page.locator('dialog[open] .dialog-close').click().catch(() => {});
+    await clickText(page, '.extras button', 'Billetera');
+    await until(async () => (await text(page, 'dialog[open]')).includes('$20'), 'Mi billetera muestra el premio pagado');
+    check(await page.locator('dialog[open] a[href*="' + hash + '"]').count() >= 1, 'el pago enlaza a su transacción en el explorador');
+    await shot(page, '12-billetera-y-pagos');
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 
@@ -478,8 +579,9 @@ async function main() {
   await scenario('Salón de campeones y semana nueva', async () => {
     const page = await newPage(0);
     await page.goto(APP);
-    await page.evaluate(([k]) => localStorage.setItem(k, JSON.stringify({ version: 2, petId: 0, name: 'X', bornAt: Date.now(), updatedAt: Date.now(), needs: { hunger: 80, thirst: 80, energy: 80, happiness: 80, cleanliness: 80 }, sleeping: false, diedAt: null, lifeHours: 1 })), [PET]);
-    await page.evaluate(() => localStorage.setItem('tamagotchi-polkadot-nft-v1', JSON.stringify({ tokenId: '1', address: '0xf39fd6e51aad88f6f4ce6ab8827279cfffb92266', mode: 'ranking' })));
+    await page.evaluate(([k]) => localStorage.setItem(k, JSON.stringify({ version: 2, petId: 0, name: 'X', bornAt: Date.now(), updatedAt: Date.now(), needs: { hunger: 80, thirst: 80, energy: 80, happiness: 80, cleanliness: 80 }, sleeping: false, diedAt: null, lifeHours: 12, peaceful: true })), [PET]);
+    // Se enlaza a la mascota viva #2 (la #1 murió en la cadena y el juego ya no le cree al navegador).
+    await page.evaluate(([address]) => localStorage.setItem('tamagotchi-polkadot-nft-v1', JSON.stringify({ tokenId: '2', address, mode: 'ranking' })), [ACCOUNTS[2].toLowerCase()]);
     await page.reload();
     await page.waitForSelector('.game-screen:not([hidden])');
     await clickText(page, '.actions button', 'Ranking');

@@ -26,6 +26,20 @@ async function main() {
     const got = { existe: a.existe, tipo: Number(a.tipo), categoria: Number(a.categoria), exclusivo: a.exclusivo };
     if (JSON.stringify(want) !== JSON.stringify(got)) { errores++; console.log(`id ${id}: esperado ${JSON.stringify(want)}, contrato ${JSON.stringify(got)}`); }
   }
+  // Precios: el contrato los trae empacados; deben coincidir con la tienda y la despensa.
+  const fuentes = [src, readFileSync(join(__dirname, "..", "..", "src", "game", "pantry.ts"), "utf8")];
+  let preciosRevisados = 0;
+  for (const texto of fuentes) {
+    for (const line of texto.split("\n")) {
+      const id = line.match(/articleId: (\d+)/)?.[1];
+      const price = line.match(/price: (\d+)/)?.[1];
+      if (!id || !price) continue;
+      preciosRevisados++;
+      const onChain = Number(await items.precio(Number(id)));
+      if (onChain !== Number(price)) { errores++; console.log(`precio del objeto ${id}: tienda ${price}, contrato ${onChain}`); }
+    }
+  }
+  console.log(`${preciosRevisados} precios revisados`);
   console.log(`${total} objetos revisados, ${errores} diferencias. totalArticulos = ${await items.totalArticulos()}`);
   if (errores) process.exitCode = 1;
 }

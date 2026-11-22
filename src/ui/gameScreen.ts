@@ -41,6 +41,8 @@ export interface GameIntents {
   shop?(): void;
   /** Ver los trofeos (logros) de la mascota. */
   trophies?(): void;
+  /** Mi billetera: dónde recibo mis premios y los pagos ya hechos. */
+  wallet?(): void;
   /** Despensa: comida especial y regalos (drops). */
   pantry?(): void;
   /** Mis animales: la mascota de ahora y las anteriores. */
@@ -126,7 +128,8 @@ export function createGameScreen(intents: GameIntents, options: GameScreenOption
   const spaceBtn = extra('🏠', 'Mi espacio', () => intents.space?.());
   const pantryBtn = extra('🧺', 'Despensa', () => intents.pantry?.());
   const trophiesBtn = extra('🏆', 'Trofeos', () => intents.trophies?.());
-  const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, pantryBtn, trophiesBtn);
+  const walletBtn = extra('👛', 'Billetera', () => intents.wallet?.());
+  const extras = h('div', { class: 'extras' }, shopBtn, accessoriesBtn, spaceBtn, pantryBtn, trophiesBtn, walletBtn);
   /** Modo y dificultad de la partida (p. ej. "⚔️ Competencia · 7 h"). */
   const badge = h('span', { class: 'mode-badge' });
   const coinsEl = h('span', { class: 'coin-pill', title: 'Pesitos ganados en los minijuegos' }, '🪙 0');

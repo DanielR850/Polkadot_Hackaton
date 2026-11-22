@@ -1,3 +1,4 @@
+import { fondear } from "./helpers/fondos";
 import { expect } from "chai";
 import hre from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
@@ -11,6 +12,7 @@ describe("Casos límite v2", () => {
     const [owner, ana, beto] = await ethers.getSigners();
     const pets = await (await ethers.getContractFactory("PolkaPets")).deploy();
     const items = await (await ethers.getContractFactory("PolkaPetsItems")).deploy(await pets.getAddress());
+    await fondear(items, [1, 2, 3, 4]);
     await pets.setOperador(await items.getAddress(), true);
     const inicio = BigInt(await time.latest()) + 100n;
     const temporadas = await (await ethers.getContractFactory("PolkaPetsTemporadas")).deploy(await pets.getAddress(), inicio);

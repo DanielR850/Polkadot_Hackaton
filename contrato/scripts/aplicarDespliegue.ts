@@ -16,8 +16,8 @@ const DIRECCION = /^0x[0-9a-fA-F]{40}$/;
 function main() {
   const probar = process.env.PROBAR === "1";
   if (!existsSync(ARCHIVO)) throw new Error(`No existe ${ARCHIVO}. Corre primero: npm run deploy:v2:testnet`);
-  const d = JSON.parse(readFileSync(ARCHIVO, "utf8")) as { pets: string; items: string; temporadas: string };
-  for (const [k, v] of Object.entries({ pets: d.pets, items: d.items, temporadas: d.temporadas })) {
+  const d = JSON.parse(readFileSync(ARCHIVO, "utf8")) as { pets: string; items: string; temporadas: string; pagos?: string };
+  for (const [k, v] of Object.entries({ pets: d.pets, items: d.items, temporadas: d.temporadas, ...(d.pagos ? { pagos: d.pagos } : {}) })) {
     if (!DIRECCION.test(v)) throw new Error(`Dirección inválida para ${k}: ${v}`);
   }
 
@@ -27,10 +27,13 @@ function main() {
     ["ITEMS_ADDRESS", /(export const ITEMS_ADDRESS[^=]*=\s*LOCAL\s*\?\s*"0x[0-9a-fA-F]+"\s*:\s*)(?:"0x[0-9a-fA-F]+"|null)/, `$1"${d.items}"`],
     ["TEMPORADAS_ADDRESS", /(export const TEMPORADAS_ADDRESS[^=]*=\s*LOCAL\s*\?\s*"0x[0-9a-fA-F]+"\s*:\s*)(?:"0x[0-9a-fA-F]+"|null)/, `$1"${d.temporadas}"`],
   ];
+  if (d.pagos) {
+    cambios.push(["PAGOS_ADDRESS", /(export const PAGOS_ADDRESS[^=]*=\s*LOCAL\s*\?\s*(?:"0x[0-9a-fA-F]+"|null)\s*:\s*)(?:"0x[0-9a-fA-F]+"|null)/, `$1"${d.pagos}"`]);
+  }
   for (const [nombre, patron, reemplazo] of cambios) {
     if (!patron.test(s)) throw new Error(`No encontré ${nombre} en config.ts; edítalo a mano.`);
     s = s.replace(patron, reemplazo);
-    console.log(`${nombre} -> ${nombre === "PETS_ADDRESS" ? d.pets : nombre === "ITEMS_ADDRESS" ? d.items : d.temporadas}`);
+    console.log(`${nombre} -> ${nombre === "PETS_ADDRESS" ? d.pets : nombre === "ITEMS_ADDRESS" ? d.items : nombre === "PAGOS_ADDRESS" ? d.pagos : d.temporadas}`);
   }
   if (probar) return console.log("(modo --probar: no se escribió nada)");
   writeFileSync(CONFIG, s);

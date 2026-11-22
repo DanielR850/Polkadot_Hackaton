@@ -82,6 +82,7 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
         uint64 muerte; // timestamp de la muerte; 0 si sigue viva
         uint8 horas;
         Modo modo;
+        uint64 durmiendoDesde; // 0 = despierta; si no, cuándo se durmió (la energía ya incluye lo dormido)
     }
 
     /** Una fila del ranking de longevidad. */
@@ -137,7 +138,8 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
     uint8 public constant COSTO_JUEGO_HAMBRE = 10;
     uint8 public constant COSTO_JUEGO_SED = 10;
     uint8 public constant COSTO_JUEGO_LIMPIEZA = 15;
-    uint8 public constant GANA_SUENO = 50;
+    /** Segundos dormida que recuperan toda la energía (unos 7 min). La energía se suma al despertar. */
+    uint32 public constant SEG_SUENO_COMPLETO = 400;
     uint8 public constant GANA_BANO = 50;
     /** Vida que recupera cada cuidado, si después de él ninguna necesidad queda en 0. */
     uint8 public constant GANA_VIDA = 5;
@@ -151,6 +153,8 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
 
     uint256 private _siguienteId = 1;
     mapping(uint256 => MascotaRaw) private _mascotas;
+    /** Cuándo se durmió cada mascota (timestamp). 0 = despierta. El momento de despertar queda en `Desperto`. */
+    mapping(uint256 => uint64) public durmiendoDesde;
     /** Contratos que pueden curar mascotas (p. ej. PolkaPetsItems al usar una comida NFT). */
     mapping(address => bool) public operador;
 
@@ -163,12 +167,16 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
     event NombreCambiado(uint256 indexed tokenId, string nombre);
     event VarianteElegida(uint256 indexed tokenId, uint8 variante);
     event SubioNivel(uint256 indexed tokenId, uint16 nivel);
+    event SeDurmio(uint256 indexed tokenId, uint64 desde);
+    event Desperto(uint256 indexed tokenId, uint64 segundosDormida, uint8 energiaGanada);
     event Curada(uint256 indexed tokenId, address indexed operador, uint8 vida, uint8 necesidades);
     event OperadorCambiado(address indexed operador, bool permitido);
 
     error NoExiste(uint256 tokenId);
     error NoEresDueno(uint256 tokenId);
     error EstaMuerta(uint256 tokenId);
+    error YaDuerme(uint256 tokenId);
+    error NoDuerme(uint256 tokenId);
     error NombreInvalido();
     error VarianteInvalida();
     error EspecieInvalida();
@@ -179,7 +187,7 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
 
     /** @notice Versión de la interfaz; el cliente la usa para saber qué funciones existen. */
     function version() external pure returns (uint8) {
-        return 3; // 3: v2 + color de la mascota (variante)
+        return 4; // 3: v2 + color de la mascota; 4: + dormir/despertar con hora en la cadena
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -261,11 +269,29 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
         _terminarCuidado(tokenId, m, s, "jugar");
     }
 
-    /** @notice Dormir: recupera energía. */
+    /**
+     * @notice Dormir: la mascota se duerme y la cadena guarda desde cuándo. La energía se recupera
+     *         según el tiempo que pase dormida (400 s = toda) y se suma al despertar, ya sea con
+     *         `despertar` o con el siguiente cuidado, que la despierta solo. Así la cadena sabe
+     *         cuándo despertó y no se puede "dormir" de golpe para llenar la energía.
+     */
     function dormir(uint256 tokenId) external {
+        if (_ownerOf(tokenId) == address(0)) revert NoExiste(tokenId);
+        if (ownerOf(tokenId) != msg.sender) revert NoEresDueno(tokenId);
+        if (durmiendoDesde[tokenId] != 0) revert YaDuerme(tokenId);
         (MascotaRaw storage m, uint8[5] memory s) = _prepararCuidado(tokenId);
-        s[2] = _sumar(s[2], GANA_SUENO);
+        durmiendoDesde[tokenId] = uint64(block.timestamp);
+        emit SeDurmio(tokenId, uint64(block.timestamp));
         _terminarCuidado(tokenId, m, s, "dormir");
+    }
+
+    /** @notice Despierta a la mascota dormida y le suma la energía de lo que durmió. */
+    function despertar(uint256 tokenId) external {
+        if (_ownerOf(tokenId) == address(0)) revert NoExiste(tokenId);
+        if (ownerOf(tokenId) != msg.sender) revert NoEresDueno(tokenId);
+        if (durmiendoDesde[tokenId] == 0) revert NoDuerme(tokenId);
+        (MascotaRaw storage m, uint8[5] memory s) = _prepararCuidado(tokenId); // despierta y suma la energía
+        _terminarCuidado(tokenId, m, s, "despertar");
     }
 
     /** @notice Bañar: recupera limpieza. */
@@ -341,6 +367,9 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
         v.etapa = _etapa(m.nivel, s, muerte);
         v.horas = m.horas;
         v.modo = m.modo;
+        uint64 desde = durmiendoDesde[tokenId];
+        v.durmiendoDesde = desde;
+        if (desde != 0 && muerte == 0) v.energia = _sumar(s[2], _energiaDormida(desde, ahora));
     }
 
     /** @notice tokenIds de las mascotas de un dueño. */
@@ -471,6 +500,20 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
         (s, vida, muerte) = _estado(m, uint64(block.timestamp));
         if (muerte != 0) revert EstaMuerta(tokenId);
         m.vida = vida;
+        // Si dormía, cualquier cuidado la despierta y se le suma la energía que recuperó.
+        uint64 desde = durmiendoDesde[tokenId];
+        if (desde != 0) {
+            uint8 ganada = _energiaDormida(desde, uint64(block.timestamp));
+            s[2] = _sumar(s[2], ganada);
+            durmiendoDesde[tokenId] = 0;
+            emit Desperto(tokenId, uint64(block.timestamp) - desde, ganada);
+        }
+    }
+
+    /** Energía (0 a 100) que recupera una mascota dormida desde `desde` hasta `hasta`. */
+    function _energiaDormida(uint64 desde, uint64 hasta) private pure returns (uint8) {
+        uint256 g = (uint256(hasta - desde) * 100) / SEG_SUENO_COMPLETO;
+        return g > 100 ? 100 : uint8(g);
     }
 
     /** Guarda las necesidades, recupera vida, suma XP y sube de nivel. */

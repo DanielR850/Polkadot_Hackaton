@@ -44,6 +44,14 @@ export const itemsAbi = parseAbi([
   "error SinDrops(uint256 mascotaId)",
   "error NoSePonen(uint16 articuloId)",
   "error OwnableUnauthorizedAccount(address account)",
+  // v3: pesitos y precios en la cadena.
+  "function pesitos(uint256 mascotaId) view returns (uint32)",
+  "function cobrarPesitos(uint256 mascotaId, uint16 cantidad)",
+  "function cupoDisponible(uint256 mascotaId) view returns (uint16)",
+  "function precio(uint16 articuloId) pure returns (uint16)",
+  "error PesitosInsuficientes(uint16 precio, uint32 saldo)",
+  "error SinCupo(uint256 mascotaId)",
+  "error CantidadInvalida()",
 ]);
 
 /** Lo que se guardó de una mascota que murió. */
@@ -129,6 +137,41 @@ export async function sellarLegadoMascota(
   await escribirLlamada(firmante, { functionName: "sellarLegado", args: [mascotaId, duracion, equipados], destino: destino() }, onPaso);
 }
 
+/** true si los pesitos viven en la cadena (PolkaPetsItems v3). */
+export async function pesitosEnCadena(): Promise<boolean> {
+  return (await versionItems()) >= 3;
+}
+
+/** Pesitos de la mascota en la cadena, o null si el contrato no los lleva (v1 y v2). */
+export async function leerPesitos(mascotaId: bigint): Promise<number | null> {
+  if (!(await pesitosEnCadena())) return null;
+  return Number(await publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "pesitos", args: [mascotaId] }));
+}
+
+/** Pesitos que la mascota puede cobrar ahora (el cupo se rellena con el tiempo). */
+export async function leerCupo(mascotaId: bigint): Promise<number> {
+  if (!(await pesitosEnCadena())) return 0;
+  return Number(await publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "cupoDisponible", args: [mascotaId] }));
+}
+
+/** Precio de un objeto según el contrato (lo que de verdad se cobra), o null si el contrato no lo tiene. */
+export async function leerPrecio(articuloId: number): Promise<number | null> {
+  if (!(await pesitosEnCadena())) return null;
+  return Number(await publicClient.readContract({ address: ITEMS_ADDRESS!, abi: itemsAbi, functionName: "precio", args: [articuloId] }));
+}
+
+/**
+ * Firma el cobro de los pesitos de un minijuego. Lo que se cobra lo limita el cupo del contrato: se pide
+ * como mucho lo que hay disponible y devuelve cuántos pesitos se pidieron de verdad.
+ */
+export async function cobrarPesitosMascota(firmante: Firmante, mascotaId: bigint, cantidad: number, onPaso?: (p: PasoTx) => void): Promise<number> {
+  await verificarItems();
+  const pedir = Math.min(Math.max(0, Math.floor(cantidad)), await leerCupo(mascotaId), 65535);
+  if (pedir <= 0) throw new Error("SinCupo");
+  await escribirLlamada(firmante, { functionName: "cobrarPesitos", args: [mascotaId, pedir], destino: destino() }, onPaso);
+  return pedir;
+}
+
 /** Objetos del contrato v1 desplegado en TestNet (catálogo de Ana). */
 export const ARTICULOS_V1 = 52;
 
@@ -200,6 +243,7 @@ export async function cambiarIntervaloDrop(firmante: Firmante, segundos: number,
 export function errorItems(e: unknown): string | null {
   if (e instanceof Error && e.message === "SoloV2") return "Este objeto llega con los contratos v2; todavía no está en TestNet.";
   if (e instanceof Error && e.message === "YaComprado") return "Esta mascota ya compró ese objeto.";
+  if (e instanceof Error && e.message === "SinCupo") return "Ya cobraste los pesitos que se permiten por ahora. El cupo se rellena con el tiempo.";
   if (e instanceof Error && e.message === "LogroYaReclamado") return "Esta mascota ya reclamó ese trofeo.";
   if (e instanceof Error && e.message === "LegadoYaSellado") return "El legado de esta mascota ya está guardado.";
   if (!(e instanceof BaseError)) return null;
@@ -210,6 +254,9 @@ export function errorItems(e: unknown): string | null {
     case "MascotaMuerta": return "Tu mascota ya murió en la blockchain: no se pueden comprar más objetos para ella.";
     case "LegadoYaSellado": return "El legado de esta mascota ya está guardado: no se pueden comprar más objetos para ella.";
     case "ArticuloInvalido": return "Ese objeto no existe en el contrato.";
+    case "PesitosInsuficientes": return "No te alcanzan los pesitos que tiene tu mascota en la blockchain.";
+    case "SinCupo": return "Ya cobraste los pesitos que se permiten por ahora. El cupo se rellena con el tiempo.";
+    case "CantidadInvalida": return "La cantidad de pesitos no es válida.";
     case "SoloPorLogro": return "Ese objeto no se compra: se gana reclamando un trofeo.";
     case "YaComprado": return "Esta mascota ya compró ese objeto.";
     case "NoComprado": return "Tienes puesto un objeto que esta mascota no compró como NFT.";

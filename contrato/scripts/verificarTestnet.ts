@@ -13,6 +13,10 @@ async function main() {
   const tamal = await items.articulo(53), poncho = await items.articulo(60), charro = await items.articulo(25);
   console.log("articulo 25 (charro) tipo", tamal && Number(charro.tipo), "· 53 (tamal) tipo", Number(tamal.tipo), "valor", Number(tamal.valor), "· 60 (poncho) tipo", Number(poncho.tipo));
   console.log("Temporadas version", await temp.version());
+  const pagos = await ethers.getContractAt("PolkaPetsPagos", d.pagos);
+  console.log("Pagos version", await pagos.version(), "· pagos registrados", (await pagos.totalPagos()).toString(), "· administrador", await pagos.owner());
+  console.log("Items: CUPO_MAX", await items.CUPO_MAX(), "· precio charro", await items.precio(25), "· precio tamal", await items.precio(53));
+  console.log("PolkaPets: sueño completo en", await pets.SEG_SUENO_COMPLETO(), "s");
   console.log("PolkaPets en Items:", (await items.pets()) === d.pets ? "ligado" : "NO LIGADO");
 }
 main().catch((e) => { console.error(e); process.exitCode = 1; });

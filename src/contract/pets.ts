@@ -6,11 +6,13 @@ import abiJson from "./polkapets.abi.json";
 
 /** ABI y tipos del contrato PolkaPets usados por el cliente activo. */
 export const polkaPetsAbi = abiJson as unknown as Abi;
-export type Accion = "alimentar" | "jugar" | "dormir" | "banar";
+export type Accion = "alimentar" | "jugar" | "dormir" | "despertar" | "banar";
 export interface Mascota {
   tokenId: bigint; nombre: string; especie: number; nacimiento: number; ultimaInteraccion: number;
   vida: number; hambre: number; sed: number; energia: number; felicidad: number; limpieza: number;
   nivel: number; xp: number; viva: boolean; etapa: number; duracion: number; muerte: number;
+  /** Cuándo se durmió (segundos Unix); 0 = despierta. Solo con PolkaPets v4. */
+  durmiendoDesde: number;
 }
 export interface FilaRanking { tokenId: bigint; dueno: Hex; nombre: string; especie: number; duracion: number; viva: boolean }
 const numero = (value: unknown) => Number(value ?? 0);
@@ -22,7 +24,7 @@ export function decodeMascota(raw: unknown): Mascota {
     nacimiento: numero(o.nacimiento), ultimaInteraccion: numero(o.ultimaInteraccion), vida: numero(o.vida),
     hambre: numero(o.hambre), sed: numero(o.sed), energia: numero(o.energia), felicidad: numero(o.felicidad),
     limpieza: numero(o.limpieza), nivel: numero(o.nivel), xp: numero(o.xp), viva: Boolean(o.viva),
-    etapa: numero(o.etapa), duracion: numero(o.duracion), muerte: numero(o.muerte),
+    etapa: numero(o.etapa), duracion: numero(o.duracion), muerte: numero(o.muerte), durmiendoDesde: numero(o.durmiendoDesde),
   };
 }
 export function decodeRanking(raw: unknown): FilaRanking[] {
@@ -198,6 +200,9 @@ export type Escritura = (
   | { functionName: "sellarLegado"; args: [bigint, bigint, readonly number[]] }
   | { functionName: "mint"; args: [string, number, number, number] | [string, number, number, number, number] }
   | { functionName: "usar"; args: [bigint] }
+  | { functionName: "cobrarPesitos"; args: [bigint, number] }
+  | { functionName: "setBilletera"; args: [Address] }
+  | { functionName: "registrarPago"; args: [number, number, Address, bigint, Hex] }
   | { functionName: "reclamarDrop"; args: [bigint] }
   | { functionName: "registrar"; args: [bigint] }
   | { functionName: "cerrarTemporada"; args: [bigint] }

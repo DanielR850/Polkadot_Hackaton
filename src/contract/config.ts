@@ -77,6 +77,12 @@ export const ITEMS_ADDRESS: `0x${string}` | null = LOCAL
   ? "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512"
   : "0x32CC55CCccBcb9F0113026929B65BB888f0B2B3d";
 
+/**
+ * Contrato PolkaPetsPagos: la wallet de cobro de cada jugador y los premios pagados (con el hash de
+ * cada pago), como en el Pac-Man. null mientras no esté desplegado: la sección de billetera se oculta.
+ */
+export const PAGOS_ADDRESS: `0x${string}` | null = LOCAL ? "0xCf7Ed3AccA5a467e9e704C703E8D87F634fB0Fc9" : null;
+
 /** Ranking: filas por página y máximo de mascotas que se leen. */
 export const RANKING_PAGINA = 50;
 export const RANKING_MAX_LEER = 1_000;

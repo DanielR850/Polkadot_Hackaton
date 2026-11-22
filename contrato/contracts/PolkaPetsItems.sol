@@ -30,6 +30,7 @@ interface IPolkaPetsLectura {
         uint64 muerte;
         uint8 horas;
         Modo modo;
+        uint64 durmiendoDesde;
     }
 
     function ownerOf(uint256 tokenId) external view returns (address);
@@ -151,6 +152,23 @@ contract PolkaPetsItems is ERC721, Ownable {
      */
     bytes private constant CATALOGO = hex"00000001000500000002000a00000001000800000002000800000001000f01000002000301000002000301000002000302000001000302000001000302000001000303010002000503010001000303020002000403020001000403030001000503040002000804010002000304020001000504030002000500000101000a00000102000f00000101001400000101000f00000001000c00000002000a00000001000600000002000c00000002000800000002000e00000001000801000002000301000002000301000002000301000002000301000002000302000001000302000001000302000001000302000001000303010002000403040002000703050001000403060001000603070002000903030001000503020002000404010002000304010001000404020002000304030002000404040001000405000003001405000004001905000004000f05000004001405000003001e05000103003205000104003c06000002000a060000020008";
     uint16 private constant TOTAL_ARTICULOS = 61;
+    /** Precio en pesitos de cada objeto (2 bytes por objeto; 0 en los exclusivos y los que solo salen de un drop). */
+    bytes private constant PRECIOS = hex"00280019002300140078001e001e001e002300230023003c0028001e0019002d005000280032002d0000000000000000005a001e00190037001e002d002300280028002d003200370028002d002d002800230046002d0041005a0037001e0023002d0023001e0028001e00190014000f002d000000000050003c";
+
+    // ─────────────────────────────────────────────────────────────────────────
+    // Pesitos 🪙: el saldo vive en la cadena, no en el dispositivo
+    // ─────────────────────────────────────────────────────────────────────────
+
+    /** Saldo de pesitos de cada mascota. Solo sube con `cobrarPesitos` y solo baja al comprar. */
+    mapping(uint256 => uint32) public pesitos;
+    /** Pesitos que da cada trofeo (logros 1 a 9, 2 bytes cada uno); deben coincidir con src/game/achievements.ts. */
+    bytes private constant PESITOS_LOGRO = hex"000a00140028003c0064012c001e006400c8";
+    /** Cupo para cobrar: se rellena con el tiempo, así que nadie puede ponerse todo el dinero que quiera. */
+    uint16 public constant CUPO_MAX = 60;
+    /** Segundos que tarda en volver 1 pesito al cupo (10 por minuto). */
+    uint32 public constant SEG_POR_PESITO = 6;
+    mapping(uint256 => uint16) private _cupo;
+    mapping(uint256 => uint64) private _cupoEn;
 
     /** NFT de objeto → id del catálogo y mascota a la que pertenece. */
     mapping(uint256 => uint16) public articuloDe;
@@ -183,6 +201,7 @@ contract PolkaPetsItems is ERC721, Ownable {
     event ArticuloComprado(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 articuloId, address indexed dueno);
     event LogroReclamado(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 logroId, address indexed dueno);
     event ComidaUsada(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 articuloId, Utilidad utilidad, uint16 valor);
+    event PesitosCobrados(uint256 indexed mascotaId, uint16 cantidad, uint32 saldo);
     event DropReclamado(uint256 indexed mascotaId, uint256 indexed tokenId, uint16 articuloId);
     event LegadoSellado(uint256 indexed mascotaId, address indexed dueno, uint64 duracion, uint256 comprados, uint256 equipados);
 
@@ -192,6 +211,9 @@ contract PolkaPetsItems is ERC721, Ownable {
     error ArticuloInvalido(uint16 articuloId);
     /** El objeto es exclusivo: solo se consigue reclamando su logro. */
     error SoloPorLogro(uint16 articuloId);
+    error PesitosInsuficientes(uint16 precio, uint32 saldo);
+    error SinCupo(uint256 mascotaId);
+    error CantidadInvalida();
     error YaComprado(uint256 mascotaId, uint16 articuloId);
     error NoComprado(uint256 mascotaId, uint16 articuloId);
     /** Dos objetos del mismo lugar: dos accesorios, dos paredes, dos pisos… */
@@ -246,6 +268,9 @@ contract PolkaPetsItems is ERC721, Ownable {
         Articulo memory a = _articulo(articuloId);
         if (!a.existe) revert ArticuloInvalido(articuloId);
         if (a.exclusivo) revert SoloPorLogro(articuloId);
+        uint16 precio = _precio(articuloId);
+        if (pesitos[mascotaId] < precio) revert PesitosInsuficientes(precio, pesitos[mascotaId]);
+        pesitos[mascotaId] -= precio;
         if (a.tipo == Tipo.Comida) return _entregarComida(mascotaId, articuloId, msg.sender);
         if (tokenComprado[mascotaId][articuloId] != 0) revert YaComprado(mascotaId, articuloId);
         tokenId = _entregar(mascotaId, articuloId, msg.sender);
@@ -317,6 +342,13 @@ contract PolkaPetsItems is ERC721, Ownable {
         _safeMint(msg.sender, tokenId);
         emit LogroReclamado(mascotaId, tokenId, logroId, msg.sender);
 
+        // Los pesitos del trofeo se acreditan aquí, ya validado el logro: una sola vez por mascota.
+        uint16 premio = _pesitosLogro(logroId);
+        if (premio != 0) {
+            pesitos[mascotaId] += premio;
+            emit PesitosCobrados(mascotaId, premio, pesitos[mascotaId]);
+        }
+
         // Recompensa: un objeto exclusivo, también ligado a la mascota (si no lo tenía ya).
         if (l.recompensa != 0 && tokenComprado[mascotaId][l.recompensa] == 0) {
             _entregar(mascotaId, l.recompensa, msg.sender);
@@ -351,7 +383,7 @@ contract PolkaPetsItems is ERC721, Ownable {
     // ─────────────────────────────────────────────────────────────────────────
 
     function version() external pure returns (uint8) {
-        return 2;
+        return 3; // 3: pesitos y precios en la cadena
     }
 
     /** @notice Drops que la mascota puede reclamar ahora. */
@@ -368,6 +400,50 @@ contract PolkaPetsItems is ERC721, Ownable {
         tokens = _despensa[mascotaId];
         articulos = new uint16[](tokens.length);
         for (uint256 i = 0; i < tokens.length; i++) articulos[i] = articuloDe[tokens[i]];
+    }
+
+    /**
+     * @notice Cobra pesitos ganados en un minijuego. El juego no se puede verificar desde la cadena, así
+     *         que lo que se cobra está limitado por un cupo que se rellena con el tiempo
+     *         (`CUPO_MAX` pesitos y 1 más cada `SEG_POR_PESITO` s): quien intente cobrar de más recibe
+     *         solo lo que el cupo permite. El dueño de la mascota viva es el único que cobra.
+     */
+    function cobrarPesitos(uint256 mascotaId, uint16 cantidad) external {
+        IPolkaPetsLectura.MascotaView memory m = _mascotaDelSender(mascotaId);
+        if (!m.viva) revert MascotaMuerta(mascotaId);
+        if (cantidad == 0) revert CantidadInvalida();
+        uint16 cupo = cupoDisponible(mascotaId);
+        if (cupo == 0) revert SinCupo(mascotaId);
+        if (cantidad > cupo) cantidad = cupo;
+        _cupo[mascotaId] = cupo - cantidad;
+        _cupoEn[mascotaId] = uint64(block.timestamp);
+        pesitos[mascotaId] += cantidad;
+        emit PesitosCobrados(mascotaId, cantidad, pesitos[mascotaId]);
+    }
+
+    /** @notice Pesitos que esta mascota puede cobrar ahora mismo. */
+    function cupoDisponible(uint256 mascotaId) public view returns (uint16) {
+        uint64 en = _cupoEn[mascotaId];
+        if (en == 0) return CUPO_MAX;
+        uint256 total = uint256(_cupo[mascotaId]) + (block.timestamp - en) / SEG_POR_PESITO;
+        return total > CUPO_MAX ? CUPO_MAX : uint16(total);
+    }
+
+    /** @notice Precio en pesitos de un objeto. */
+    function precio(uint16 articuloId) external pure returns (uint16) {
+        return _precio(articuloId);
+    }
+
+    function _pesitosLogro(uint16 logroId) private pure returns (uint16) {
+        if (logroId == 0 || logroId > PESITOS_LOGRO.length / 2) return 0;
+        uint256 o = (uint256(logroId) - 1) * 2;
+        return (uint16(uint8(PESITOS_LOGRO[o])) << 8) | uint16(uint8(PESITOS_LOGRO[o + 1]));
+    }
+
+    function _precio(uint16 id) private pure returns (uint16) {
+        if (id == 0 || id > TOTAL_ARTICULOS) return 0;
+        uint256 o = (uint256(id) - 1) * 2;
+        return (uint16(uint8(PRECIOS[o])) << 8) | uint16(uint8(PRECIOS[o + 1]));
     }
 
     /** @notice Datos de un objeto del catálogo. */

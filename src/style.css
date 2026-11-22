@@ -625,3 +625,14 @@ button:focus-visible, input:focus-visible { outline: 4px solid var(--accent); ou
   .extra-icon { width: 30px; height: 30px; }
   .extra-icon img { width: 24px; height: 24px; }
 }
+
+/* Billetera y pagos (dialogo Mi billetera y panel de administracion). */
+.wallet-dialog { width: min(560px, calc(100vw - 20px)); }
+.wallet-account, .wallet-current { margin: 6px 0; overflow-wrap: anywhere; }
+.payment-list { list-style: none; margin: 8px 0 14px; padding: 0; display: grid; gap: 6px; }
+.payment-list li { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; padding: 6px 8px; border: 2px solid var(--ink); background: var(--panel-2); font-size: 11px; }
+.payment-list li.mine { background: var(--accent-soft, var(--panel-2)); border-color: var(--accent-dark, var(--ink)); }
+.payment-list a { margin-left: auto; color: var(--accent-dark, inherit); }
+.admin-pay-form { display: grid; gap: 6px; margin: 8px 0; }
+.admin-pay-form input { width: 100%; box-sizing: border-box; padding: 6px 8px; border: 3px solid var(--ink); font: inherit; }
+.wallet-dialog input { text-transform: none; font-size: 11px; letter-spacing: 0; }

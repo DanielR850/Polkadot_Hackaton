@@ -40,7 +40,7 @@ describe("PolkaPets", () => {
     expect(m.modo).to.equal(COMPETENCIA);
     for (const v of [m.vida, m.hambre, m.sed, m.energia, m.felicidad, m.limpieza]) expect(v).to.equal(100);
     expect(m.viva).to.equal(true);
-    expect(await pets.version()).to.equal(3);
+    expect(await pets.version()).to.equal(4);
   });
 
   it("guarda el color elegido al adoptar y lo expone en varianteDe", async () => {
@@ -120,6 +120,7 @@ describe("PolkaPets", () => {
     expect(m.muerte).to.equal(0);
     await pets.alimentar(1);
     await pets.dormir(1);
+    await time.increase(600); // 10 min dormida: recupera un tercio de la energía al despertar
     await pets.jugar(1);
     await pets.banar(1);
     m = await pets.verMascota(1);
@@ -149,9 +150,60 @@ describe("PolkaPets", () => {
     expect(m.vida).to.equal(100 - 12 + 5);
   });
 
+  it("dormir guarda desde cuándo duerme, la energía depende de lo dormido y despertar lo registra", async () => {
+    const { pets, nacimiento } = await adoptar(7);
+    await time.setNextBlockTimestamp(nacimiento + 7200n); // gasta energía antes de dormir
+    await pets.jugar(1);
+    const antes = (await pets.verMascota(1)).energia;
+    await time.increase(60);
+    await expect(pets.dormir(1)).to.emit(pets, "SeDurmio");
+    const desde = await pets.durmiendoDesde(1);
+    expect(desde).to.be.greaterThan(0n);
+    await expect(pets.dormir(1)).to.be.revertedWithCustomError(pets, "YaDuerme");
+    // 15 minutos dormida = la mitad de la energía (30 min = toda); la lectura ya la incluye.
+    await time.increaseTo(desde + 900n);
+    const durmiendo = await pets.verMascota(1);
+    expect(durmiendo.durmiendoDesde).to.equal(desde);
+    expect(Number(durmiendo.energia)).to.be.greaterThan(Number(antes));
+    await time.setNextBlockTimestamp(desde + 1000n);
+    await expect(pets.despertar(1)).to.emit(pets, "Desperto");
+    expect(await pets.durmiendoDesde(1)).to.equal(0n);
+    await expect(pets.despertar(1)).to.be.revertedWithCustomError(pets, "NoDuerme");
+    const despierta = await pets.verMascota(1);
+    expect(despierta.durmiendoDesde).to.equal(0n);
+    expect(Number(despierta.energia)).to.be.greaterThan(Number(antes));
+  });
+
+  it("no se llena la energía durmiendo de golpe y cualquier cuidado despierta a la mascota", async () => {
+    const { pets, nacimiento } = await adoptar(7);
+    await time.setNextBlockTimestamp(nacimiento + 14400n);
+    await pets.jugar(1);
+    const baja = (await pets.verMascota(1)).energia;
+    await pets.dormir(1);
+    await pets.despertar(1); // despierta casi al instante: casi no recupera energía
+    const poca = (await pets.verMascota(1)).energia;
+    expect(Number(poca) - Number(baja)).to.be.lessThan(5);
+    await pets.dormir(1);
+    await time.increase(600);
+    await pets.alimentar(1); // despierta sola y recibe la energía de 10 minutos
+    expect(await pets.durmiendoDesde(1)).to.equal(0n);
+    expect(Number((await pets.verMascota(1)).energia)).to.be.greaterThan(Number(poca) + 25);
+  });
+
+  it("solo el dueño duerme o despierta a su mascota", async () => {
+    const { pets } = await adoptar(7);
+    const [, otro] = await ethers.getSigners();
+    await expect(pets.connect(otro).dormir(1)).to.be.revertedWithCustomError(pets, "NoEresDueno");
+    await pets.dormir(1);
+    await expect(pets.connect(otro).despertar(1)).to.be.revertedWithCustomError(pets, "NoEresDueno");
+  });
+
   it("sube de nivel al acumular XP", async () => {
     const { pets } = await adoptar(12);
-    for (let i = 0; i < 10; i++) await pets.dormir(1);
+    for (let i = 0; i < 5; i++) {
+      await pets.dormir(1);
+      await pets.despertar(1);
+    }
     const m = await pets.verMascota(1);
     expect(m.nivel).to.equal(2);
     expect(m.etapa).to.equal(1); // Joven

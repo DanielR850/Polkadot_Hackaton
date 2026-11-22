@@ -157,6 +157,17 @@
         "type": "uint256"
       }
     ],
+    "name": "NoDuerme",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
     "name": "NoEresDueno",
     "type": "error"
   },
@@ -206,6 +217,17 @@
   {
     "inputs": [],
     "name": "VarianteInvalida",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "YaDuerme",
     "type": "error"
   },
   {
@@ -318,6 +340,31 @@
         "type": "uint256"
       },
       {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "segundosDormida",
+        "type": "uint64"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "energiaGanada",
+        "type": "uint8"
+      }
+    ],
+    "name": "Desperto",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
         "indexed": true,
         "internalType": "address",
         "name": "dueno",
@@ -394,6 +441,25 @@
       }
     ],
     "name": "OwnershipTransferred",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint64",
+        "name": "desde",
+        "type": "uint64"
+      }
+    ],
+    "name": "SeDurmio",
     "type": "event"
   },
   {
@@ -565,19 +631,6 @@
   },
   {
     "inputs": [],
-    "name": "GANA_SUENO",
-    "outputs": [
-      {
-        "internalType": "uint8",
-        "name": "",
-        "type": "uint8"
-      }
-    ],
-    "stateMutability": "view",
-    "type": "function"
-  },
-  {
-    "inputs": [],
     "name": "GANA_VIDA",
     "outputs": [
       {
@@ -727,6 +780,19 @@
         "internalType": "uint64",
         "name": "",
         "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "SEG_SUENO_COMPLETO",
+    "outputs": [
+      {
+        "internalType": "uint32",
+        "name": "",
+        "type": "uint32"
       }
     ],
     "stateMutability": "view",
@@ -896,9 +962,41 @@
         "type": "uint256"
       }
     ],
+    "name": "despertar",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
     "name": "dormir",
     "outputs": [],
     "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "",
+        "type": "uint256"
+      }
+    ],
+    "name": "durmiendoDesde",
+    "outputs": [
+      {
+        "internalType": "uint64",
+        "name": "",
+        "type": "uint64"
+      }
+    ],
+    "stateMutability": "view",
     "type": "function"
   },
   {
@@ -1544,6 +1642,11 @@
             "internalType": "enum PolkaPets.Modo",
             "name": "modo",
             "type": "uint8"
+          },
+          {
+            "internalType": "uint64",
+            "name": "durmiendoDesde",
+            "type": "uint64"
           }
         ],
         "internalType": "struct PolkaPets.MascotaView",

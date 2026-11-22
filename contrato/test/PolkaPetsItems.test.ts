@@ -1,3 +1,4 @@
+import { fondear } from "./helpers/fondos";
 import { expect } from "chai";
 import hre from "hardhat";
 import { time } from "@nomicfoundation/hardhat-network-helpers";
@@ -30,6 +31,7 @@ describe("PolkaPetsItems", () => {
     const pets = await (await ethers.getContractFactory("PolkaPets")).deploy();
     await pets.waitForDeployment();
     const items = await (await ethers.getContractFactory("PolkaPetsItems")).deploy(await pets.getAddress());
+    await fondear(items, [1, 2, 3, 4]);
     await items.waitForDeployment();
     await pets.mint("Michi", 0, 12, 1); // mascota 1
     await pets.mint("Pelusa", 0, 12, 1); // mascota 2

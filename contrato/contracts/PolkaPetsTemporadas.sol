@@ -28,6 +28,7 @@ interface IPolkaPetsV2 {
         uint64 muerte;
         uint8 horas;
         Modo modo;
+        uint64 durmiendoDesde;
     }
 
     function ownerOf(uint256 tokenId) external view returns (address);

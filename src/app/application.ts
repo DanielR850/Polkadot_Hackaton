@@ -17,9 +17,11 @@ import { createCollectionDialog } from '../ui/collectionDialog.ts';
 import { addRecord, loadHistory, saveHistory, type PetRecord } from '../game/history.ts';
 import { createSeasonDialog, type SeasonRow } from '../ui/seasonDialog.ts';
 import { createAdminScreen, type AdminView } from '../ui/adminScreen.ts';
+import { createWalletDialog, type PaymentRow, type WalletData } from '../ui/walletDialog.ts';
+import type { PagoRegistrado } from '../polkadot/nftMint.ts';
 import type { ChainVersions, Temporada } from '../polkadot/nftMint.ts';
 import { calendario } from '../contract/temporadas.ts';
-import { CHAIN_NAME, ITEMS_ADDRESS as ITEMS_ADDR, PETS_ADDRESS, TEMPORADAS_ADDRESS } from '../contract/config.ts';
+import { CHAIN_NAME, ITEMS_ADDRESS as ITEMS_ADDR, PAGOS_ADDRESS, PETS_ADDRESS, TEMPORADAS_ADDRESS } from '../contract/config.ts';
 import { configForPet, DIFFICULTIES } from '../game/config.ts';
 import { createPetScene, type PetSceneHandle } from '../game/petScene.ts';
 import { findPet } from '../game/catalog.ts';
@@ -92,6 +94,10 @@ let minter: NftMinter | null = null;
 let mintBusy = false;
 let mintAccount: MintAccount | null = null;
 let lastWallets: MintWallet[] = [];
+/** Pesitos de la mascota en la cadena (PolkaPetsItems v3). null = no hay contrato que los lleve: son locales. */
+let chainCoins: number | null = null;
+/** Pesitos que se muestran y con los que se compra: los de la cadena si los hay, si no los locales. */
+const coinsNow = (): number => chainCoins ?? purse.coins;
 let bathing = false;
 let bathProgress = 0;
 let action: { anim: 'eat' | 'play'; until: number } | null = null;
@@ -388,6 +394,7 @@ async function signRun() {
     pendingSign = null;
     signDialog.close();
     job.apply();
+    syncSoon();
   } catch (error) {
     signBusy = false;
     console.warn('[polkapets] firmar cuidado', error);
@@ -489,15 +496,21 @@ function claimMiniGame(result: MiniGameResult) {
     if (!possible(play(p, now, config, reward.happiness), p)) return;
     careWithSignature(`Cobrar el minijuego de ${p.name}`, 'jugar', () => withPet((q, t) => {
       purse = {
-        coins: purse.coins + reward.coins,
+        // Con los pesitos en la cadena se cobran allá (más abajo); aquí no se suman.
+        coins: chainCoins === null ? purse.coins + reward.coins : purse.coins,
         lastPlayAt: Date.now(),
         best: { ...purse.best, [result.game]: Math.max(purse.best[result.game], result.score) },
       };
       savePurse(purse);
-      gameScreen.setCoins(purse.coins);
+      gameScreen.setCoins(coinsNow());
       miniGameDialog.close();
       commit(play(q, t, config, reward.happiness),
         `¡Se divirtió muchísimo! +${reward.happiness} de felicidad y +${reward.coins} 🪙.`, { anim: 'play', icon: '🎾' });
+      // Con los pesitos en la cadena, cobrarlos es otra firma: el contrato valida y limita lo que se cobra.
+      if (chainCoins !== null && reward.coins > 0) {
+        signedAction(`Cobrar ${reward.coins} 🪙 de ${q.name}`, async (m, tokenId, onStep) => { await m.claimCoins(tokenId, reward.coins, onStep); },
+          () => void refreshCoins(), () => gameScreen.say('No se cobraron los pesitos: se puede intentar con el siguiente juego.'));
+      }
     }));
   });
 }
@@ -605,11 +618,16 @@ function signPurchase(item: ShopItem): Promise<void> {
 const shopBackend: ShopBackend = {
   async buy(item) {
     if (pet?.diedAt != null) throw new Error('Tu mascota ya murió: no se pueden comprar más objetos para ella.');
-    const check = canBuy(item, purse.coins, purchases);
+    const check = canBuy(item, coinsNow(), purchases);
     if (!check.ok) throw new Error(check.reason);
     if (itemsAsNft()) await signPurchase(item);
-    purse = { ...purse, coins: purse.coins - item.price };
-    savePurse(purse);
+    // Con los pesitos en la cadena el contrato ya los cobró; si no, se descuentan aquí.
+    if (chainCoins === null) {
+      purse = { ...purse, coins: purse.coins - item.price };
+      savePurse(purse);
+    } else {
+      await refreshCoins();
+    }
     purchases = [...purchases, item.id];
     savePurchases(purchases);
   },
@@ -623,9 +641,9 @@ const shopDialog = createShopDialog(SHOP_CATALOG, {
     shopDialog.buying(item);
     try {
       await shopBackend.buy(item);
-      gameScreen.setCoins(purse.coins);
+      gameScreen.setCoins(coinsNow());
       await loadInventory();
-      shopDialog.bought(item, { coins: purse.coins, owned: purchases });
+      shopDialog.bought(item, { coins: coinsNow(), owned: purchases });
     } catch (error) {
       shopDialog.failed(error instanceof Error ? error.message : 'No se pudo completar la compra.');
     } finally {
@@ -676,15 +694,21 @@ const gameScreen = createGameScreen({
   }),
   accessories: () => void openInventory(accessoriesDialog),
   space: () => void openInventory(spaceDialog),
-  shop: () => shopDialog.open({ coins: purse.coins, owned: purchases, pantry: pantryCount() }),
+  shop: () => { void refreshCoins().then(() => shopDialog.open({ coins: coinsNow(), owned: purchases, pantry: pantryCount() })); },
   trophies: () => openTrophies(),
+  wallet: () => walletDialog.open(),
   sleep: () => withPet((p, now) => {
     if (computeStats(p, now, config).energy >= 99.5) { gameScreen.say(sayAs(p.name, 'notSleepy', now)); return; }
     if (!possible(sleep(p, now, config), p)) return;
     careWithSignature(`Mandar a dormir a ${p.name}`, 'dormir', () => withPet((q, t) =>
       commit(sleep(q, t, config), sayAs(q.name, 'goSleep', t))));
   }),
-  wake: () => withPet((p, now) => commit(wake(p, now, config), sayAs(p.name, 'woke', now))),
+  wake: () => withPet((p) => {
+    const woke = () => withPet((q, t) => commit(wake(q, t, config), sayAs(q.name, 'woke', t)));
+    // Con PolkaPets v4 la cadena guarda cuándo despertó; con una versión anterior no existe `despertar`.
+    if (onChain() && versions.pets >= 4) careWithSignature(`Despertar a ${p.name}`, 'despertar', woke);
+    else woke();
+  }),
   bath: () => {
     bathing = true;
     bathProgress = 0;
@@ -985,9 +1009,13 @@ function rewardLabel(def: AchievementDef): string {
  * contrato ya creó el NFT del accesorio al reclamar; aquí solo se refleja en el juego.
  */
 function grantReward(def: AchievementDef) {
-  purse = { ...purse, coins: purse.coins + def.coins };
-  savePurse(purse);
-  gameScreen.setCoins(purse.coins);
+  if (chainCoins === null) {
+    purse = { ...purse, coins: purse.coins + def.coins };
+    savePurse(purse);
+    gameScreen.setCoins(purse.coins);
+  } else {
+    void refreshCoins(); // el contrato acreditó los pesitos al validar el trofeo
+  }
   if (def.rewardItem && !purchases.includes(def.rewardItem)) {
     purchases = [...purchases, def.rewardItem];
     savePurchases(purchases);
@@ -1168,19 +1196,23 @@ async function claimDrop() {
 async function buyFood(food: SpecialFood) {
   if (shopBusy) return;
   if (!pet || pet.diedAt !== null) { shopDialog.failed('Tu mascota ya no puede comer.'); return; }
-  if (purse.coins < food.price) { shopDialog.failed(`Te faltan ${food.price - purse.coins} 🪙.`); return; }
+  if (coinsNow() < food.price) { shopDialog.failed(`Te faltan ${food.price - coinsNow()} 🪙.`); return; }
   shopBusy = true;
   shopDialog.buying(food);
   if (nft) await ensureChainInfo();
   const done = async (asNft: boolean) => {
-    purse = { ...purse, coins: purse.coins - food.price };
-    savePurse(purse);
-    gameScreen.setCoins(purse.coins);
+    if (chainCoins === null) {
+      purse = { ...purse, coins: purse.coins - food.price };
+      savePurse(purse);
+    } else {
+      await refreshCoins();
+    }
+    gameScreen.setCoins(coinsNow());
     // Con NFT la comida nueva se lee de la cadena (con su tokenId); sin NFT se guarda aquí.
     if (asNft) await syncPantry();
     else pantry = addToPantry(pantry, { uid: `local-${Date.now()}`, foodId: food.id });
     savePantry(pantry);
-    shopDialog.boughtFood(food, { coins: purse.coins, pantry: pantryCount() });
+    shopDialog.boughtFood(food, { coins: coinsNow(), pantry: pantryCount() });
   };
   try {
     const asNft = foodAsNft();
@@ -1198,6 +1230,55 @@ async function buyFood(food: SpecialFood) {
     shopBusy = false;
   }
 }
+
+/* ------------------------------------------ la cadena manda (modos con NFT) */
+
+/** Hay una mascota NFT cuya verdad vive en el contrato (Pacífico o Competencia). */
+const onChain = (): boolean => pet !== null && nft !== null && playMode() !== 'local';
+
+/**
+ * Con NFT, la vida, las necesidades, la edad, la muerte y el sueño salen del contrato: si alguien edita
+ * el navegador (localStorage) el estado se corrige en cuanto se lee la cadena. Sin cartera el juego es
+ * local y no compite: ahí no hay nada que verificar.
+ */
+async function syncFromChain(): Promise<void> {
+  if (!pet || !nft || !onChain()) return;
+  try {
+    const m = await getMinter();
+    const c = await m.chainPet(BigInt(nft.tokenId));
+    if (!pet || !nft) return;
+    const now = Date.now();
+    pet = {
+      ...pet,
+      bornAt: c.bornAt * 1000,
+      updatedAt: now,
+      needs: { hunger: c.hunger, thirst: c.thirst, energy: c.energy, happiness: c.happiness, cleanliness: c.cleanliness },
+      sleeping: c.alive && c.sleepingSince > 0 && c.energy < 100,
+      diedAt: c.alive ? null : (c.diedAt > 0 ? c.diedAt * 1000 : now),
+    };
+    savePet(pet);
+    await refreshCoins();
+    render();
+  } catch (error) {
+    console.warn('[polkapets] sincronizar con la cadena', error);
+  }
+}
+
+/** Lee los pesitos del contrato (si los lleva) y los muestra. */
+async function refreshCoins(): Promise<void> {
+  if (!nft || !onChain()) { chainCoins = null; return; }
+  try {
+    const m = await getMinter();
+    await ensureChainInfo();
+    chainCoins = versions.items >= 3 ? await m.chainCoins(BigInt(nft.tokenId)) : null;
+  } catch (error) {
+    console.warn('[polkapets] pesitos en la cadena', error);
+  }
+  gameScreen.setCoins(coinsNow());
+}
+
+/** Después de una firma, la lectura puede ir un bloque atrás: se espera un poco antes de sincronizar. */
+const syncSoon = () => { window.setTimeout(() => void syncFromChain(), 4000); };
 
 function withPet(fn: (p: PetState, now: number) => void) {
   if (pet) fn(pet, Date.now());
@@ -1315,11 +1396,13 @@ if (params.get('admin') === '1') {
   useTheme(pet?.petId ?? null);
   showNftNote();
   setRecordButton();
-  gameScreen.setCoins(purse.coins);
+  gameScreen.setCoins(coinsNow());
   gameScreen.setStyle(drawStyle);
   showScreen(pet ? 'game' : 'start');
-  // Con NFT se averigua en segundo plano qué contratos hay (v1 o v2).
-  if (nft) void ensureChainInfo();
+  // Con NFT se averigua en segundo plano qué contratos hay y se trae el estado verdadero de la cadena.
+  if (nft) void ensureChainInfo().then(() => syncFromChain());
+  window.setInterval(() => { if (document.visibilityState === 'visible') void syncFromChain(); }, 45_000);
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void syncFromChain(); });
   // Murió en una sesión anterior y nunca se preguntó: se pregunta ahora (solo con NFT).
   if (pet && pet.diedAt !== null && nft && !nft.asked) openRecord(true);
   window.addEventListener('storage', (event) => {
@@ -1340,12 +1423,47 @@ if (params.get('admin') === '1') {
   window.setInterval(tick, 1000);
 }
 
+/* ------------------------------------------------------ billetera y pagos */
+
+const paymentRow = (p: PagoRegistrado, mine: string | null, txUrl: (hash: string) => string): PaymentRow => ({
+  week: p.semana, place: p.lugar, amount: p.monto, account: p.cuenta, wallet: p.billetera, txHash: p.txHash, url: txUrl(p.txHash),
+  paidAt: p.pagadoEn, mine: !!mine && p.cuenta.toLowerCase() === mine.toLowerCase(),
+});
+
+/** Billetera de cobro: se lee con la cuenta del NFT aunque no haya una wallet conectada en este momento. */
+const walletDialog = createWalletDialog({
+  async load(): Promise<WalletData> {
+    const m = await getMinter();
+    const enabled = m.payouts.enabled();
+    const connected = onChain();
+    const account = connected && nft ? nft.address : null;
+    if (!enabled) return { enabled, connected, account, wallet: null, mine: [], latest: [] };
+    const [wallet, mine, latest] = await Promise.all([
+      account ? m.payouts.wallet(account) : Promise.resolve(null),
+      account ? m.payouts.mine(account) : Promise.resolve([]),
+      m.payouts.latest(10),
+    ]);
+    return {
+      enabled, connected, account, wallet,
+      mine: mine.map((p) => paymentRow(p, account, m.payouts.txUrl)),
+      latest: latest.map((p) => paymentRow(p, account, m.payouts.txUrl)),
+    };
+  },
+  save: (address) => new Promise<void>((resolve, reject) => {
+    if (!onChain()) { reject(new Error('Juega con cartera (modo Pacífico o Competencia) para guardar tu wallet de cobro.')); return; }
+    if (signBusy || pendingSign) { reject(new Error('Espera a que termine la firma en curso.')); return; }
+    signedAction('Guardar tu wallet de cobro', async (m, _tokenId, onStep) => { await m.payouts.save(address, onStep); },
+      resolve, () => reject(new Error('Cancelaste la firma: no se guardó nada.')));
+  }),
+});
+
 /* ---------------------------------------------- administración (?admin=1) */
 
 function startAdmin() {
   let view: AdminView = {
     network: CHAIN_NAME, addresses: [], totalPets: null, season: null, seasonsOwner: null, itemsOwner: null, dropIntervalSec: null,
     pendingClose: [], account: null, wallets: [], inHost: false, busy: 'Leyendo los contratos…', message: null,
+    payments: { enabled: false, owner: null, currentWeek: null, latest: [] },
   };
   const screenAdmin = createAdminScreen({
     connect: (walletId) => void run('Conectando…', async (m) => {
@@ -1358,6 +1476,10 @@ function startAdmin() {
     setDropInterval: (minutes) => void run('Cambiando el intervalo…', async (m) => {
       if (!(minutes >= 1)) throw new Error('Escribe al menos 1 minuto.');
       await m.setDropInterval(minutes * 60);
+    }),
+    recordPayment: (p) => void run('Anotando el pago…', async (m) => {
+      if (!(p.week >= 0) || !(p.amount >= 1)) throw new Error('Revisa la semana y el monto.');
+      await m.payouts.record(p);
     }),
     exit: () => { location.search = ''; },
   });
@@ -1393,12 +1515,18 @@ function startAdmin() {
           { label: 'Objetos', address: ITEMS_ADDR, version: info.versions.items ? `v${info.versions.items}` : undefined },
           { label: 'Temporadas', address: TEMPORADAS_ADDRESS },
           { label: 'Ranking v1', address: RANKING_ADDRESS },
+          { label: 'Pagos', address: PAGOS_ADDRESS },
         ],
         season: info.season ? {
           week: info.season.semana, open: info.season.abierta, paused: info.season.pausada, opensAt: info.season.abre, closesAt: info.season.cierra, registered,
         } : null,
         seasonsOwner: info.seasonsOwner, itemsOwner: info.itemsOwner,
         dropIntervalSec: info.dropInterval, pendingClose: info.pendingClose,
+        payments: {
+          enabled: m.payouts.enabled(), owner: m.payouts.enabled() ? await m.payouts.adminAccount() : null,
+          currentWeek: info.season ? info.season.semana : null,
+          latest: (m.payouts.enabled() ? await m.payouts.latest(8) : []).map((p) => ({ week: p.semana, place: p.lugar, amount: p.monto, account: p.cuenta, wallet: p.billetera, txHash: p.txHash, url: m.payouts.txUrl(p.txHash) })),
+        },
       };
     } catch (error) {
       console.warn('[polkapets] admin', error);

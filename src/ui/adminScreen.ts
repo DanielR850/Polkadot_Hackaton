@@ -17,6 +17,8 @@ export interface AdminView {
   inHost: boolean;
   busy: string | null;
   message: string | null;
+  /** Pagos de premios (contrato PolkaPetsPagos). */
+  payments: { enabled: boolean; owner: string | null; currentWeek: number | null; latest: ReadonlyArray<{ week: number; place: number; amount: number; account: string; wallet: string; txHash: string; url: string }> };
 }
 
 export interface AdminIntents {
@@ -25,6 +27,8 @@ export interface AdminIntents {
   pause(paused: boolean): void;
   closeWeek(week: number): void;
   setDropInterval(minutes: number): void;
+  /** Anota un premio ya pagado (semana desde 1, lugar 1 a 3, monto en dólares enteros). */
+  recordPayment(p: { week: number; place: number; account: string; amount: number; txHash: string }): void;
   exit(): void;
 }
 
@@ -44,6 +48,40 @@ export function createAdminScreen(intents: AdminIntents) {
     b.addEventListener('click', onClick);
     return b;
   };
+
+  /** Borrador del formulario de pagos: un refresco del panel no debe borrarlo. */
+  const draft = { week: '', place: '1', account: '', amount: '20', txHash: '' };
+
+  function paymentsCard(v: AdminView, busy: boolean) {
+    if (!v.payments.enabled) {
+      return h('div', { class: 'mint-card admin-card' }, h('b', {}, 'Pagos de premios'),
+        h('p', { class: 'hint' }, 'El contrato de pagos todavía no está desplegado en esta red.'));
+    }
+    const owns = same(v.account, v.payments.owner);
+    const field = (label: string, key: keyof typeof draft, attrs: Record<string, string | number> = {}) => {
+      const input = h('input', { type: 'text', value: draft[key], 'aria-label': label, placeholder: label, autocomplete: 'off', ...attrs });
+      input.addEventListener('input', () => { draft[key] = input.value; });
+      return input;
+    };
+    if (draft.week === '' && v.payments.currentWeek !== null) draft.week = String(v.payments.currentWeek + 1);
+    const form = h('form', { class: 'admin-pay-form' },
+      field('Semana (1, 2…)', 'week', { inputmode: 'numeric' }), field('Lugar (1, 2 o 3)', 'place', { inputmode: 'numeric' }),
+      field('Cuenta del jugador 0x…', 'account'), field('Monto en dólares', 'amount', { inputmode: 'numeric' }),
+      field('Hash de la transacción del pago 0x…', 'txHash'),
+      btn('Anotar pago', 'primary', () => {
+        intents.recordPayment({ week: Number(draft.week) - 1, place: Number(draft.place), account: draft.account.trim(), amount: Number(draft.amount), txHash: draft.txHash.trim() });
+      }, busy || !owns));
+    form.addEventListener('submit', (event) => event.preventDefault());
+    return h('div', { class: 'mint-card admin-card' },
+      h('b', {}, 'Pagos de premios'),
+      h('p', { class: 'hint' }, 'Primero manda el premio desde tu wallet; después anota aquí el hash de esa transacción. Solo se puede pagar a quien registró su wallet de cobro.'),
+      form,
+      !owns ? h('p', { class: 'hint' }, 'Solo la cuenta administradora de los pagos puede anotar uno.') : null,
+      h('ul', { class: 'admin-list' }, ...(v.payments.latest.length
+        ? v.payments.latest.map((p) => h('li', {}, h('span', {}, `Semana ${p.week + 1} · lugar ${p.place} · $${p.amount}`),
+          h('code', {}, short(p.wallet)), h('a', { href: p.url, target: '_blank', rel: 'noopener noreferrer' }, 'ver pago')))
+        : [h('li', { class: 'hint' }, 'Aún no hay pagos registrados.')])));
+  }
 
   function sync(v: AdminView) {
     const busy = v.busy !== null;
@@ -93,6 +131,8 @@ export function createAdminScreen(intents: AdminIntents) {
             h('p', {}, `Un regalo cada ${formatDuration(v.dropIntervalSec * 1000)} de vida.`),
             h('div', { class: 'row' }, minutes,
               btn('Cambiar', 'ghost', () => { const value = Number(minutes.value); draftMinutes = null; intents.setDropInterval(value); }, busy || !ownsItems)))),
+
+      paymentsCard(v, busy),
 
       h('div', { class: 'row' }, btn('Actualizar', 'ghost', intents.refresh, busy), btn('Volver al juego', 'primary', intents.exit)));
   }
