@@ -59,7 +59,7 @@ export interface NftMinter {
    * Firma la adopción y devuelve el tokenId. Si el contrato no admite la especie, usa la 0.
    * Con PolkaPets v2 también firma la dificultad (horas) y el modo (Pacífico o Competencia).
    */
-  mint(name: string, petId: number, onStep?: (step: MintStep) => void, options?: { lifeHours: 1 | 7 | 12; peaceful: boolean }): Promise<bigint>;
+  mint(name: string, petId: number, onStep?: (step: MintStep) => void, options?: { lifeHours: 1 | 7 | 12; peaceful: boolean; variantIndex?: number }): Promise<bigint>;
   versions(): Promise<ChainVersions>;
   /** Temporada de Competencia en curso (v2), o null si no hay contrato de temporadas. */
   season(): Promise<Temporada | null>;
@@ -168,7 +168,7 @@ export function createNftMinter(): NftMinter {
     async mint(name, petId, onStep, options) {
       if (!signer) throw new Error('Conecta tu cuenta primero.');
       if (options) {
-        return adoptar(signer, name, petId < species ? petId : 0, onStep, { horas: options.lifeHours, modo: options.peaceful ? 0 : 1 });
+        return adoptar(signer, name, petId < species ? petId : 0, onStep, { horas: options.lifeHours, modo: options.peaceful ? 0 : 1, variante: options.variantIndex });
       }
       // Comodín: el contrato desplegado solo admite la especie 0 (NUM_ESPECIES = 1). Si la especie
       // elegida no cabe, el NFT se registra como especie 0 y el juego sigue mostrando el animal

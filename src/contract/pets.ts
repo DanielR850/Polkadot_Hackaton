@@ -67,10 +67,13 @@ const contrato = { address: PETS_ADDRESS, abi: polkaPetsAbi } as const;
 /** Funciones nuevas de PolkaPets v2 (dificultad, modos y operadores). */
 export const petsV2Abi = parseAbi([
   "function mint(string nombre, uint8 especie, uint8 horas, uint8 modo) returns (uint256)",
+  "function mint(string nombre, uint8 especie, uint8 horas, uint8 modo, uint8 variante) returns (uint256)",
+  "function varianteDe(uint256 tokenId) view returns (uint8)",
   "function version() pure returns (uint8)",
   "function owner() view returns (address)",
   "function operador(address cuenta) view returns (bool)",
   "error DificultadInvalida()",
+  "error VarianteInvalida()",
   "error NoEresOperador()",
   "error NombreInvalido()",
   "error EspecieInvalida()",
@@ -97,7 +100,8 @@ export async function versionPets(): Promise<number> {
 }
 
 /** Modo al adoptar en v2: 0 Pacífico (no muere), 1 Competencia. */
-export interface OpcionesAdopcion { horas: 1 | 7 | 12; modo: 0 | 1 }
+/** `variante`: color elegido (0 = original, 1 a 4 = las variantes de la especie); se guarda en el NFT con PolkaPets v3. */
+export interface OpcionesAdopcion { horas: 1 | 7 | 12; modo: 0 | 1; variante?: number }
 
 // ───────────────────────────────────────────────────────────── cuenta
 
@@ -192,7 +196,7 @@ export type Escritura = (
   | { functionName: "comprar"; args: [bigint, number] }
   | { functionName: "reclamarLogro"; args: [bigint, number] }
   | { functionName: "sellarLegado"; args: [bigint, bigint, readonly number[]] }
-  | { functionName: "mint"; args: [string, number, number, number] }
+  | { functionName: "mint"; args: [string, number, number, number] | [string, number, number, number, number] }
   | { functionName: "usar"; args: [bigint] }
   | { functionName: "reclamarDrop"; args: [bigint] }
   | { functionName: "registrar"; args: [bigint] }
@@ -264,8 +268,11 @@ export async function adoptar(
   const antes = new Set((await mascotasDe(cuenta)).map(String));
   if ((await versionPets()) >= 2) {
     const o = opciones ?? { horas: 7, modo: 0 };
+    const conColor = (await versionPets()) >= 3 && (o.variante ?? 0) > 0;
     await escribir(firmante, {
-      functionName: "mint", args: [nombre.trim(), especie, o.horas, o.modo], destino: { address: PETS_ADDRESS, abi: petsV2Abi },
+      functionName: "mint",
+      args: conColor ? [nombre.trim(), especie, o.horas, o.modo, o.variante ?? 0] : [nombre.trim(), especie, o.horas, o.modo],
+      destino: { address: PETS_ADDRESS, abi: petsV2Abi },
     }, onPaso);
   } else {
     await escribir(firmante, { functionName: "mint", args: [nombre.trim(), especie] }, onPaso);

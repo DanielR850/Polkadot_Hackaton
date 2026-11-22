@@ -40,6 +40,24 @@ Después, en la Polkadot App o Desktop: `dotns.dot` → Profile → My Domains �
 Bulletin borra el contenido a los ~14 días: vuelve a publicar antes (por ejemplo, el día 11) y
 pega el CID nuevo con Resolve.
 
+## Contratos v3 en TestNet (para que la app sea funcional y no solo interfaz)
+
+Los contratos de TestNet son v1 (una sola especie, 52 objetos de Ana). Los v3 agregan las cinco
+especies como NFT, dificultad y modos, temporadas semanales, comida, ropa y el color guardado en el
+NFT (`mint` con `variante`, `varianteDe`). La app detecta la versión y sigue funcionando con v1.
+
+1. En `contrato/`, copiar `.env.example` a `.env` y poner la llave de una cuenta **solo de pruebas** con
+   PAS del faucet (nunca subir el `.env`; Git lo ignora).
+2. `npm run deploy:v2:testnet` (despliega PolkaPets, PolkaPetsItems y PolkaPetsTemporadas, y autoriza a
+   Items como operador). Guarda las direcciones en `contrato/deployments/polkadotHubTestnet-v2.json`.
+3. `npm run aplicar:testnet` pega esas tres direcciones en `src/contract/config.ts`
+   (`PROBAR=1 npm run aplicar:testnet` muestra el cambio sin escribir).
+4. `pnpm build` y publicar con `pad` (ciclo de arriba). Dentro del Host se prueba con el `.dot`:
+   ningún Host se conecta a `localhost`.
+
+Esto reemplaza el contrato de objetos de Ana: sus ids 1 a 52 se conservan; se suman comida (53 a 59) y
+ropa (60 y 61). Las mascotas ya adoptadas en los contratos v1 no se mueven al v3.
+
 ## Publicaciones
 
 | Fecha | CID raíz | Icono | Contenido |

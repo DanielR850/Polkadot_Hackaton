@@ -99,6 +99,8 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
     // ─────────────────────────────────────────────────────────────────────────
 
     uint8 public constant STAT_MAX = 100;
+    uint8 public constant MAX_VARIANTE = 4; // 0 original + 4 colores por especie
+    mapping(uint256 => uint8) private _variantes;
     uint8 public constant NUM_ESPECIES = 5; // 0 ajolote, 1 lobo, 2 oso, 3 tlacuache, 4 manatí
     uint8 public constant NOMBRE_MAX = 24;
     uint16 public constant XP_POR_NIVEL = 100;
@@ -159,6 +161,7 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
     event MascotaNacida(uint256 indexed tokenId, address indexed dueno, string nombre, uint8 especie);
     event Cuidada(uint256 indexed tokenId, string accion);
     event NombreCambiado(uint256 indexed tokenId, string nombre);
+    event VarianteElegida(uint256 indexed tokenId, uint8 variante);
     event SubioNivel(uint256 indexed tokenId, uint16 nivel);
     event Curada(uint256 indexed tokenId, address indexed operador, uint8 vida, uint8 necesidades);
     event OperadorCambiado(address indexed operador, bool permitido);
@@ -167,6 +170,7 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
     error NoEresDueno(uint256 tokenId);
     error EstaMuerta(uint256 tokenId);
     error NombreInvalido();
+    error VarianteInvalida();
     error EspecieInvalida();
     error DificultadInvalida();
     error NoEresOperador();
@@ -175,7 +179,7 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
 
     /** @notice Versión de la interfaz; el cliente la usa para saber qué funciones existen. */
     function version() external pure returns (uint8) {
-        return 2;
+        return 3; // 3: v2 + color de la mascota (variante)
     }
 
     // ─────────────────────────────────────────────────────────────────────────
@@ -188,7 +192,26 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
      * @param modo Pacífico (no muere) o Competencia.
      */
     function mint(string calldata nombre, uint8 especie, uint8 horas, Modo modo) external returns (uint256 tokenId) {
+        return _adoptar(nombre, especie, horas, modo, 0);
+    }
+
+    /**
+     * @notice Igual que `mint`, y además guarda el color elegido (0 = original; 1 a 4 = las variantes
+     * de la especie en el mismo orden que el juego) para que el NFT se vea igual en cualquier lado.
+     */
+    function mint(string calldata nombre, uint8 especie, uint8 horas, Modo modo, uint8 variante) external returns (uint256 tokenId) {
+        return _adoptar(nombre, especie, horas, modo, variante);
+    }
+
+    /** @notice Color de la mascota (0 = original). */
+    function varianteDe(uint256 tokenId) external view returns (uint8) {
+        if (_ownerOf(tokenId) == address(0)) revert NoExiste(tokenId);
+        return _variantes[tokenId];
+    }
+
+    function _adoptar(string calldata nombre, uint8 especie, uint8 horas, Modo modo, uint8 variante) private returns (uint256 tokenId) {
         _validarNombre(nombre);
+        if (variante > MAX_VARIANTE) revert VarianteInvalida();
         if (especie >= NUM_ESPECIES) revert EspecieInvalida();
         if (horas != HORAS_DIFICIL && horas != HORAS_NORMAL && horas != HORAS_FACIL) revert DificultadInvalida();
 
@@ -211,6 +234,10 @@ contract PolkaPets is ERC721, ERC721Enumerable, Ownable {
             modo: modo
         });
 
+        if (variante != 0) {
+            _variantes[tokenId] = variante;
+            emit VarianteElegida(tokenId, variante);
+        }
         _safeMint(msg.sender, tokenId);
         emit MascotaNacida(tokenId, msg.sender, nombre, especie);
     }

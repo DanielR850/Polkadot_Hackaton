@@ -40,7 +40,19 @@ describe("PolkaPets", () => {
     expect(m.modo).to.equal(COMPETENCIA);
     for (const v of [m.vida, m.hambre, m.sed, m.energia, m.felicidad, m.limpieza]) expect(v).to.equal(100);
     expect(m.viva).to.equal(true);
-    expect(await pets.version()).to.equal(2);
+    expect(await pets.version()).to.equal(3);
+  });
+
+  it("guarda el color elegido al adoptar y lo expone en varianteDe", async () => {
+    const { pets, owner } = await desplegar();
+    await pets.mint("Original", AJOLOTE, 7, PACIFICO);
+    expect(await pets.varianteDe(1)).to.equal(0);
+    await expect(pets["mint(string,uint8,uint8,uint8,uint8)"]("Dorado", 1, 7, PACIFICO, 2))
+      .to.emit(pets, "VarianteElegida").withArgs(2n, 2);
+    expect(await pets.varianteDe(2)).to.equal(2);
+    expect(await pets.ownerOf(2)).to.equal(owner.address);
+    await expect(pets["mint(string,uint8,uint8,uint8,uint8)"]("Raro", 1, 7, PACIFICO, 5)).to.be.revertedWithCustomError(pets, "VarianteInvalida");
+    await expect(pets.varianteDe(99)).to.be.revertedWithCustomError(pets, "NoExiste");
   });
 
   it("rechaza nombres, especies y dificultades inválidos", async () => {

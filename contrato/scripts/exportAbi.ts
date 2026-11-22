@@ -11,7 +11,7 @@ async function main() {
   await hre.run("compile");
 
   const artifact = await hre.artifacts.readArtifact("PolkaPets");
-  const destino = join(__dirname, "..", "..", "game", "src", "contract", "polkapets.abi.json");
+  const destino = join(__dirname, "..", "..", "src", "contract", "polkapets.abi.json");
 
   if (!existsSync(dirname(destino))) mkdirSync(dirname(destino), { recursive: true });
   writeFileSync(destino, JSON.stringify(artifact.abi, null, 2));

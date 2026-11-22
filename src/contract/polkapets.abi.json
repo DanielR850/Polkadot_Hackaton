@@ -6,6 +6,11 @@
   },
   {
     "inputs": [],
+    "name": "DificultadInvalida",
+    "type": "error"
+  },
+  {
+    "inputs": [],
     "name": "ERC721EnumerableForbiddenBatchMint",
     "type": "error"
   },
@@ -156,6 +161,11 @@
     "type": "error"
   },
   {
+    "inputs": [],
+    "name": "NoEresOperador",
+    "type": "error"
+  },
+  {
     "inputs": [
       {
         "internalType": "uint256",
@@ -169,6 +179,33 @@
   {
     "inputs": [],
     "name": "NombreInvalido",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "owner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableInvalidOwner",
+    "type": "error"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "account",
+        "type": "address"
+      }
+    ],
+    "name": "OwnableUnauthorizedAccount",
+    "type": "error"
+  },
+  {
+    "inputs": [],
+    "name": "VarianteInvalida",
     "type": "error"
   },
   {
@@ -252,6 +289,37 @@
       {
         "indexed": true,
         "internalType": "address",
+        "name": "operador",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "vida",
+        "type": "uint8"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "necesidades",
+        "type": "uint8"
+      }
+    ],
+    "name": "Curada",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
         "name": "dueno",
         "type": "address"
       },
@@ -288,6 +356,44 @@
       }
     ],
     "name": "NombreCambiado",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "operador",
+        "type": "address"
+      },
+      {
+        "indexed": false,
+        "internalType": "bool",
+        "name": "permitido",
+        "type": "bool"
+      }
+    ],
+    "name": "OperadorCambiado",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "previousOwner",
+        "type": "address"
+      },
+      {
+        "indexed": true,
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "OwnershipTransferred",
     "type": "event"
   },
   {
@@ -332,6 +438,25 @@
       }
     ],
     "name": "Transfer",
+    "type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {
+        "indexed": true,
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      },
+      {
+        "indexed": false,
+        "internalType": "uint8",
+        "name": "variante",
+        "type": "uint8"
+      }
+    ],
+    "name": "VarianteElegida",
     "type": "event"
   },
   {
@@ -454,6 +579,58 @@
   {
     "inputs": [],
     "name": "GANA_VIDA",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "HORAS_DIFICIL",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "HORAS_FACIL",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "HORAS_NORMAL",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "MAX_VARIANTE",
     "outputs": [
       {
         "internalType": "uint8",
@@ -694,6 +871,29 @@
         "internalType": "uint256",
         "name": "tokenId",
         "type": "uint256"
+      },
+      {
+        "internalType": "uint8",
+        "name": "vida",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "necesidades",
+        "type": "uint8"
+      }
+    ],
+    "name": "curar",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
       }
     ],
     "name": "dormir",
@@ -787,6 +987,55 @@
         "internalType": "uint8",
         "name": "especie",
         "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "horas",
+        "type": "uint8"
+      },
+      {
+        "internalType": "enum PolkaPets.Modo",
+        "name": "modo",
+        "type": "uint8"
+      }
+    ],
+    "name": "mint",
+    "outputs": [
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "string",
+        "name": "nombre",
+        "type": "string"
+      },
+      {
+        "internalType": "uint8",
+        "name": "especie",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "horas",
+        "type": "uint8"
+      },
+      {
+        "internalType": "enum PolkaPets.Modo",
+        "name": "modo",
+        "type": "uint8"
+      },
+      {
+        "internalType": "uint8",
+        "name": "variante",
+        "type": "uint8"
       }
     ],
     "name": "mint",
@@ -808,6 +1057,38 @@
         "internalType": "string",
         "name": "",
         "type": "string"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
+      }
+    ],
+    "name": "operador",
+    "outputs": [
+      {
+        "internalType": "bool",
+        "name": "",
+        "type": "bool"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "owner",
+    "outputs": [
+      {
+        "internalType": "address",
+        "name": "",
+        "type": "address"
       }
     ],
     "stateMutability": "view",
@@ -889,6 +1170,13 @@
     "type": "function"
   },
   {
+    "inputs": [],
+    "name": "renounceOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
     "inputs": [
       {
         "internalType": "address",
@@ -953,6 +1241,24 @@
       }
     ],
     "name": "setApprovalForAll",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "address",
+        "name": "cuenta",
+        "type": "address"
+      },
+      {
+        "internalType": "bool",
+        "name": "permitido",
+        "type": "bool"
+      }
+    ],
+    "name": "setOperador",
     "outputs": [],
     "stateMutability": "nonpayable",
     "type": "function"
@@ -1103,6 +1409,38 @@
   {
     "inputs": [
       {
+        "internalType": "address",
+        "name": "newOwner",
+        "type": "address"
+      }
+    ],
+    "name": "transferOwnership",
+    "outputs": [],
+    "stateMutability": "nonpayable",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
+        "internalType": "uint256",
+        "name": "tokenId",
+        "type": "uint256"
+      }
+    ],
+    "name": "varianteDe",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [
+      {
         "internalType": "uint256",
         "name": "tokenId",
         "type": "uint256"
@@ -1196,6 +1534,16 @@
             "internalType": "uint64",
             "name": "muerte",
             "type": "uint64"
+          },
+          {
+            "internalType": "uint8",
+            "name": "horas",
+            "type": "uint8"
+          },
+          {
+            "internalType": "enum PolkaPets.Modo",
+            "name": "modo",
+            "type": "uint8"
           }
         ],
         "internalType": "struct PolkaPets.MascotaView",
@@ -1204,6 +1552,19 @@
       }
     ],
     "stateMutability": "view",
+    "type": "function"
+  },
+  {
+    "inputs": [],
+    "name": "version",
+    "outputs": [
+      {
+        "internalType": "uint8",
+        "name": "",
+        "type": "uint8"
+      }
+    ],
+    "stateMutability": "pure",
     "type": "function"
   }
 ]

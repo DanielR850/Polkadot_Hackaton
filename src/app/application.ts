@@ -6,7 +6,7 @@ import { pickAnimation, type PetAnim } from '../game/animations.ts';
 import { findItem } from '../game/catalog.ts';
 import { headWearFor, isWearable, loadHatPalette, saveHatPalette } from '../game/wearables.ts';
 import { slotOf } from '../game/bodyPoints.ts';
-import { findVariant } from '../game/variants.ts';
+import { findVariant, variantsOf } from '../game/variants.ts';
 import {
   addToPantry, clearPantry, DROP_INTERVAL_MS, dropsAvailable, findFood, findFoodByArticle, foodEffects, loadPantry, pickDrop,
   removeFromPantry, savePantry, type PantryItem, type SpecialFood,
@@ -277,7 +277,9 @@ async function mintNft() {
   mintScreen.sync({ step: 'minting', inHost: account.inHost, progress: 'simulando' });
   try {
     // Con PolkaPets v2 la dificultad y el modo quedan en el NFT; con v1 solo nombre y especie.
-    const options = versions.pets >= 2 ? { lifeHours: draftChoice.lifeHours, peaceful: draftMode === 'passive' } : undefined;
+    // Con v3 el color elegido también se guarda en el NFT (0 = original).
+    const variantIndex = variantsOf(draftPetId).findIndex((v) => v.id === draftChoice.variant) + 1;
+    const options = versions.pets >= 2 ? { lifeHours: draftChoice.lifeHours, peaceful: draftMode === 'passive', variantIndex } : undefined;
     const tokenId = await minter.mint(draftName, draftPetId, (progress) => {
       mintScreen.sync({ step: 'minting', inHost: account.inHost, progress });
     }, options);
