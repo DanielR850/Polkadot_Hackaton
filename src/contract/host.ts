@@ -1,6 +1,6 @@
 /*
  * Adaptador del Host de Polkadot (Polkadot Desktop o la Polkadot App) con el Product SDK 0.39.0.
- * Sigue la app de referencia del taller Products Devnet (polkadot-devnet-workshop, game/src/hub/hub.ts).
+ * Sigue la integración del Host definida en este cliente.
  *
  * - Dentro del Host la cuenta la entrega el Host: es una cuenta derivada de `polka-pets.dot`,
  *   distinta de la de MetaMask.

@@ -12,7 +12,7 @@ Consultar `docs/decisions/` si la tarea cambia límites entre módulos, red o SD
 - `src/app/`: compone módulos y coordina flujos (`application.ts`).
 - `src/infrastructure/`: recursos del navegador (música con Web Audio).
 - `src/polkadot/`: adaptador del mint y del leaderboard (`nftMint.ts`). No filtra SDK a las reglas.
-- `game/src/contract/`: cliente de los contratos (viem, Host SDK, ABI y direcciones).
+- `src/contract/`: cliente de los contratos (viem, Host SDK, ABI y direcciones).
 - `contrato/`: Solidity y Hardhat (`PolkaPets.sol`, `PolkaPetsItems.sol`, `PolkaPetsTemporadas.sol`,
   `PolkaPetsRanking.sol`); se compila y despliega por separado del bundle web (`npm run deploy:v2:*`).
 - Prendas (`wearables.ts`) y variantes de color (`variants.ts`) se generan con código sobre las
@@ -31,5 +31,5 @@ Consultar `docs/decisions/` si la tarea cambia límites entre módulos, red o SD
 
 - `pnpm dev`: prototipo local.
 - `pnpm build`: typecheck y bundle de producción.
-- Pruebas del cliente: `pnpm dlx --ignore-scripts vitest@2.1.0 run` desde `game/`.
+- Pruebas del cliente: `pnpm test` desde la raíz.
 - Pruebas del contrato: `npm install` y `npm test` desde `contrato/`.

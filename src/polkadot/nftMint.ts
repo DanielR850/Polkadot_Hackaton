@@ -1,20 +1,20 @@
 // Adaptador del mint del NFT para el juego local. Es la única firma del juego: adoptar.
-// Los cuidados siguen siendo locales y gratis. Reutiliza el cliente de game/src/contract:
+// Los cuidados siguen siendo locales y gratis. Reutiliza el cliente de src/contract:
 // dentro de Polkadot Desktop o la Polkadot App firma el Host; en un navegador, una wallet EVM.
-import { EXPLORER_URL, PETS_ADDRESS } from '../../game/src/contract/config.ts';
-import { conectarHost, dentroDelHost } from '../../game/src/contract/host.ts';
-import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, versionPets, type Firmante, type PasoTx } from '../../game/src/contract/pets.ts';
-import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../../game/src/contract/wallets.ts';
-import { mensajeError } from '../../game/src/lib/txErrors.ts';
+import { EXPLORER_URL, PETS_ADDRESS } from '../contract/config.ts';
+import { conectarHost, dentroDelHost } from '../contract/host.ts';
+import { adoptar, cambiarNombre, conectar, cuidar, firmanteEvm, firmanteHost, numEspecies, versionPets, type Firmante, type PasoTx } from '../contract/pets.ts';
+import { descubrirWallets, WALLETS_SUGERIDAS, type WalletInfo } from '../contract/wallets.ts';
+import { mensajeError } from '../lib/txErrors.ts';
 import {
   cambiarIntervaloDrop, comprarArticulo, errorItems, itemsActivo, leerAdminItems, leerDespensa, leerDropsDisponibles, reclamarDropMascota,
   reclamarLogroMascota, sellarLegadoMascota, usarComida, versionItems,
-} from '../../game/src/contract/items.ts';
+} from '../contract/items.ts';
 import {
   cerrarTemporada, errorTemporadas, leerAdminTemporadas, leerCampeones, leerRegistros, leerTemporada, pausarTemporadas, registrarEnTemporada,
   semanasSinCerrar, temporadasActivas, yaRegistradaTemporada, type RegistroTemporada, type Temporada,
-} from '../../game/src/contract/temporadas.ts';
-import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../../game/src/contract/ranking.ts';
+} from '../contract/temporadas.ts';
+import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../contract/ranking.ts';
 
 export type { FilaLeaderboard, Partida, RegistroTemporada, Temporada };
 

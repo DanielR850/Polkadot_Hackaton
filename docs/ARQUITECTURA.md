@@ -15,7 +15,7 @@ Una sola app web (Vite + TypeScript + Phaser) en la raíz, publicada en `polka-p
 - **Firmas:** solo dos, ambas opcionales: adoptar (`mint` en PolkaPets) y, al morir la mascota,
   registrar la partida (`registrarMuerte` en PolkaPetsRanking).
 - **Accesorios y muebles (NFT):** con un NFT de mascota y `ITEMS_ADDRESS` configurado
-  (`game/src/contract/config.ts`), comprar en la tienda firma `comprar(mascotaId, articuloId)` en
+  (`src/contract/config.ts`), comprar en la tienda firma `comprar(mascotaId, articuloId)` en
   `PolkaPetsItems`. El contrato crea un NFT ligado a esa mascota (no transferible) y los pesitos 🪙,
   que son locales, solo se descuentan si la firma se confirma. Qué está puesto no es una
   transacción por cambio: se guarda en el dispositivo y se declara una sola vez al morir con
@@ -40,26 +40,19 @@ Una sola app web (Vite + TypeScript + Phaser) en la raíz, publicada en `polka-p
     especie 0 como comodín y el juego muestra el animal elegido).
   - PolkaPetsRanking `0xf675957A89bfF3e02BD8AeB302Ca2E8Ca6f2a5d2` (leaderboard).
 
-`product-app/` y `product-contract/` son otra ruta (PolkaVM en Paseo) que la app no usa.
-
 ## Mapa de carpetas
 
 ```text
 src/
 ├── main.ts, app/bootstrap.ts       # punto de entrada Vite
-├── app/
-│   ├── application.ts              # controlador: pantallas, cuidados, mint, registro y música
-│   └── chainApplication.ts         # modo NFT con firma por cuidado (no se abre hoy)
-├── game/                           # reglas puras (petState, config, catalog, storage) y Phaser (petScene)
-├── ui/                             # pantallas y diálogos: inicio, mascota, mint, juego, registro, ranking
+├── app/application.ts              # controlador principal: pantallas, cuidados, mint y música
+├── game/                           # reglas puras, persistencia y Phaser
+├── ui/                             # pantallas y diálogos
 ├── infrastructure/audio/music.ts   # música original con Web Audio
-└── polkadot/nftMint.ts             # adaptador: conectar, mint, registrar y leer el leaderboard
+└── polkadot/nftMint.ts              # adaptador de mint, ranking y objetos
 
-game/src/
-├── contract/                       # config, ABI, pets.ts (viem), host.ts (Product SDK), ranking.ts
-├── hub/, engine/, lib/             # estado y reglas del modo NFT con firma por cuidado (+ tests)
-
-contrato/                           # Hardhat: PolkaPets.sol, PolkaPetsRanking.sol, tests y scripts
+src/contract/                      # cliente viem, Host SDK, ABI y direcciones
+contrato/                           # Hardhat: Solidity, pruebas y scripts
 ```
 
 ```mermaid
@@ -69,7 +62,7 @@ flowchart LR
     APP --> SCENE[game / Phaser]
     APP --> STORE[game / storage local]
     APP --> PORT[polkadot / nftMint.ts]
-    PORT --> CLIENT[game/src/contract]
+    PORT --> CLIENT[src/contract]
     CLIENT -- MetaMask / viem --> CHAIN[Polkadot Hub TestNet]
     CLIENT -- Product SDK --> HOST[Polkadot App / Desktop]
     HOST --> CHAIN

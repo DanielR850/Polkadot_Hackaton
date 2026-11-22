@@ -17,12 +17,6 @@ La mascota cambia de ilustración en las etapas `teen` y `adult` usando `public/
 
 Cada carpeta `public/assets/pets/{wolf,bear,opossum,manatee}/` contiene `idle.png` (bebé), `teen.png` y `adult.png`. Son ilustraciones transparentes de 1254×1254 px generadas con ImageGen para esta versión. La pantalla de selección muestra el bebé. Phaser usa el retrato de la edad actual y anima todos los estados: reposo, comer, jugar, dormir, baño, tristeza y muerte. El juego aplica movimiento, escala, inclinación y color mediante código; las especies nuevas todavía no tienen hojas de fotogramas dibujados para cada acción.
 
-## Recursos recibidos en `TomoDachi/`
-
-Las ilustraciones JPEG se conservan como referencias del equipo. Incluyen imágenes del ajolote, acciones de comer, beber, jugar y dormir, además de imágenes de comida y bebidas. Los nombres sugieren generación con Gemini, pero el repositorio no registra autoría verificable, prompts ni licencia. No son spritesheets y actualmente la interfaz no las carga.
-
-La rama `main` añadió cinco JPEG de acciones (beber, jugar y dormir) a los originales. Se mantienen en sus carpetas de origen; aún no se convierten a sprites ni se usan en runtime. Antes de publicar, confirmar permiso de uso y distribución.
-
 ## Agregar más sprites
 
 Coloca cada hoja de sprites en `public/assets/pets/<slug>/` y agrega sus datos a `SPRITES` en `src/game/assets.ts`: especie, etapa, acción, dimensiones de cuadro y FPS. Si varias acciones comparten una hoja, indica `firstFrame` y `lastFrame`. Especies o etapas sin sprite siguen usando el marcador dibujado por Phaser. La selección comparte los archivos de la escena; las especies están en `src/game/catalog.ts` y sus IDs persistidos (0–4) no deben cambiar.
@@ -38,3 +32,17 @@ Las variantes de color se generan sobre las ilustraciones originales en `src/gam
 ## Recursos necesarios para el bundle
 
 La versión web solo carga desde `public/`: `app-logo.jpeg` (inicio y favicon), `assets/pets/` (mascotas y animaciones) y `assets/ui/fonts/` (fuentes). La decoración, los accesorios y los íconos se dibujan en runtime y conservan los `articleId` del contrato NFT.
+
+## Especies y animaciones
+
+Las cinco especies conservan el mismo ID en el juego local, el frontend NFT y el contrato:
+
+| ID | Especie | Bebé | Adolescente | Adulto |
+|---:|---|:---:|:---:|:---:|
+| 0 | Ajolote | ✓ | ✓ | ✓ |
+| 1 | Lobo | ✓ | ✓ | ✓ |
+| 2 | Oso grizzly | ✓ | ✓ | ✓ |
+| 3 | Tlacuache | ✓ | ✓ | ✓ |
+| 4 | Manatí | ✓ | ✓ | ✓ |
+
+El contrato guarda el ID de especie, propietario, nivel y necesidades, pero no guarda fotogramas.

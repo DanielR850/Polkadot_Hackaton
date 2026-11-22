@@ -11,7 +11,7 @@ import { dirname, join } from "node:path";
  *
  * Uso:  npm run deploy:v2:local   (nodo de `npm run node`)
  *       npm run deploy:v2:testnet (necesita PRIVATE_KEY en contrato/.env y PAS de prueba)
- * Copia las direcciones que imprime en game/src/contract/config.ts.
+ * Copia las direcciones que imprime en src/contract/config.ts.
  */
 
 /** Lunes 1970-01-05 00:00 en México (UTC-6) = 06:00 UTC. México no usa horario de verano desde 2022. */
@@ -46,7 +46,7 @@ async function main() {
   await (await pets.setOperador(itemsAddress, true)).wait();
   console.log("PolkaPetsItems autorizado como operador de PolkaPets.");
 
-  console.log(`\nPega en game/src/contract/config.ts:
+  console.log(`\nPega en src/contract/config.ts:
   PETS_ADDRESS       = "${petsAddress}"
   ITEMS_ADDRESS      = "${itemsAddress}"
   TEMPORADAS_ADDRESS = "${temporadasAddress}"`);

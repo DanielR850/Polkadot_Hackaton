@@ -18,8 +18,8 @@ import { addRecord, loadHistory, saveHistory, type PetRecord } from '../game/his
 import { createSeasonDialog, type SeasonRow } from '../ui/seasonDialog.ts';
 import { createAdminScreen, type AdminView } from '../ui/adminScreen.ts';
 import type { ChainVersions, Temporada } from '../polkadot/nftMint.ts';
-import { calendario } from '../../game/src/contract/temporadas.ts';
-import { CHAIN_NAME, ITEMS_ADDRESS as ITEMS_ADDR, PETS_ADDRESS, TEMPORADAS_ADDRESS } from '../../game/src/contract/config.ts';
+import { calendario } from '../contract/temporadas.ts';
+import { CHAIN_NAME, ITEMS_ADDRESS as ITEMS_ADDR, PETS_ADDRESS, TEMPORADAS_ADDRESS } from '../contract/config.ts';
 import { configForPet, DIFFICULTIES } from '../game/config.ts';
 import { createPetScene, type PetSceneHandle } from '../game/petScene.ts';
 import { findPet } from '../game/catalog.ts';
@@ -28,7 +28,7 @@ import {
   markDeadIfNeeded, play, rename, sleep, wake,
 } from '../game/petState.ts';
 import type { RankingSource } from '../game/ranking.ts';
-import { ITEMS_ADDRESS, RANKING_ADDRESS } from '../../game/src/contract/config.ts';
+import { ITEMS_ADDRESS, RANKING_ADDRESS } from '../contract/config.ts';
 import { createRecordDialog } from '../ui/recordDialog.ts';
 import { createSignDialog } from '../ui/signDialog.ts';
 import { createMiniGameDialog } from '../ui/miniGameDialog.ts';
