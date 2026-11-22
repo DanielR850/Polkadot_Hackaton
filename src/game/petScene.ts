@@ -15,8 +15,11 @@ import { findVariant, recolorPixels, SPECIES_RAMPS, variantOutline } from './var
 import { BLOCK, buildTopHat, colorOf, findPalette, HAT_SIZES, HEAD_ANCHORS, type HeadAnchor, type HeadWear, wearKey } from './wearables.ts';
 
 /** Lugares de los muebles (en el piso) y adornos (en la pared). */
-const FURNITURE_X = [104, 332, 446];
-const DECOR_SPOTS = [{ x: 216, y: 92 }, { x: 300, y: 70 }];
+const FURNITURE_X = [138, 352, 456];
+const DECOR_SPOTS = [{ x: 190, y: 96 }, { x: 292, y: 82 }];
+/** Escala (en píxeles enteros) de muebles y adornos: antes 4 y 3 se veían chiquitos junto a la mascota. */
+const FURNITURE_SCALE = 6;
+const DECOR_SCALE = 4;
 
 /** Oscurece un color 0xRRGGBB (para las franjas y tablas). */
 const darker = (c: number, f = 0.82) =>
@@ -652,12 +655,12 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       this.decorLayer.removeAll(true);
       const floorY = Math.round(H * 0.74);
       this.decor.furniture.forEach((icon, i) => {
-        this.decorLayer.add(this.add.ellipse(FURNITURE_X[i], floorY + 26, 64, 10, 0x000000, 0.18));
-        this.decorLayer.add(this.iconObject(icon, FURNITURE_X[i], floorY + 28, 4).setOrigin(0.5, 1));
+        this.decorLayer.add(this.add.ellipse(FURNITURE_X[i], floorY + 26, FURNITURE_SCALE * 16, 12, 0x000000, 0.18));
+        this.decorLayer.add(this.iconObject(icon, FURNITURE_X[i], floorY + 28, FURNITURE_SCALE).setOrigin(0.5, 1));
       });
       this.decor.decor.forEach((icon, i) => {
         const { x, y } = DECOR_SPOTS[i];
-        this.decorLayer.add(this.iconObject(icon, x, y, 3).setOrigin(0.5));
+        this.decorLayer.add(this.iconObject(icon, x, y, DECOR_SCALE).setOrigin(0.5));
       });
     }
 
@@ -725,6 +728,8 @@ export function createPetScene(parent: HTMLElement, onScrub: (progress: number) 
       if (spriteAnim) {
         this.spriteKeyNow = spriteAnim.key;
         this.sprite.play(this.variantAnim(spriteAnim.key, view));
+        // Muerta no se mueve: el bebé ajolote usa la hoja de reposo, que se detiene en su primer cuadro.
+        if (view.anim === 'dead') this.sprite.anims.stop();
         // Misma altura visual que el marcador para que la escena no cambie al llegar los assets.
         const scale = (BODY.ry * 3) / spriteAnim.frameHeight;
         this.clearEat();

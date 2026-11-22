@@ -31,6 +31,9 @@ function petImageUrl(petId: PetId, stage: Stage): string {
   return portraitUrl(findPet(petId)?.slug ?? 'axolotl');
 }
 
+/** El lienzo se dibuja al doble de tamaño y el texto se rasteriza al doble: así no se ve pixeleado al escalarlo. */
+const RES = 2;
+
 const hudStyle = { fontFamily: '"Press Start 2P", monospace', fontSize: '14px', color: '#fff7e6', stroke: INK, strokeThickness: 6 };
 
 abstract class BaseGame extends Phaser.Scene {
@@ -46,6 +49,11 @@ abstract class BaseGame extends Phaser.Scene {
 
   constructor(key: string, protected opts: MiniGameOptions) { super(key); }
 
+  /** Texto con resolución doble. */
+  protected txt(x: number, y: number, text: string, style: Phaser.Types.GameObjects.Text.TextStyle = {}) {
+    return this.add.text(x, y, text, { ...style, resolution: RES });
+  }
+
   preload() {
     this.load.on('loaderror', () => { /* sin imagen se usa un emoji */ });
     this.load.image('pet', petImageUrl(this.opts.petId, this.opts.stage));
@@ -53,18 +61,19 @@ abstract class BaseGame extends Phaser.Scene {
 
   /** Fondo, mascota, marcador, controles y la cuenta regresiva. */
   protected setup(petY: number, petHeight: number) {
+    this.cameras.main.setZoom(RES).centerOn(W / 2, H / 2);
     const g = this.add.graphics();
     g.fillStyle(this.opts.colors.wall, 1).fillRect(0, 0, W, H);
     g.fillStyle(this.opts.colors.floor, 1).fillRect(0, H - 40, W, 40);
     g.fillStyle(0x302b43, 1).fillRect(0, H - 44, W, 4);
     this.pet = this.textures.exists('pet')
       ? this.add.image(W / 2, petY, 'pet').setScale(petHeight / this.textures.get('pet').getSourceImage().height)
-      : this.add.text(W / 2, petY, findPet(this.opts.petId)?.label.slice(0, 1) ?? '🐾', { fontSize: `${petHeight * 0.7}px` }).setOrigin(0.5);
-    this.hud = this.add.text(12, 10, '', hudStyle).setDepth(10);
+      : this.txt(W / 2, petY, findPet(this.opts.petId)?.label.slice(0, 1) ?? '🐾', { fontSize: `${petHeight * 0.7}px` }).setOrigin(0.5);
+    this.hud = this.txt(12, 10, '', hudStyle).setDepth(10);
     this.keys = this.input.keyboard?.createCursorKeys() ?? null;
     this.input.on('pointermove', (p: Phaser.Input.Pointer) => { this.targetX = p.worldX; });
     this.input.on('pointerdown', (p: Phaser.Input.Pointer) => { this.targetX = p.worldX; });
-    const count = this.add.text(W / 2, H / 2, '¡LISTOS!', { ...hudStyle, fontSize: '28px' }).setOrigin(0.5).setDepth(10);
+    const count = this.txt(W / 2, H / 2, '¡LISTOS!', { ...hudStyle, fontSize: '28px' }).setOrigin(0.5).setDepth(10);
     this.time.delayedCall(1100, () => { count.destroy(); this.running = true; });
   }
 
@@ -78,7 +87,7 @@ abstract class BaseGame extends Phaser.Scene {
   }
 
   protected popText(x: number, y: number, text: string, color = '#ffd23f') {
-    const t = this.add.text(x, y, text, { ...hudStyle, fontSize: '16px', color }).setOrigin(0.5).setDepth(9);
+    const t = this.txt(x, y, text, { ...hudStyle, fontSize: '16px', color }).setOrigin(0.5).setDepth(9);
     this.tweens.add({ targets: t, y: y - 36, alpha: 0, duration: 700, onComplete: () => t.destroy() });
   }
 
@@ -86,7 +95,7 @@ abstract class BaseGame extends Phaser.Scene {
     if (this.ended) return;
     this.ended = true;
     this.running = false;
-    const banner = this.add.text(W / 2, H / 2, '¡FIN!', { ...hudStyle, fontSize: '32px' }).setOrigin(0.5).setDepth(10);
+    const banner = this.txt(W / 2, H / 2, '¡FIN!', { ...hudStyle, fontSize: '32px' }).setOrigin(0.5).setDepth(10);
     this.tweens.add({ targets: banner, scale: 1.2, duration: 250, yoyo: true });
     this.time.delayedCall(900, () => this.opts.onEnd({ game: this.opts.game, score: Math.max(0, this.score), coins: this.coins }));
   }
@@ -120,7 +129,7 @@ class CatchGame extends BaseGame {
       const r = Math.random();
       const kind = r < 0.6 ? 'fruit' : r < 0.82 ? 'coin' : 'chile';
       const icon = kind === 'fruit' ? Phaser.Utils.Array.GetRandom(FRUITS) : kind === 'coin' ? '🪙' : '🌶️';
-      const obj = this.add.text(Phaser.Math.Between(24, W - 24), -20, icon, { fontSize: '30px' }).setOrigin(0.5);
+      const obj = this.txt(Phaser.Math.Between(24, W - 24), -20, icon, { fontSize: '30px' }).setOrigin(0.5);
       this.items.push({ obj, kind, speed: 120 + 140 * progress + Math.random() * 40 });
     }
 
@@ -255,7 +264,7 @@ class BallGame extends BaseGame {
 
   create() {
     this.setup(H - 82, 84);
-    this.ball = this.add.text(W / 2, H / 2 - 40, '🎾', { fontSize: '38px' }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(5);
+    this.ball = this.txt(W / 2, H / 2 - 40, '🎾', { fontSize: '38px' }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(5);
     this.ball.on('pointerdown', () => this.hit());
     this.tweens.add({ targets: this.ball, y: '-=18', duration: 380, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     this.drawHud();
@@ -294,9 +303,9 @@ class BallGame extends BaseGame {
 export function startMiniGame(host: HTMLElement, opts: MiniGameOptions): MiniGameHandle {
   const scene = opts.game === 'catch' ? new CatchGame(opts) : opts.game === 'ball' ? new BallGame(opts) : new PongGame(opts);
   const game = new Phaser.Game({
-    type: Phaser.AUTO, parent: host, width: W, height: H, backgroundColor: '#302b43',
+    type: Phaser.AUTO, parent: host, width: W * RES, height: H * RES, backgroundColor: '#302b43',
     scale: { mode: Phaser.Scale.FIT, autoCenter: Phaser.Scale.CENTER_BOTH },
-    scene: [scene], render: { pixelArt: true, antialias: false, roundPixels: true },
+    scene: [scene], render: { pixelArt: false, antialias: true, roundPixels: false },
     input: { keyboard: true },
   });
   return { destroy: () => game.destroy(true) };

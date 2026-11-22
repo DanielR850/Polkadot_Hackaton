@@ -1,7 +1,7 @@
 // Revisión visual de las animaciones: las 5 especies × 3 etapas × 7 estados (reposo, triste, dormir,
 // muerta, comer, jugar y baño). Guarda una captura de cada combinación en e2e/out/animales/ y un
 // resumen de errores de consola. Uso: node e2e/animales.mjs   (lo mira una persona: no hay "pasa/falla" de imagen)
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import { mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -70,7 +70,7 @@ for (const [petId, species] of SPECIES.entries()) {
   console.log(`${species} listo`);
 }
 await browser.close();
-server.kill();
+spawnSync('taskkill', ['/pid', String(server.pid), '/T', '/F']);
 console.log(`${shots} capturas en ${OUT}`);
 console.log(errors.length ? `Errores (${errors.length}):\n${[...new Set(errors)].slice(0, 30).join('\n')}` : 'Sin errores de consola.');
 process.exit(0);
