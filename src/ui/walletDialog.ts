@@ -87,7 +87,7 @@ export function createWalletDialog(source: WalletSource) {
     account.textContent = d.account ? `Tu cuenta en el juego: ${short(d.account)}` : '';
     account.hidden = !d.account;
     current.textContent = !d.enabled ? 'Los pagos todavía no están activados en esta red.'
-      : !d.connected ? 'Para guardar tu wallet juega con cartera (modo Pacífico o Competencia): los premios son de las cuentas con NFT.'
+      : !d.connected ? 'Para guardar tu wallet juega con cartera: los premios son de las cuentas con NFT.'
       : d.wallet ? `Wallet de cobro guardada: ${d.wallet}` : 'Todavía no guardas una wallet de cobro: sin ella no se te puede pagar un premio.';
     current.classList.toggle('error', usable && !d.wallet);
     mineTitle.hidden = mineList.hidden = !d.connected;

@@ -203,16 +203,16 @@ async function main() {
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 
-  await scenario('Pacífico sin cartera: color, dificultad y guardado', async () => {
+  await scenario('Sin cartera: color, dificultad y guardado (mortal)', async () => {
     const page = await newPage();
     await createPet(page, { name: 'Luna', pet: 1, color: 'Ártico', hours: 12 });
     const portrait = await page.locator('.mint-frame img').getAttribute('src');
     check(portrait?.startsWith('data:image/png'), 'el retrato del paso 3 ya lleva el color elegido');
     await clickText(page, '.mint-screen button', 'Jugar sin cartera');
     await page.waitForSelector('.game-screen:not([hidden])');
-    check((await text(page, '.mode-badge')) === 'Pacífico · 12 h · Ártico', 'insignia: Pacífico · 12 h · Ártico (sin emoji)');
+    check((await text(page, '.mode-badge')) === 'Sin cartera · 12 h · Ártico', 'insignia: Sin cartera · 12 h · Ártico (sin emoji)');
     const saved = JSON.parse(await storage(page, PET));
-    check(saved.lifeHours === 12 && saved.peaceful === true && saved.variant === 'artico', 'la partida guarda dificultad, modo y color');
+    check(saved.lifeHours === 12 && saved.peaceful === false && saved.variant === 'artico', 'la partida guarda dificultad y color, y es mortal');
     await page.reload();
     await page.waitForSelector('.game-screen:not([hidden])');
     check((await text(page, '.mode-badge')).includes('Ártico'), 'al recargar conserva el color');
@@ -221,21 +221,29 @@ async function main() {
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 
-  await scenario('Pacífico: no muere, regalos, comida, tienda y sombrero', async () => {
+  await scenario('Toda mascota muere si se descuida; regalos, comida, tienda y sombrero', async () => {
     const page = await newPage();
     await createPet(page, { name: 'Osa', pet: 2, color: 'Polar', hours: 1 });
     await clickText(page, '.mint-screen button', 'Jugar sin cartera');
     await page.waitForSelector('.game-screen:not([hidden])');
+    // Sin cartera también se muere: pasan 60 veces su dificultad sin cuidados.
     await ageLocalPet(page, 60 * 3600_000);
-    check(await page.locator('.death-panel').isHidden(), 'tras 60 veces su dificultad sigue viva (sin panel de muerte)');
-    check((await text(page, '.meter-row.health')).includes('0%'), 'la vida llega a 0 %: está enferma');
+    await until(async () => (await page.locator('.death-panel:not([hidden])').count()) > 0, 'tras 60 veces su dificultad se muere (aparece el panel de muerte)');
+    check(JSON.parse(await storage(page, PET)).diedAt !== null, 'la partida guarda la hora de la muerte');
+    // Empieza otra y la deja 3 h sin cuidar (12 h de dificultad): sigue viva y acumula regalos.
+    await page.evaluate(() => localStorage.clear());
+    await createPet(page, { name: 'Osa', pet: 2, color: 'Polar', hours: 12 });
+    await clickText(page, '.mint-screen button', 'Jugar sin cartera');
+    await page.waitForSelector('.game-screen:not([hidden])');
+    await ageLocalPet(page, 3 * 3600_000);
+    check(await page.locator('.death-panel').isHidden(), 'a las 3 h de 12 sigue viva');
     const gifts = await until(async () => { const t = await text(page, '.extras button:has-text("Despensa")'); return /\d/.test(t) && t; }, 'contador de regalos');
-    check(/Despensa\s*120/.test(gifts), `120 regalos acumulados en 60 h (${gifts.replace(/\s+/g, ' ')})`);
+    check(/Despensa\s*6/.test(gifts), `6 regalos acumulados en 3 h (${gifts.replace(/\s+/g, ' ')})`);
     await clickText(page, '.extras button', 'Despensa');
     await clickText(page, 'dialog[open] button', 'Abrir regalo');
     await until(async () => JSON.parse(await storage(page, 'tamagotchi-polkadot-pantry-v1')).items.length === 1, 'regalo en la despensa');
     await page.locator('dialog[open] .inv-item').first().click();
-    await until(async () => !(await text(page, '.meter-row.health')).startsWith('❤️ Vida\n0%') && !(await text(page, '.meter-row.health')).includes(' 0%'), 'la comida le sube la vida');
+    await until(async () => (await text(page, '.meter-row.health')).replace(/[^0-9]/g, '') !== '', 'la comida se usa y la vida se muestra');
     await page.locator('dialog[open] .dialog-close').click().catch(() => {});
     // Tienda: comprar comida con pesitos.
     await setStorage(page, 'tamagotchi-polkadot-purse-v1', JSON.stringify({ coins: 100, lastPlayAt: 0, best: { catch: 0, pong: 0 } }));
@@ -382,14 +390,13 @@ async function main() {
     await createPet(page, { name: 'Campeona', pet: 0, color: 'Dorado', hours: 1 });
     await clickText(page, '.chain-wallet', 'Wallet de prueba 0');
     await page.waitForSelector('.mode-option');
-    check(await page.locator('.mode-option', { hasText: 'competencia' }).isDisabled(), 'en "sábado" la Competencia está cerrada');
-    check((await text(page, '.mode-option:has-text("competencia")')).includes('cerrada'), 'explica que la temporada está cerrada');
+    check((await text(page, '.mode-option')).includes('se muere'), 'la pantalla avisa que la mascota puede morir');
+    check((await text(page, '.mode-option')).includes('cerrada'), 'explica que la temporada está cerrada');
     await travel(2 * DAY); // lunes de la semana 1
     await clickText(page, '.mint-screen button', 'Cambiar mascota');
     await page.click('.select-form button[type=submit]');
     await clickText(page, '.chain-wallet', 'Wallet de prueba 0');
-    await until(async () => !(await page.locator('.mode-option', { hasText: 'competencia' }).isDisabled()), 'Competencia abierta el lunes');
-    await clickText(page, '.mode-option', 'competencia');
+    await until(async () => (await text(page, '.mode-option')).includes('cierra el viernes'), 'la temporada abierta el lunes se explica en pantalla');
     await clickText(page, '.mint-screen .primary', 'ADOPTAR');
     await page.waitForSelector('.mint-screen[data-step="done"]', { timeout: 30_000 });
     check((await text(page, '.mint-screen')).includes('Hardhat local'), 'muestra la red real (Hardhat local)');
@@ -470,12 +477,11 @@ async function main() {
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
   });
 
-  await scenario('Pesitos, sueño, vida y billetera en la cadena (Pacífico)', async () => {
+  await scenario('Pesitos, sueño, vida y billetera en la cadena', async () => {
     const page = await newPage(2);
     await createPet(page, { name: 'Dormilona', pet: 1, hours: 12 });
     await clickText(page, '.chain-wallet', 'Wallet de prueba 2');
     await page.waitForSelector('.mode-option');
-    await clickText(page, '.mode-option', 'pacífico');
     await clickText(page, '.mint-screen .primary', 'ADOPTAR');
     await page.waitForSelector('.mint-screen[data-step="done"]', { timeout: 30_000 });
     await clickText(page, '.mint-screen .primary', 'ENTRAR');
@@ -580,8 +586,10 @@ async function main() {
     const page = await newPage(0);
     await page.goto(APP);
     await page.evaluate(([k]) => localStorage.setItem(k, JSON.stringify({ version: 2, petId: 0, name: 'X', bornAt: Date.now(), updatedAt: Date.now(), needs: { hunger: 80, thirst: 80, energy: 80, happiness: 80, cleanliness: 80 }, sleeping: false, diedAt: null, lifeHours: 12, peaceful: true })), [PET]);
-    // Se enlaza a la mascota viva #2 (la #1 murió en la cadena y el juego ya no le cree al navegador).
-    await page.evaluate(([address]) => localStorage.setItem('tamagotchi-polkadot-nft-v1', JSON.stringify({ tokenId: '2', address, mode: 'ranking' })), [ACCOUNTS[2].toLowerCase()]);
+    // Se enlaza a una mascota recién nacida (las anteriores ya murieron en la cadena y el juego ya no le cree al navegador).
+    await chainSend('pets', 'mint', ['Viva', 0, 12, 1], ACCOUNTS[2]);
+    const vivaId = (await read('pets', 'mascotasDe', [ACCOUNTS[2]])).at(-1).toString();
+    await page.evaluate(([address, tokenId]) => localStorage.setItem('tamagotchi-polkadot-nft-v1', JSON.stringify({ tokenId, address, mode: 'ranking' })), [ACCOUNTS[2].toLowerCase(), vivaId]);
     await page.reload();
     await page.waitForSelector('.game-screen:not([hidden])');
     await clickText(page, '.actions button', 'Ranking');

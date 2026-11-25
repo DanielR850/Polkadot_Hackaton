@@ -180,18 +180,15 @@ export function createMintScreen(intents: MintIntents) {
           h('div', { class: 'mint-card mint-account' },
             h('span', { class: 'live-dot' }),
             h('div', {}, h('small', {}, 'Cuenta conectada'), h('b', {}, `${v.via} · ${short(v.address)}`))),
-          h('p', { class: 'eyebrow' }, 'ELIGE CÓMO JUGAR'),
-          h('div', { class: 'mode-options', role: 'group', 'aria-label': 'Modo de juego' },
-            option('passive', '🌿', 'Modo pacífico', 'Tu mundo: no muere. Si la descuidas se enferma y espera tus cuidados. Sin ranking.'),
-            option('ranking', '⚔️', 'Modo competencia',
-              v.rankingAvailable
-                ? `Puede morir. Cuando muera, registra cuánto vivió en la temporada semanal. ${v.competitionNote ?? ''}`
-                : v.competitionNote ?? 'La competencia no está disponible por ahora.',
-              !v.rankingAvailable)),
+          h('p', { class: 'eyebrow' }, 'TU MASCOTA PUEDE MORIR'),
+          h('div', { class: 'mint-card mode-option', 'aria-label': 'Reglas de la partida' },
+            h('span', { class: 'mode-icon', 'aria-hidden': 'true' }, '⚔️'),
+            h('span', {}, h('b', {}, 'Si la descuidas, se muere'),
+              h('small', {}, v.rankingAvailable
+                ? `Aguanta las horas de la dificultad que elegiste. Cuando muera, registra cuánto vivió en la temporada semanal. ${v.competitionNote ?? ''}`
+                : `Aguanta las horas de la dificultad que elegiste. ${v.competitionNote ?? 'Si muere cuando la temporada está cerrada, su tiempo no se registra.'}`))),
           primary('🥚 ADOPTAR NFT', intents.mint),
-          h('p', { class: 'hint' }, v.mode === 'ranking'
-            ? `Firmas ${where} al adoptar, en cada cuidado y, cuando muera, para registrar su tiempo.`
-            : `Firmas ${where} al adoptar y en cada cuidado.`));
+          h('p', { class: 'hint' }, `Firmas ${where} al adoptar, en cada cuidado y, cuando muera, para registrar su tiempo.`));
       } else if (v.step === 'minting') {
         if (startedAt === 0 || v.progress === 'simulando') startedAt = Date.now();
         help.textContent = '';

@@ -80,8 +80,10 @@ let drawStyle: 'original' | 'pixel' = (() => { try { return localStorage.getItem
 type Screen = 'start' | 'select' | 'mint' | 'game';
 
 let pet: PetState | null = loadPet();
+// Las partidas locales guardadas en modo Pacífico (inmortal) pasan a ser mortales: ya no existe ese modo.
+if (pet?.peaceful && !loadNft()) { pet = { ...pet, peaceful: false }; savePet(pet); }
 let nft: PetNft | null = pet ? loadNft() : null;
-/** Reglas de la partida: dificultad (horas sin cuidados) y modo (Pacífico no muere). */
+/** Reglas de la partida: dificultad (horas sin cuidados). Toda mascota puede morir si se descuida. */
 let config = configForPet(pet, speed);
 /** Color, dificultad y modo elegidos para la mascota nueva. */
 let draftChoice: PetChoice = { variant: null, lifeHours: 7 };
@@ -108,7 +110,8 @@ let draftName = '';
 /** Modo elegido en el paso 3 (con cartera). Por defecto, ranking si el leaderboard existe. */
 /** Hay dónde registrar una partida de Competencia: temporadas (v2) o el ranking v1. */
 const recordAvailable = () => RANKING_ADDRESS !== null || TEMPORADAS_ADDRESS !== null;
-let draftMode: NftMode = recordAvailable() ? 'ranking' : 'passive';
+/** Toda mascota con cartera es mortal: ya no hay modo Pacífico. */
+let draftMode: NftMode = 'ranking';
 
 /** Modo de la partida: sin cartera es 'local'; con NFT, el que se eligió al adoptar. */
 type PlayMode = 'local' | NftMode;
@@ -159,8 +162,8 @@ const selectScreen = createSelectScreen((petId, choice) => {
 
 /** Crea la partida local y entra a la habitación, con o sin NFT. */
 function startGame(minted: PetNft | null) {
-  // Sin cartera es Pacífico ("tu mundo"); con NFT, el modo que se eligió al adoptar.
-  const peaceful = minted ? minted.mode === 'passive' : true;
+  // Toda mascota puede morir si se descuida, con o sin cartera (ya no hay modo Pacífico).
+  const peaceful = false;
   pet = createPet(draftPetId, draftName, Date.now(), { lifeHours: draftChoice.lifeHours, peaceful, variant: draftChoice.variant });
   config = configForPet(pet, speed);
   savePet(pet);
@@ -182,7 +185,7 @@ function startGame(minted: PetNft | null) {
 let minted: PetNft | null = null;
 
 const mintScreen = createMintScreen({
-  setMode: (mode) => { if (!mintBusy && (mode === 'passive' || competitionState().available)) { draftMode = mode; syncConnected(); } },
+  setMode: () => { /* un solo modo: la mascota puede morir */ },
   connect: (walletId) => void connectWallet(walletId),
   retry: () => void prepareMint(),
   mint: () => void mintNft(),
@@ -267,7 +270,6 @@ function competitionState(): { available: boolean; note: string } {
 function syncConnected() {
   if (!mintAccount) return;
   const competition = competitionState();
-  if (!competition.available && draftMode === 'ranking') draftMode = 'passive';
   // Cualquier especie se puede adoptar: si el contrato no la admite, el mint usa el comodín (0).
   mintScreen.sync({
     step: 'connected', via: mintAccount.via, address: mintAccount.address, inHost: mintAccount.inHost,
@@ -285,7 +287,7 @@ async function mintNft() {
     // Con PolkaPets v2 la dificultad y el modo quedan en el NFT; con v1 solo nombre y especie.
     // Con v3 el color elegido también se guarda en el NFT (0 = original).
     const variantIndex = variantsOf(draftPetId).findIndex((v) => v.id === draftChoice.variant) + 1;
-    const options = versions.pets >= 2 ? { lifeHours: draftChoice.lifeHours, peaceful: draftMode === 'passive', variantIndex } : undefined;
+    const options = versions.pets >= 2 ? { lifeHours: draftChoice.lifeHours, peaceful: false, variantIndex } : undefined;
     const tokenId = await minter.mint(draftName, draftPetId, (progress) => {
       mintScreen.sync({ step: 'minting', inHost: account.inHost, progress });
     }, options);
@@ -307,7 +309,7 @@ function showNftNote() {
   const mode = playMode();
   if (mode === 'ranking') gameScreen.setNote(`Competencia · NFT #${nft!.tokenId}`, 'Cada cuidado lleva firma. Si se te muere, registra su tiempo en la temporada.');
   else if (mode === 'passive') gameScreen.setNote(`Pacífico · NFT #${nft!.tokenId}`, 'Cada cuidado lleva firma. Aquí no se muere: si lo descuidas, se enferma.');
-  else gameScreen.setNote('Pacífico, sin cartera.', 'Tu mundo: se guarda en este aparato, es gratis y no se muere.');
+  else gameScreen.setNote('Sin cartera.', 'Práctica en este aparato: es gratis y no compite, pero si la descuidas se muere.');
   gameScreen.setRankingVisible(mode === 'ranking');
   gameScreen.setBadge(badgeText());
 }
@@ -315,7 +317,7 @@ function showNftNote() {
 /** "⚔️ Competencia · 7 h · Dorado". */
 function badgeText(): string {
   if (!pet) return '';
-  const mode = pet.peaceful ? 'Pacífico' : 'Competencia';
+  const mode = pet.peaceful ? 'Pacífico' : nft ? 'Competencia' : 'Sin cartera';
   const hours = pet.lifeHours ? `${pet.lifeHours} h` : '';
   const color = findVariant(pet.petId, pet.variant)?.name ?? '';
   return [mode, hours, color].filter(Boolean).join(' · ');
@@ -1450,7 +1452,7 @@ const walletDialog = createWalletDialog({
     };
   },
   save: (address) => new Promise<void>((resolve, reject) => {
-    if (!onChain()) { reject(new Error('Juega con cartera (modo Pacífico o Competencia) para guardar tu wallet de cobro.')); return; }
+    if (!onChain()) { reject(new Error('Juega con cartera para guardar tu wallet de cobro.')); return; }
     if (signBusy || pendingSign) { reject(new Error('Espera a que termine la firma en curso.')); return; }
     signedAction('Guardar tu wallet de cobro', async (m, _tokenId, onStep) => { await m.payouts.save(address, onStep); },
       resolve, () => reject(new Error('Cancelaste la firma: no se guardó nada.')));
