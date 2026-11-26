@@ -273,7 +273,9 @@ export async function adoptar(
   const antes = new Set((await mascotasDe(cuenta)).map(String));
   if ((await versionPets()) >= 2) {
     const o = opciones ?? { horas: 7, modo: 0 };
-    const conColor = (await versionPets()) >= 3 && (o.variante ?? 0) > 0;
+    // Con v3+ siempre se manda la versión de 5 argumentos (0 = color original): el SDK del Host solo
+    // conoce una de las dos sobrecargas de `mint` y con 4 argumentos fallaba ("ABI encoding … mismatch").
+    const conColor = (await versionPets()) >= 3;
     await escribir(firmante, {
       functionName: "mint",
       args: conColor ? [nombre.trim(), especie, o.horas, o.modo, o.variante ?? 0] : [nombre.trim(), especie, o.horas, o.modo],

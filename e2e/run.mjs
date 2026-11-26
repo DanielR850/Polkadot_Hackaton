@@ -229,7 +229,7 @@ async function main() {
     // Sin cartera también se muere: pasan 60 veces su dificultad sin cuidados.
     await ageLocalPet(page, 60 * 3600_000);
     await until(async () => (await page.locator('.death-panel:not([hidden])').count()) > 0, 'tras 60 veces su dificultad se muere (aparece el panel de muerte)');
-    check(JSON.parse(await storage(page, PET)).diedAt !== null, 'la partida guarda la hora de la muerte');
+    await until(async () => JSON.parse(await storage(page, PET)).diedAt != null, 'la partida guarda la hora de la muerte');
     // Empieza otra y la deja 3 h sin cuidar (12 h de dificultad): sigue viva y acumula regalos.
     await page.evaluate(() => localStorage.clear());
     await createPet(page, { name: 'Osa', pet: 2, color: 'Polar', hours: 12 });
