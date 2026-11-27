@@ -157,6 +157,8 @@ async function createPet(page, { name, pet, color, hours }) {
 /* ------------------------------------------------------------- escenarios */
 
 async function scenario(name, fn) {
+  // SOLO="texto" corre únicamente los escenarios cuyo nombre lo contiene (para depurar uno).
+  if (process.env.SOLO && !name.includes(process.env.SOLO)) return;
   current = name;
   console.log(`\n▶ ${name}`);
   try { await fn(); } catch (e) { results.push({ scenario: name, ok: false, text: String(e.message ?? e).split('\n')[0] }); console.log(`  ✗ ${e.message}`); }
@@ -544,6 +546,37 @@ async function main() {
     check(await page.locator('dialog[open] a[href*="' + hash + '"]').count() >= 1, 'el pago enlaza a su transacción en el explorador');
     await shot(page, '12-billetera-y-pagos');
     check(page.errors.length === 0, `sin errores en la consola (${page.errors.join(' | ')})`);
+  });
+
+  await scenario('La muerte en la cadena aparece en vivo, sin recargar', async () => {
+    const page = await newPage(1);
+    await createPet(page, { name: 'Efimera', pet: 0, hours: 1 });
+    await clickText(page, '.chain-wallet', 'Wallet de prueba 1');
+    await page.waitForSelector('.mode-option');
+    await clickText(page, '.mint-screen .primary', 'ADOPTAR');
+    await page.waitForSelector('.mint-screen[data-step="done"]', { timeout: 30_000 });
+    await clickText(page, '.mint-screen .primary', 'ENTRAR');
+    await page.waitForSelector('.game-screen:not([hidden])');
+    check(await page.locator('.death-panel').isHidden(), 'recién adoptada está viva');
+    const id = (await read('pets', 'mascotasDe', [ACCOUNTS[1]])).at(-1);
+    // Pasa más de 1 h sin cuidados en la cadena, con la partida abierta: debe aparecer la muerte sin recargar.
+    await travel(2 * 3600);
+    check((await read('pets', 'verMascota', [id])).viva === false, 'el contrato la da por muerta');
+    await until(async () => (await page.locator('.death-panel:not([hidden])').count()) > 0, 'el panel de muerte aparece solo, sin recargar', 40_000);
+    await until(async () => JSON.parse(await storage(page, PET)).diedAt != null, 'la partida guarda la muerte que dijo la cadena');
+    check((await text(page, '.game-screen')).includes('murió'), 'la pantalla avisa que murió');
+    await shot(page, '13-muerte-en-vivo');
+    // La competencia es en vivo: aparecen la que murió y otra que sigue viva, sin que nadie registre nada.
+    await chainSend('pets', 'mint', ['Sigue', 0, 12, 1], ACCOUNTS[2]);
+    // Al morir el juego ofrece registrar su tiempo: se cierra ese aviso para abrir el ranking.
+    await until(async () => (await text(page, 'dialog[open]')).includes('Registrar partida'), 'al morir ofrece registrar la partida');
+    await page.locator('dialog[open] .dialog-close').click();
+    await clickText(page, '.death-panel button', 'Ver ranking');
+    await until(async () => { const t = await text(page, 'dialog[open]'); return t.includes('Efimera') && t.includes('murió'); }, 'la competencia muestra a la que murió, sin registrarla');
+    await clickText(page, 'dialog[open] [role=tab]', '12 h');
+    await until(async () => { const t = await text(page, 'dialog[open]'); return t.includes('Sigue') && t.includes('viva'); }, 'la competencia muestra a la que sigue viva');
+    await shot(page, '14-competencia-en-vivo');
+    await page.locator('dialog[open] .dialog-close').click().catch(() => {});
   });
 
   await scenario('Admin: permisos, drops, pausa y cierre con podio', async () => {

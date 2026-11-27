@@ -813,10 +813,15 @@ const seasonDialog = createSeasonDialog({
     const toRow = (r: { tokenId: bigint; dueno: string; nombre: string; especie: number; horas: number; duracion: number }): SeasonRow => ({
       id: r.tokenId.toString(), name: r.nombre, petId: r.especie, hours: r.horas, aliveMs: r.duracion * 1000, mine: me !== '' && r.dueno.toLowerCase() === me,
     });
-    const [rows, champions, admin] = await Promise.all([m.seasonRows(s.semana), m.champions(), m.admin()]);
+    const [rows, live, champions, admin] = await Promise.all([
+      m.seasonRows(s.semana),
+      // La vista en vivo no debe romper la competencia si falla la lectura: se cae a los registros.
+      m.liveSeason(s.abre).catch((error) => { console.warn('[polkapets] competencia en vivo', error); return []; }),
+      m.champions(), m.admin(),
+    ]);
     return {
       week: s.semana, open: s.abierta, paused: s.pausada, opensAt: s.abre, closesAt: s.cierra,
-      rows: rows.map(toRow), champions: champions.map((c) => ({ week: c.semana, podium: c.podio.map(toRow) })),
+      rows: rows.map(toRow), live: live.map((r) => ({ ...toRow(r), alive: r.viva })), champions: champions.map((c) => ({ week: c.semana, podium: c.podio.map(toRow) })),
       pendingClose: admin.pendingClose,
     };
   },
@@ -1250,6 +1255,7 @@ async function syncFromChain(): Promise<void> {
     const c = await m.chainPet(BigInt(nft.tokenId));
     if (!pet || !nft) return;
     const now = Date.now();
+    const wasDead = pet.diedAt !== null;
     pet = {
       ...pet,
       bornAt: c.bornAt * 1000,
@@ -1259,12 +1265,31 @@ async function syncFromChain(): Promise<void> {
       diedAt: c.alive ? null : (c.diedAt > 0 ? c.diedAt * 1000 : now),
     };
     savePet(pet);
+    if (!wasDead && pet.diedAt !== null) announceDeath(now);
     await refreshCoins();
     render();
   } catch (error) {
     console.warn('[polkapets] sincronizar con la cadena', error);
   }
 }
+
+/** La cadena dice que murió: se ve al instante (panel, mensaje y aviso) y se ofrece guardar su tiempo. */
+function announceDeath(now: number) {
+  if (!pet) return;
+  bathing = false;
+  action = null;
+  gameScreen.say(sayAs(pet.name, 'starved', now));
+  gameScreen.showToast(`${pet.name} murió. Vivió ${formatDuration(ageMs(pet, now))}.`);
+  openRecord(true);
+}
+
+/** true si la cuenta local la dará por muerta en el próximo minuto. */
+function nearDeath(now: number): boolean {
+  if (!pet || pet.diedAt !== null || !config.canDie) return false;
+  return isDead(pet, now + 60_000, config);
+}
+
+let lastDeathSync = 0;
 
 /** Lee los pesitos del contrato (si los lleva) y los muestra. */
 async function refreshCoins(): Promise<void> {
@@ -1329,6 +1354,8 @@ function render() {
 function tick() {
   if (!pet || screen !== 'game') return;
   const now = Date.now();
+  // Con NFT la muerte la decide el contrato: cerca del final se le pregunta cada 5 s, sin esperar al ciclo de 45 s.
+  if (onChain() && nearDeath(now) && now - lastDeathSync > 5_000) { lastDeathSync = now; void syncFromChain(); }
   const checked = markDeadIfNeeded(pet, now, config);
   if (checked !== pet) {
     pet = checked;
@@ -1403,7 +1430,7 @@ if (params.get('admin') === '1') {
   showScreen(pet ? 'game' : 'start');
   // Con NFT se averigua en segundo plano qué contratos hay y se trae el estado verdadero de la cadena.
   if (nft) void ensureChainInfo().then(() => syncFromChain());
-  window.setInterval(() => { if (document.visibilityState === 'visible') void syncFromChain(); }, 45_000);
+  window.setInterval(() => { if (document.visibilityState === 'visible') void syncFromChain(); }, 15_000);
   document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') void syncFromChain(); });
   // Murió en una sesión anterior y nunca se preguntó: se pregunta ahora (solo con NFT).
   if (pet && pet.diedAt !== null && nft && !nft.asked) openRecord(true);

@@ -15,8 +15,8 @@ import {
   registrarPagoHecho, type PagoRegistrado,
 } from '../contract/pagos.ts';
 import {
-  cerrarTemporada, errorTemporadas, leerAdminTemporadas, leerCampeones, leerRegistros, leerTemporada, pausarTemporadas, registrarEnTemporada,
-  semanasSinCerrar, temporadasActivas, yaRegistradaTemporada, type RegistroTemporada, type Temporada,
+  cerrarTemporada, errorTemporadas, leerAdminTemporadas, leerCampeones, leerEnVivo, leerRegistros, leerTemporada, pausarTemporadas, registrarEnTemporada,
+  semanasSinCerrar, temporadasActivas, yaRegistradaTemporada, type RegistroEnVivo, type RegistroTemporada, type Temporada,
 } from '../contract/temporadas.ts';
 import { errorRanking, leerLeaderboard, rankingActivo, registrarPartida, yaRegistrada, type FilaLeaderboard, type Partida } from '../contract/ranking.ts';
 
@@ -98,6 +98,8 @@ export interface NftMinter {
   /** Temporada de Competencia en curso (v2), o null si no hay contrato de temporadas. */
   season(): Promise<Temporada | null>;
   seasonRows(week: number): Promise<RegistroTemporada[]>;
+  /** Competencia en vivo: todas las mascotas de la semana, vivas o muertas, sin esperar a que se registren. */
+  liveSeason(opensAt: number): Promise<RegistroEnVivo[]>;
   champions(): Promise<Array<{ semana: number; podio: RegistroTemporada[] }>>;
   isSeasonRecorded(tokenId: bigint): Promise<boolean>;
   /** Firma el registro en la temporada (la duración la calcula la cadena). */
@@ -231,6 +233,7 @@ export function createNftMinter(): NftMinter {
     },
     season: () => leerTemporada(),
     seasonRows: (week) => leerRegistros(week),
+    liveSeason: (opensAt) => leerEnVivo(opensAt),
     champions: () => leerCampeones(),
     isSeasonRecorded: (tokenId) => yaRegistradaTemporada(tokenId),
     async recordSeason(tokenId, onStep) {

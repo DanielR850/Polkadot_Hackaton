@@ -13,6 +13,9 @@ export interface Mascota {
   nivel: number; xp: number; viva: boolean; etapa: number; duracion: number; muerte: number;
   /** Cuándo se durmió (segundos Unix); 0 = despierta. Solo con PolkaPets v4. */
   durmiendoDesde: number;
+  /** Dificultad elegida al adoptar (1, 7 o 12 h) y modo (0 Pacífico, 1 Competencia). */
+  horas: number;
+  modo: number;
 }
 export interface FilaRanking { tokenId: bigint; dueno: Hex; nombre: string; especie: number; duracion: number; viva: boolean }
 const numero = (value: unknown) => Number(value ?? 0);
@@ -25,6 +28,7 @@ export function decodeMascota(raw: unknown): Mascota {
     hambre: numero(o.hambre), sed: numero(o.sed), energia: numero(o.energia), felicidad: numero(o.felicidad),
     limpieza: numero(o.limpieza), nivel: numero(o.nivel), xp: numero(o.xp), viva: Boolean(o.viva),
     etapa: numero(o.etapa), duracion: numero(o.duracion), muerte: numero(o.muerte), durmiendoDesde: numero(o.durmiendoDesde),
+    horas: numero(o.horas), modo: numero(o.modo),
   };
 }
 export function decodeRanking(raw: unknown): FilaRanking[] {

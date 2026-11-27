@@ -1,8 +1,8 @@
 // Cliente del contrato PolkaPetsTemporadas: Competencia semanal (lunes a viernes, hora de México).
 // Lecturas por ETH-RPC; registrar y cerrar se simulan y se firman igual que el resto (pets.ts).
 import { BaseError, ContractFunctionRevertedError, parseAbi, type Address } from "viem";
-import { TEMPORADAS_ADDRESS } from "./config";
-import { escribirLlamada, publicClient, type Firmante, type PasoTx } from "./pets";
+import { PETS_ADDRESS, TEMPORADAS_ADDRESS } from "./config";
+import { decodeRanking, escribirLlamada, polkaPetsAbi, publicClient, verMascota, type Firmante, type PasoTx } from "./pets";
 
 /** Misma interfaz que contrato/contracts/PolkaPetsTemporadas.sol. */
 export const temporadasAbi = parseAbi([
@@ -80,6 +80,41 @@ export async function leerRegistros(semana: number): Promise<RegistroTemporada[]
     paginas.push(leer<Parameters<typeof fila>[0][]>("registros", [BigInt(semana), BigInt(desde), BigInt(Math.min(50, total - desde))]));
   }
   return (await Promise.all(paginas)).flat().map(fila);
+}
+
+export interface RegistroEnVivo extends RegistroTemporada {
+  /** true = sigue viva en la cadena (su duración sigue creciendo). */
+  viva: boolean;
+}
+
+/**
+ * La competencia en vivo: todas las mascotas de Competencia adoptadas desde `abreMs` (inicio de la
+ * semana), vivas o muertas, leídas directo de PolkaPets. No hace falta que nadie registre nada para
+ * aparecer; registrar solo sirve para el podio al cerrar. Recorre las adopciones de la más nueva a la
+ * más vieja y se detiene al llegar a una anterior a la semana.
+ */
+export async function leerEnVivo(abreMs: number, max = 150): Promise<RegistroEnVivo[]> {
+  const total = Number(await publicClient.readContract({ address: PETS_ADDRESS, abi: polkaPetsAbi, functionName: "totalMascotas" } as never));
+  const salida: RegistroEnVivo[] = [];
+  const LOTE = 25;
+  let hasta = total; // ids hasta..(hasta-LOTE+1)
+  while (hasta > 0 && total - hasta < max) {
+    const desde = Math.max(1, hasta - LOTE + 1);
+    const ids = Array.from({ length: hasta - desde + 1 }, (_, i) => BigInt(desde + i));
+    const [mascotas, filas] = await Promise.all([
+      Promise.all(ids.map((id) => verMascota(id))),
+      publicClient.readContract({ address: PETS_ADDRESS, abi: polkaPetsAbi, functionName: "ranking", args: [BigInt(desde - 1), BigInt(ids.length)] } as never).then(decodeRanking),
+    ]);
+    let hayAnteriores = false;
+    mascotas.forEach((m, i) => {
+      if (m.nacimiento * 1000 < abreMs) { hayAnteriores = true; return; }
+      if (m.modo !== 1) return;
+      salida.push({ tokenId: m.tokenId, dueno: filas[i]?.dueno ?? "0x", nombre: m.nombre, especie: m.especie, horas: m.horas, duracion: m.duracion, viva: m.viva });
+    });
+    if (hayAnteriores) break;
+    hasta = desde - 1;
+  }
+  return salida;
 }
 
 /** Campeones: podio guardado de cada semana cerrada, de la más reciente a la más vieja. */

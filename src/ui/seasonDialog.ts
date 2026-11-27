@@ -5,7 +5,8 @@ import { createDialog, h } from './dom.ts';
 import { pixelIcon } from './pixelArt.ts';
 import { formatDuration } from './format.ts';
 
-export interface SeasonRow { id: string; name: string; petId: number; hours: number; aliveMs: number; mine: boolean }
+/** `alive` solo viene en la vista en vivo: true = sigue viva (su tiempo corre), false = ya murió. */
+export interface SeasonRow { id: string; name: string; petId: number; hours: number; aliveMs: number; mine: boolean; alive?: boolean }
 
 export interface SeasonData {
   week: number;
@@ -13,8 +14,10 @@ export interface SeasonData {
   paused: boolean;
   opensAt: number;
   closesAt: number;
-  /** Registros de la semana en curso. */
+  /** Registros de la semana en curso (las que ya murieron y guardaron su tiempo). */
   rows: readonly SeasonRow[];
+  /** Todas las mascotas de Competencia de la semana, vivas o muertas, leídas de la cadena. */
+  live?: readonly SeasonRow[];
   /** Podio de las semanas cerradas, de la más reciente a la más vieja. */
   champions: ReadonlyArray<{ week: number; podium: readonly SeasonRow[] }>;
   /** Semanas que terminaron y nadie cerró: se puede guardar su podio. */
@@ -47,6 +50,10 @@ export function createSeasonDialog(source: SeasonSource) {
   let hours = 7;
   let request = 0;
   let timer = 0;
+  let loadedAt = 0;
+  let ticks = 0;
+  /** Tiempo de la fila ahora mismo: si sigue viva, sigue sumando desde la última lectura. */
+  const timeOf = (r: SeasonRow) => r.aliveMs + (r.alive ? Math.max(0, Date.now() - loadedAt) : 0);
 
   const tabButtons = DIFFICULTY_TABS.map((t) => {
     const b = h('button', { type: 'button', role: 'tab', title: `Dificultad de ${t.label}` }, t.label);
@@ -59,8 +66,9 @@ export function createSeasonDialog(source: SeasonSource) {
     h('li', { class: r.mine ? 'mine' : '', 'aria-current': r.mine ? 'true' : undefined },
       h('span', { class: 'rank' }, MEDAL[index] ?? `${index + 1}`),
       h('b', {}, r.name, r.mine ? h('small', {}, ' (tú)') : null),
-      h('span', { class: 'species' }, findPet(r.petId)?.label ?? ''),
-      h('span', { class: 'time' }, formatDuration(r.aliveMs)));
+      h('span', { class: 'species' }, findPet(r.petId)?.label ?? '',
+        r.alive === undefined ? null : h('small', { class: r.alive ? 'live-on' : 'live-off' }, r.alive ? ' 🟢 viva' : ' 💀 murió')),
+      h('span', { class: 'time' }, formatDuration(timeOf(r))));
 
   function drawBanner() {
     if (!data) return;
@@ -72,14 +80,15 @@ export function createSeasonDialog(source: SeasonSource) {
     banner.replaceChildren(
       pixelIcon('📅', 'inv-icon'),
       h('span', {}, h('b', {}, `Temporada ${data.week + 1} · ${state}`), h('small', {}, when),
-        h('small', {}, 'Adopta en modo Competencia esta semana; cuando muera, registra su tiempo. Cada lunes el ranking vuelve a cero.')));
+        h('small', {}, 'En vivo: las mascotas vivas suman tiempo y las que mueren se quedan con su marca. Cuando la tuya muera, registra su tiempo para el podio. Cada lunes el ranking vuelve a cero.')));
   }
 
   function drawList() {
     for (const t of tabButtons) t.b.setAttribute('aria-selected', String(t.hours === hours));
     if (!data) return;
-    const rows = data.rows.filter((r) => r.hours === hours).sort((a, b) => b.aliveMs - a.aliveMs).slice(0, 10);
-    status.textContent = rows.length ? '' : 'Todavía nadie se ha registrado en esta dificultad esta semana.';
+    const source = data.live && data.live.length > 0 ? data.live : data.rows;
+    const rows = source.filter((r) => r.hours === hours).sort((a, b) => timeOf(b) - timeOf(a)).slice(0, 10);
+    status.textContent = rows.length ? '' : 'Todavía nadie compite en esta dificultad esta semana.';
     list.replaceChildren(...rows.map(row));
   }
 
@@ -106,19 +115,23 @@ export function createSeasonDialog(source: SeasonSource) {
           })))));
   }
 
-  async function load() {
+  /** `silent`: refresco en vivo, sin borrar la lista ni mostrar "Cargando…". */
+  async function load(silent = false) {
     const id = ++request;
-    status.textContent = 'Cargando…';
-    list.replaceChildren();
+    if (!silent) {
+      status.textContent = 'Cargando…';
+      list.replaceChildren();
+    }
     try {
       const d = await source.load();
       if (id !== request) return;
       data = d;
+      loadedAt = Date.now();
       drawBanner();
       drawList();
       drawHall();
     } catch {
-      if (id === request) status.textContent = 'No se pudo cargar la competencia. Intenta de nuevo.';
+      if (id === request && !silent) status.textContent = 'No se pudo cargar la competencia. Intenta de nuevo.';
     }
   }
 
@@ -130,7 +143,13 @@ export function createSeasonDialog(source: SeasonSource) {
       dialog.showModal();
       void load();
       window.clearInterval(timer);
-      timer = window.setInterval(drawBanner, 1000);
+      ticks = 0;
+      // Cada segundo corre el tiempo de las vivas; cada 8 s se vuelve a leer la cadena (muertes y nuevas adopciones).
+      timer = window.setInterval(() => {
+        drawBanner();
+        drawList();
+        if (++ticks % 8 === 0) void load(true);
+      }, 1000);
     },
   };
 }
